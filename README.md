@@ -92,3 +92,7 @@ Las nueve aplicaciones validan su configuración técnica mediante `shared-confi
 ## Paso 8: base de persistencia
 
 Los ocho servicios propietarios de datos cuentan con configuración TypeORM para SQL Server o Azure SQL. La persistencia permanece deshabilitada hasta disponer de credenciales reales.
+
+## Paso 9: frontend responsive
+
+Existe una aplicación Next.js llamada `web` y una librería `shared-ui` con temas, escalas de accesibilidad y componentes base.

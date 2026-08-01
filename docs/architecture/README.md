@@ -51,3 +51,7 @@
 
 - [Variables de entorno](environment-configuration.md)
 - [Base técnica del Gateway](gateway-foundation.md)
+
+## Frontend
+
+- [Base frontend responsive y estándar visual](frontend-visual-foundation.md)

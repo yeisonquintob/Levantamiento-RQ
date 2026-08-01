@@ -10,6 +10,7 @@ const backendScopes = [
   "scope:erp-knowledge",
   "scope:workflow",
   "scope:operations",
+  "scope:web",
 ];
 
 const scopeConstraints = backendScopes.map((scope) => ({

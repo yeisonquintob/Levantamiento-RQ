@@ -10,3 +10,5 @@ allowBuilds:
   "@parcel/watcher": true
   less: true
   "@nestjs/core": false
+  sharp: true
+  core-js: true

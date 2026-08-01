@@ -45,3 +45,7 @@ se configure la base técnica del Gateway y de cada servicio.
 ## Persistencia técnica
 
 El Paso 8 incorpora `@levantamiento-rq/shared-persistence` como librería técnica sin entidades ni repositorios compartidos. Su etiqueta Nx es `scope:shared,type:data-access`.
+
+## Interfaz compartida
+
+`@levantamiento-rq/shared-ui` concentra tokens semánticos y componentes React reutilizables. Sus etiquetas Nx son `scope:shared,type:util`.
