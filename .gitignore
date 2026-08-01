@@ -64,3 +64,7 @@ logs/
 # Levantamiento RQ - infraestructura local
 infrastructure/docker/.env
 !infrastructure/docker/.env.example
+
+# Next.js
+.next
+out
