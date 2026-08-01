@@ -19,18 +19,18 @@
 
 ## Componentes
 
-| Componente | Responsabilidad |
-|---|---|
-| Web | Interfaz responsive y experiencia PWA |
-| Gateway | Entrada, seguridad, agregación y enrutamiento |
-| Identity | Usuarios, organizaciones, roles y permisos |
-| Projects | Proyectos, participantes y acceso |
-| Sources | Archivos, conversaciones, notas y extracción |
-| Documents | Plantillas, editor, requerimientos y versiones |
-| AI Analysis | Análisis, evidencias, contradicciones y propuestas |
-| ERP Knowledge | Conocimiento ERP y análisis fit-gap |
-| Workflow | Revisión, correcciones, aprobación y rechazo |
-| Operations | PDF, exportaciones y notificaciones |
+| Componente    | Responsabilidad                                    |
+| ------------- | -------------------------------------------------- |
+| Web           | Interfaz responsive y experiencia PWA              |
+| Gateway       | Entrada, seguridad, agregación y enrutamiento      |
+| Identity      | Usuarios, organizaciones, roles y permisos         |
+| Projects      | Proyectos, participantes y acceso                  |
+| Sources       | Archivos, conversaciones, notas y extracción       |
+| Documents     | Plantillas, editor, requerimientos y versiones     |
+| AI Analysis   | Análisis, evidencias, contradicciones y propuestas |
+| ERP Knowledge | Conocimiento ERP y análisis fit-gap                |
+| Workflow      | Revisión, correcciones, aprobación y rechazo       |
+| Operations    | PDF, exportaciones y notificaciones                |
 
 ## Documentos relacionados
 
@@ -43,3 +43,4 @@
 - [Conocimiento ERP y fit-gap](erp-knowledge-fit-gap.md)
 - [Límites Nx](nx-boundaries.md)
 - [Catálogo técnico](service-catalog.yaml)
+- [Aplicaciones backend](backend-applications.md)

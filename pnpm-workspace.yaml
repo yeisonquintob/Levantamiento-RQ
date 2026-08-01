@@ -3,3 +3,9 @@ packages:
   - "libs/*"
 allowBuilds:
   nx: true
+  "@swc/core": true
+  esbuild: true
+  unrs-resolver: true
+  "@parcel/watcher": true
+  less: true
+  "@nestjs/core": false

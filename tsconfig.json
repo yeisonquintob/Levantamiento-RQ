@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/gateway"
+    },
+    {
+      "path": "./apps/identity-service"
+    },
+    {
+      "path": "./apps/projects-service"
+    },
+    {
+      "path": "./apps/sources-service"
+    },
+    {
+      "path": "./apps/documents-service"
+    },
+    {
+      "path": "./apps/ai-analysis-service"
+    },
+    {
+      "path": "./apps/erp-knowledge-service"
+    },
+    {
+      "path": "./apps/workflow-service"
+    },
+    {
+      "path": "./apps/operations-service"
+    }
+  ]
+}

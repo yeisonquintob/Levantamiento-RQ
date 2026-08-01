@@ -69,3 +69,11 @@ instancia remota durante el desarrollo.
 
 Todavía no se han creado aplicaciones, microservicios, bases de datos
 ni migraciones.
+
+## Estado de implementación
+
+Paso 5: aplicaciones backend NestJS creadas con Fastify.
+
+Existen nueve esqueletos técnicos compilables. Todavía no se han
+implementado lógica empresarial, persistencia, mensajería, seguridad,
+inteligencia artificial ni frontend.
