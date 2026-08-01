@@ -18,3 +18,5 @@
 | 0014 | Librerías técnicas compartidas y límites Nx          |
 
 - [ADR-0015: Variables de entorno y base técnica del Gateway](0015-environment-and-gateway-foundation.md)
+
+- [ADR-0016: Base de persistencia TypeORM para SQL Server](0016-typeorm-sql-server-persistence-foundation.md)

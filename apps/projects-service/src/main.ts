@@ -10,8 +10,6 @@ import {
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
 
-import { AppModule } from "./app/app.module";
-
 loadEnvironmentFiles({
   paths: [".env", "apps/projects-service/.env"],
 });
@@ -21,6 +19,8 @@ async function bootstrap(): Promise<void> {
     serviceName: "projects-service",
     defaultPort: 3002,
   });
+
+  const { AppModule } = await import("./app/app.module.js");
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,

@@ -15,12 +15,11 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": [
-    "eslint.config.js",
-    "eslint.config.cjs",
-    "eslint.config.mjs"
-  ],
+  "exclude": ["eslint.config.js", "eslint.config.cjs", "eslint.config.mjs"],
   "references": [
+    {
+      "path": "../../libs/shared/persistence/tsconfig.lib.json"
+    },
     {
       "path": "../../libs/shared/config/tsconfig.lib.json"
     }

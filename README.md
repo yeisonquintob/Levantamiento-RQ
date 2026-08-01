@@ -88,3 +88,7 @@ Los límites entre scopes y tipos se validan mediante ESLint y etiquetas Nx.
 ## Paso 7: variables de entorno y Gateway
 
 Las nueve aplicaciones validan su configuración técnica mediante `shared-config`. El Gateway registra correlación HTTP, Problem Details, health check tipado y registro estructurado de inicio.
+
+## Paso 8: base de persistencia
+
+Los ocho servicios propietarios de datos cuentan con configuración TypeORM para SQL Server o Azure SQL. La persistencia permanece deshabilitada hasta disponer de credenciales reales.

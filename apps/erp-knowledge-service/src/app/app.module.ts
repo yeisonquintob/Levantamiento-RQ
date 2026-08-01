@@ -1,9 +1,17 @@
 import { Module } from "@nestjs/common";
+
+import { PersistenceModule } from "@levantamiento-rq/shared-persistence";
+
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
 @Module({
-  imports: [],
+  imports: [
+    PersistenceModule.register({
+      serviceName: "erp-knowledge-service",
+      defaultDatabaseName: "RqErpKnowledgeDb",
+    }),
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

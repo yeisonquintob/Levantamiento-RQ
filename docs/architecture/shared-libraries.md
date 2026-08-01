@@ -41,3 +41,7 @@ por varios servicios sin compartir entidades ni reglas de negocio.
 Base técnica creada en el Paso 6. Las aplicaciones todavía no registran
 globalmente los interceptores o filtros; esa integración se realizará cuando
 se configure la base técnica del Gateway y de cada servicio.
+
+## Persistencia técnica
+
+El Paso 8 incorpora `@levantamiento-rq/shared-persistence` como librería técnica sin entidades ni repositorios compartidos. Su etiqueta Nx es `scope:shared,type:data-access`.

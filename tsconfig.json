@@ -47,6 +47,9 @@
     },
     {
       "path": "./libs/shared/testing"
+    },
+    {
+      "path": "./libs/shared/persistence"
     }
   ]
 }
