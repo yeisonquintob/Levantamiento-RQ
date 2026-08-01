@@ -8,7 +8,8 @@
     "graph": "nx graph",
     "lint:backend": "nx run-many --target=lint --projects=gateway,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service --parallel=3",
     "lint:shared": "nx run-many --target=lint --projects=shared-config,shared-contracts,shared-errors,shared-http,shared-observability,shared-testing --parallel=3",
-    "serve:gateway": "nx serve gateway"
+    "serve:gateway": "nx serve gateway",
+    "validate:gateway": "nx run gateway:lint && nx run gateway:build"
   },
   "private": true,
   "devDependencies": {

@@ -5,27 +5,48 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 
+import { loadEnvironmentFiles } from "@levantamiento-rq/shared-config";
+import {
+  ApplicationExceptionFilter,
+  CorrelationIdInterceptor,
+} from "@levantamiento-rq/shared-http";
+import { createStructuredLogEntry } from "@levantamiento-rq/shared-observability";
+
 import { AppModule } from "./app/app.module";
+import { loadGatewayConfig } from "./config/gateway-config";
+
+loadEnvironmentFiles({
+  paths: [".env", "apps/gateway/.env"],
+});
 
 async function bootstrap(): Promise<void> {
+  const config = loadGatewayConfig();
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
 
-  const globalPrefix = "api/v1";
-  const host = process.env.HOST ?? "127.0.0.1";
-  const port = Number(process.env.PORT ?? 3000);
-
-  app.setGlobalPrefix(globalPrefix);
+  app.setGlobalPrefix(config.globalPrefix);
+  app.useGlobalInterceptors(new CorrelationIdInterceptor());
+  app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
 
-  await app.listen(port, host);
+  await app.listen(config.port, config.host);
 
-  Logger.log(
-    `Gateway / BFF disponible en http://${host}:${port}/${globalPrefix}`,
-    "Bootstrap",
-  );
+  const entry = createStructuredLogEntry("info", "Gateway iniciado", {
+    service: config.serviceName,
+    operation: "bootstrap",
+    metadata: {
+      environment: config.environment,
+      host: config.host,
+      port: config.port,
+      globalPrefix: config.globalPrefix,
+      version: config.version,
+    },
+  });
+
+  Logger.log(JSON.stringify(entry), "Bootstrap");
 }
 
 void bootstrap().catch((error: unknown) => {

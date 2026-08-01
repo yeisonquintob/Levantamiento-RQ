@@ -46,3 +46,8 @@
 - [Aplicaciones backend](backend-applications.md)
 
 - [Librerías compartidas y contratos](shared-libraries.md)
+
+## Configuración técnica
+
+- [Variables de entorno](environment-configuration.md)
+- [Base técnica del Gateway](gateway-foundation.md)

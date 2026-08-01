@@ -16,3 +16,5 @@
 | 0012 | Azurite para almacenamiento local                    |
 | 0013 | Base backend con NestJS y Fastify                    |
 | 0014 | Librerías técnicas compartidas y límites Nx          |
+
+- [ADR-0015: Variables de entorno y base técnica del Gateway](0015-environment-and-gateway-foundation.md)

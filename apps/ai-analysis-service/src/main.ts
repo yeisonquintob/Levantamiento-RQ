@@ -5,25 +5,37 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 
+import {
+  loadBaseServiceConfig,
+  loadEnvironmentFiles,
+} from "@levantamiento-rq/shared-config";
+
 import { AppModule } from "./app/app.module";
 
+loadEnvironmentFiles({
+  paths: [".env", "apps/ai-analysis-service/.env"],
+});
+
 async function bootstrap(): Promise<void> {
+  const config = loadBaseServiceConfig({
+    serviceName: "ai-analysis-service",
+    defaultPort: 3005,
+  });
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
 
   const globalPrefix = "api/v1";
-  const host = process.env.HOST ?? "127.0.0.1";
-  const port = Number(process.env.PORT ?? 3005);
 
   app.setGlobalPrefix(globalPrefix);
   app.enableShutdownHooks();
 
-  await app.listen(port, host);
+  await app.listen(config.port, config.host);
 
   Logger.log(
-    `AI Analysis Service disponible en http://${host}:${port}/${globalPrefix}`,
+    `AI Analysis Service disponible en http://${config.host}:${config.port}/${globalPrefix} (${config.environment})`,
     "Bootstrap",
   );
 }

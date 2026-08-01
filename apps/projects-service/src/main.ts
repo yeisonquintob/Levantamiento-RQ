@@ -5,25 +5,37 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 
+import {
+  loadBaseServiceConfig,
+  loadEnvironmentFiles,
+} from "@levantamiento-rq/shared-config";
+
 import { AppModule } from "./app/app.module";
 
+loadEnvironmentFiles({
+  paths: [".env", "apps/projects-service/.env"],
+});
+
 async function bootstrap(): Promise<void> {
+  const config = loadBaseServiceConfig({
+    serviceName: "projects-service",
+    defaultPort: 3002,
+  });
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
 
   const globalPrefix = "api/v1";
-  const host = process.env.HOST ?? "127.0.0.1";
-  const port = Number(process.env.PORT ?? 3002);
 
   app.setGlobalPrefix(globalPrefix);
   app.enableShutdownHooks();
 
-  await app.listen(port, host);
+  await app.listen(config.port, config.host);
 
   Logger.log(
-    `Projects Service disponible en http://${host}:${port}/${globalPrefix}`,
+    `Projects Service disponible en http://${config.host}:${config.port}/${globalPrefix} (${config.environment})`,
     "Bootstrap",
   );
 }

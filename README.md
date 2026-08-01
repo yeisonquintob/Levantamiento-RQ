@@ -84,3 +84,7 @@ El Paso 6 incorporó contratos técnicos, configuración, errores, soporte HTTP,
 observabilidad y utilidades de pruebas bajo `libs/shared`.
 
 Los límites entre scopes y tipos se validan mediante ESLint y etiquetas Nx.
+
+## Paso 7: variables de entorno y Gateway
+
+Las nueve aplicaciones validan su configuración técnica mediante `shared-config`. El Gateway registra correlación HTTP, Problem Details, health check tipado y registro estructurado de inicio.

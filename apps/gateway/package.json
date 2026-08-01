@@ -3,9 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@levantamiento-rq/shared-config": "workspace:*",
+    "@levantamiento-rq/shared-contracts": "workspace:*",
+    "@levantamiento-rq/shared-http": "workspace:*",
+    "@levantamiento-rq/shared-observability": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-fastify": "11.1.28",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "tslib": "^2.3.0"

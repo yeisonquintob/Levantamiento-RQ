@@ -101,15 +101,18 @@ importers:
 
   apps/ai-analysis-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -126,15 +129,18 @@ importers:
 
   apps/documents-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -151,15 +157,18 @@ importers:
 
   apps/erp-knowledge-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -176,15 +185,27 @@ importers:
 
   apps/gateway:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
+      "@levantamiento-rq/shared-contracts":
+        specifier: workspace:*
+        version: link:../../libs/shared/contracts
+      "@levantamiento-rq/shared-http":
+        specifier: workspace:*
+        version: link:../../libs/shared/http
+      "@levantamiento-rq/shared-observability":
+        specifier: workspace:*
+        version: link:../../libs/shared/observability
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -201,15 +222,18 @@ importers:
 
   apps/identity-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -226,15 +250,18 @@ importers:
 
   apps/operations-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -251,15 +278,18 @@ importers:
 
   apps/projects-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -276,15 +306,18 @@ importers:
 
   apps/sources-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -301,15 +334,18 @@ importers:
 
   apps/workflow-service:
     dependencies:
+      "@levantamiento-rq/shared-config":
+        specifier: workspace:*
+        version: link:../../libs/shared/config
       "@nestjs/common":
         specifier: ^11.0.0
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
       "@nestjs/core":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      "@nestjs/platform-express":
-        specifier: ^11.0.0
-        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(supports-color@8.1.1)
+      "@nestjs/platform-fastify":
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
@@ -10286,6 +10322,7 @@ snapshots:
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   "@nestjs/platform-fastify@11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@7.2.0))(@nestjs/core@11.1.28)":
     dependencies:
@@ -10293,6 +10330,21 @@ snapshots:
       "@fastify/formbody": 8.0.2
       "@nestjs/common": 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@7.2.0)
       "@nestjs/core": 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@7.2.0))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
+      fast-querystring: 1.1.2
+      fastify: 5.10.0
+      fastify-plugin: 6.0.0
+      find-my-way: 9.6.0
+      light-my-request: 6.6.0
+      path-to-regexp: 8.4.2
+      reusify: 1.1.0
+      tslib: 2.8.1
+
+  "@nestjs/platform-fastify@11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)":
+    dependencies:
+      "@fastify/cors": 11.2.0
+      "@fastify/formbody": 8.0.2
+      "@nestjs/common": 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
+      "@nestjs/core": 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)
       fast-querystring: 1.1.2
       fastify: 5.10.0
       fastify-plugin: 6.0.0
@@ -11265,6 +11317,7 @@ snapshots:
     dependencies:
       mime-types: 3.0.2
       negotiator: 1.0.0
+    optional: true
 
   acorn-jsx@5.3.2(acorn@8.18.0):
     dependencies:
@@ -11336,7 +11389,8 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.2
 
-  append-field@1.0.0: {}
+  append-field@1.0.0:
+    optional: true
 
   argparse@1.0.10:
     dependencies:
@@ -11566,6 +11620,7 @@ snapshots:
       type-is: 2.1.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   bonjour-service@1.4.4:
     dependencies:
@@ -11617,6 +11672,7 @@ snapshots:
   busboy@1.6.0:
     dependencies:
       streamsearch: 1.1.0
+    optional: true
 
   bytes@3.1.2: {}
 
@@ -11760,6 +11816,7 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
       typedarray: 0.0.6
+    optional: true
 
   confusing-browser-globals@1.0.11: {}
 
@@ -11769,17 +11826,20 @@ snapshots:
     dependencies:
       safe-buffer: 5.2.1
 
-  content-disposition@1.1.0: {}
+  content-disposition@1.1.0:
+    optional: true
 
   content-type@1.0.5: {}
 
-  content-type@2.0.0: {}
+  content-type@2.0.0:
+    optional: true
 
   convert-source-map@2.0.0: {}
 
   cookie-signature@1.0.7: {}
 
-  cookie-signature@1.2.2: {}
+  cookie-signature@1.2.2:
+    optional: true
 
   cookie@0.7.2: {}
 
@@ -11808,6 +11868,7 @@ snapshots:
     dependencies:
       object-assign: 4.1.1
       vary: 1.1.2
+    optional: true
 
   corser@2.0.1: {}
 
@@ -12323,6 +12384,7 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   fast-decode-uri-component@1.0.1: {}
 
@@ -12471,6 +12533,7 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   find-cache-dir@4.0.0:
     dependencies:
@@ -12553,7 +12616,8 @@ snapshots:
 
   fresh@0.5.2: {}
 
-  fresh@2.0.0: {}
+  fresh@2.0.0:
+    optional: true
 
   fs-constants@1.0.0: {}
 
@@ -12746,6 +12810,7 @@ snapshots:
   iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
+    optional: true
 
   icss-utils@5.1.0(postcss@8.5.25):
     dependencies:
@@ -12833,7 +12898,8 @@ snapshots:
     dependencies:
       isobject: 3.0.1
 
-  is-promise@4.0.0: {}
+  is-promise@4.0.0:
+    optional: true
 
   is-unicode-supported@0.1.0: {}
 
@@ -13340,7 +13406,8 @@ snapshots:
 
   media-typer@0.3.0: {}
 
-  media-typer@1.1.1: {}
+  media-typer@1.1.1:
+    optional: true
 
   memfs@3.5.3:
     dependencies:
@@ -13365,7 +13432,8 @@ snapshots:
 
   merge-descriptors@1.0.3: {}
 
-  merge-descriptors@2.0.0: {}
+  merge-descriptors@2.0.0:
+    optional: true
 
   merge-stream@2.0.0: {}
 
@@ -13439,6 +13507,7 @@ snapshots:
       busboy: 1.6.0
       concat-stream: 2.0.0
       type-is: 1.6.18
+    optional: true
 
   multicast-dns@7.2.5:
     dependencies:
@@ -13461,7 +13530,8 @@ snapshots:
 
   negotiator@0.6.4: {}
 
-  negotiator@1.0.0: {}
+  negotiator@1.0.0:
+    optional: true
 
   neo-async@2.6.2: {}
 
@@ -13618,7 +13688,8 @@ snapshots:
       "@nx/nx-win32-arm64-msvc": 23.1.1
       "@nx/nx-win32-x64-msvc": 23.1.1
 
-  object-assign@4.1.1: {}
+  object-assign@4.1.1:
+    optional: true
 
   object-inspect@1.13.4: {}
 
@@ -14065,6 +14136,7 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.3
       unpipe: 1.0.0
+    optional: true
 
   react-is@18.3.1: {}
 
@@ -14185,6 +14257,7 @@ snapshots:
       path-to-regexp: 8.4.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   run-applescript@7.0.0: {}
 
@@ -14401,6 +14474,7 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   serialize-javascript@7.0.7: {}
 
@@ -14443,6 +14517,7 @@ snapshots:
       send: 1.2.1(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   set-cookie-parser@2.7.2: {}
 
@@ -14568,7 +14643,8 @@ snapshots:
 
   statuses@2.0.2: {}
 
-  streamsearch@1.1.0: {}
+  streamsearch@1.1.0:
+    optional: true
 
   string-length@4.0.2:
     dependencies:
@@ -14785,10 +14861,12 @@ snapshots:
       content-type: 2.0.0
       media-typer: 1.1.1
       mime-types: 3.0.2
+    optional: true
 
   typed-assert@1.0.9: {}
 
-  typedarray@0.0.6: {}
+  typedarray@0.0.6:
+    optional: true
 
   typescript-eslint@8.65.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3):
     dependencies:
