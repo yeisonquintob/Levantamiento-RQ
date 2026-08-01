@@ -1,0 +1,9 @@
+{
+  "name": "shared-testing",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/testing/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:testing"],
+  "// targets": "to see all targets run: nx show project shared-testing --web",
+  "targets": {}
+}

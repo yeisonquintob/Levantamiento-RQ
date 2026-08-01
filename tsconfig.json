@@ -29,6 +29,24 @@
     },
     {
       "path": "./apps/operations-service"
+    },
+    {
+      "path": "./libs/shared/config"
+    },
+    {
+      "path": "./libs/shared/contracts"
+    },
+    {
+      "path": "./libs/shared/errors"
+    },
+    {
+      "path": "./libs/shared/http"
+    },
+    {
+      "path": "./libs/shared/observability"
+    },
+    {
+      "path": "./libs/shared/testing"
     }
   ]
 }

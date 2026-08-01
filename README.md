@@ -77,3 +77,10 @@ Paso 5: aplicaciones backend NestJS creadas con Fastify.
 Existen nueve esqueletos técnicos compilables. Todavía no se han
 implementado lógica empresarial, persistencia, mensajería, seguridad,
 inteligencia artificial ni frontend.
+
+## Librerías compartidas
+
+El Paso 6 incorporó contratos técnicos, configuración, errores, soporte HTTP,
+observabilidad y utilidades de pruebas bajo `libs/shared`.
+
+Los límites entre scopes y tipos se validan mediante ESLint y etiquetas Nx.

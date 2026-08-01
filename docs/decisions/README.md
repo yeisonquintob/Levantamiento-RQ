@@ -15,3 +15,4 @@
 | 0011 | Infraestructura local compatible con ARM64           |
 | 0012 | Azurite para almacenamiento local                    |
 | 0013 | Base backend con NestJS y Fastify                    |
+| 0014 | Librerías técnicas compartidas y límites Nx          |

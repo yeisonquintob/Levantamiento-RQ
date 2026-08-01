@@ -71,6 +71,9 @@ importers:
       eslint-config-prettier:
         specifier: ^10.0.0
         version: 10.1.8(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
+      jsonc-eslint-parser:
+        specifier: ^2.1.0
+        version: 2.4.2
       nx:
         specifier: 23.1.1
         version: 23.1.1
@@ -320,6 +323,60 @@ importers:
       "@nestjs/testing":
         specifier: ^11.0.0
         version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/core@11.1.28)(@nestjs/platform-express@11.1.28)
+
+  libs/shared/config:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/shared/contracts:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/shared/errors:
+    dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/shared/http:
+    dependencies:
+      "@levantamiento-rq/shared-contracts":
+        specifier: workspace:*
+        version: link:../contracts
+      "@levantamiento-rq/shared-errors":
+        specifier: workspace:*
+        version: link:../errors
+      "@nestjs/common":
+        specifier: ^11.0.0
+        version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
+      rxjs:
+        specifier: ^7.8.0
+        version: 7.8.1
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/shared/observability:
+    dependencies:
+      "@levantamiento-rq/shared-contracts":
+        specifier: workspace:*
+        version: link:../contracts
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/shared/testing:
+    dependencies:
+      "@levantamiento-rq/shared-contracts":
+        specifier: workspace:*
+        version: link:../contracts
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
 
 packages:
   "@angular-devkit/core@19.2.24":

@@ -3,10 +3,12 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "build:backend": "nx run-many -t build --projects=gateway,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service --parallel=3",
-    "lint:backend": "nx run-many -t lint --projects=gateway,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service --parallel=3",
-    "serve:gateway": "nx serve gateway",
-    "graph": "nx graph"
+    "build:backend": "nx run-many --target=build --projects=gateway,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service --parallel=3",
+    "build:shared": "nx run-many --target=build --projects=shared-config,shared-contracts,shared-errors,shared-http,shared-observability,shared-testing --parallel=3",
+    "graph": "nx graph",
+    "lint:backend": "nx run-many --target=lint --projects=gateway,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service --parallel=3",
+    "lint:shared": "nx run-many --target=lint --projects=shared-config,shared-contracts,shared-errors,shared-http,shared-observability,shared-testing --parallel=3",
+    "serve:gateway": "nx serve gateway"
   },
   "private": true,
   "devDependencies": {
@@ -25,6 +27,7 @@
     "@types/node": "^22.0.0",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
+    "jsonc-eslint-parser": "^2.1.0",
     "nx": "23.1.1",
     "prettier": "^3.9.6",
     "tslib": "^2.3.0",

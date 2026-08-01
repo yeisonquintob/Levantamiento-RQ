@@ -44,3 +44,5 @@
 - [Límites Nx](nx-boundaries.md)
 - [Catálogo técnico](service-catalog.yaml)
 - [Aplicaciones backend](backend-applications.md)
+
+- [Librerías compartidas y contratos](shared-libraries.md)
