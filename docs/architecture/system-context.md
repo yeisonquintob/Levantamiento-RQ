@@ -27,7 +27,7 @@ flowchart LR
     G --> F[Workflow Service]
     G --> O[Operations Service]
 
-    S --> B[(MinIO / Blob Storage)]
+    S --> B[(Azurite / Azure Blob Storage)]
     A --> AI[Proveedor de IA]
     A --> E
 

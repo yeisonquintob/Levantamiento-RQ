@@ -16,7 +16,7 @@ del proyecto, estado del recurso y propiedad de la operación.
 ## Secretos
 
 No se almacenarán en Git claves de OpenAI, contraseñas SQL, tokens,
-certificados privados ni credenciales de Redis, RabbitMQ, MinIO o
+certificados privados ni credenciales de Redis, RabbitMQ, Azure Storage o
 Dynamics.
 
 ## Auditoría

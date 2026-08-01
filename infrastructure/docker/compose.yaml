@@ -1,0 +1,100 @@
+name: ${COMPOSE_PROJECT_NAME:-levantamiento-rq}
+
+services:
+  redis:
+    image: redis:8.2.8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:${RQ_REDIS_PORT:-6381}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - rq-backend
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep -q PONG'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4.3.4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "127.0.0.1:${RQ_RABBITMQ_AMQP_PORT:-5673}:5672"
+      - "127.0.0.1:${RQ_RABBITMQ_MANAGEMENT_PORT:-15673}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - rq-backend
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.36.0
+    restart: unless-stopped
+    command:
+      - azurite
+      - --blobHost
+      - 0.0.0.0
+      - --queueHost
+      - 0.0.0.0
+      - --tableHost
+      - 0.0.0.0
+      - --location
+      - /data
+      - --debug
+      - /data/debug.log
+      - --disableTelemetry
+    ports:
+      - "127.0.0.1:${RQ_AZURITE_BLOB_PORT:-10000}:10000"
+      - "127.0.0.1:${RQ_AZURITE_QUEUE_PORT:-10001}:10001"
+      - "127.0.0.1:${RQ_AZURITE_TABLE_PORT:-10002}:10002"
+    volumes:
+      - azurite-data:/data
+    networks:
+      - rq-backend
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const net=require('net');
+          const socket=net.connect(10000,'127.0.0.1');
+          socket.on('connect',()=>{socket.end();process.exit(0);});
+          socket.on('error',()=>process.exit(1));
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+networks:
+  rq-backend:
+    driver: bridge
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  azurite-data:

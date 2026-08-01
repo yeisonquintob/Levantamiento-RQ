@@ -44,7 +44,7 @@ conexión directa a producción.
 - Passport, JWT y cookies seguras.
 - BullMQ y Redis.
 - RabbitMQ / Azure Service Bus.
-- MinIO / Azure Blob Storage.
+- Azurite / Azure Blob Storage.
 - OpenAI API.
 - Nx y pnpm.
 - Docker Compose.
@@ -52,6 +52,7 @@ conexión directa a producción.
 ## Documentación
 
 - [Arquitectura](docs/architecture/README.md)
+- [Infraestructura local](infrastructure/docker/README.md)
 - [Contratos HTTP](docs/api/http-contract-guidelines.md)
 - [Catálogo de eventos](docs/api/event-catalog.md)
 - [Propiedad de datos](docs/database/database-ownership.md)
@@ -60,10 +61,11 @@ conexión directa a producción.
 
 ## Estado
 
-Paso 3.1: estructura documental y plantilla canónica definidas.
+Paso 4: infraestructura local preparada.
 
-La plataforma utilizará la plantilla compacta 1.0.0 con trece secciones,
-contrato JSON, validaciones, versionamiento y reglas de exportación.
+Docker Compose incluye Redis, RabbitMQ y Azurite con imágenes ARM64 y
+versiones fijadas. SQL Server o Azure SQL se utilizará mediante una
+instancia remota durante el desarrollo.
 
-Todavía no se han creado aplicaciones, microservicios, bases de datos,
-migraciones ni contenedores.
+Todavía no se han creado aplicaciones, microservicios, bases de datos
+ni migraciones.

@@ -60,3 +60,7 @@ dist/
 tmp/
 logs/
 .nx/cache/
+
+# Levantamiento RQ - infraestructura local
+infrastructure/docker/.env
+!infrastructure/docker/.env.example

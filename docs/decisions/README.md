@@ -12,3 +12,5 @@
 | 0008 | Definir estructura documental antes de implementarla |
 | 0009 | Documento canónico de levantamiento |
 | 0010 | Plantillas documentales versionadas |
+| 0011 | Infraestructura local compatible con ARM64 |
+| 0012 | Azurite para almacenamiento local |
