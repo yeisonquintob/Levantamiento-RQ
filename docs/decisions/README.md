@@ -10,3 +10,5 @@
 | 0006 | Conocimiento ERP para análisis fit-gap |
 | 0007 | Sin acceso directo de IA a Dynamics productivo |
 | 0008 | Definir estructura documental antes de implementarla |
+| 0009 | Documento canónico de levantamiento |
+| 0010 | Plantillas documentales versionadas |

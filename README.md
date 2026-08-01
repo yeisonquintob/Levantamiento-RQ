@@ -55,15 +55,15 @@ conexión directa a producción.
 - [Contratos HTTP](docs/api/http-contract-guidelines.md)
 - [Catálogo de eventos](docs/api/event-catalog.md)
 - [Propiedad de datos](docs/database/database-ownership.md)
-- [Plan del modelo documental](docs/document-model/README.md)
+- [Modelo documental canónico](docs/document-model/README.md)
 - [Decisiones arquitectónicas](docs/decisions/README.md)
 
 ## Estado
 
-Paso 3: arquitectura definida y documentada.
+Paso 3.1: estructura documental y plantilla canónica definidas.
 
-La estructura detallada de los documentos se definirá en el Paso 3.1,
-antes de implementar bases de datos, APIs o el Documents Service.
+La plataforma utilizará la plantilla compacta 1.0.0 con trece secciones,
+contrato JSON, validaciones, versionamiento y reglas de exportación.
 
-Todavía no se han creado aplicaciones, microservicios, bases de datos
-ni contenedores.
+Todavía no se han creado aplicaciones, microservicios, bases de datos,
+migraciones ni contenedores.

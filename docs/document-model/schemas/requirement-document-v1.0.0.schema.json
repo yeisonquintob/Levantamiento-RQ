@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.levantamiento-rq.local/requirement-document-v1.0.0.schema.json",
+  "title": "Levantamiento de requerimientos 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "templateVersion",
+    "sectionOrder",
+    "header",
+    "objectives",
+    "problemDescription",
+    "scope",
+    "processFlow",
+    "milestones",
+    "nonFunctionalRequirements",
+    "tests",
+    "assumptionsDependenciesPending",
+    "approvalsAndChangeControl",
+    "writingRules",
+    "visualFormat",
+    "automationInstruction"
+  ],
+  "properties": {
+    "templateVersion": {
+      "const": "1.0.0"
+    },
+    "sectionOrder": {
+      "const": [
+        "header",
+        "objectives",
+        "problemDescription",
+        "scope",
+        "processFlow",
+        "milestones",
+        "nonFunctionalRequirements",
+        "tests",
+        "assumptionsDependenciesPending",
+        "approvalsAndChangeControl",
+        "writingRules",
+        "visualFormat",
+        "automationInstruction"
+      ]
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "projectCode",
+        "documentVersion",
+        "createdDate",
+        "requestingArea",
+        "preparedBy",
+        "reviewedBy",
+        "approvedBy",
+        "status"
+      ],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "projectCode": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "documentVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "createdDate": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "requestingArea": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "preparedBy": { "$ref": "#/$defs/personRole" },
+        "reviewedBy": { "$ref": "#/$defs/personRole" },
+        "approvedBy": { "$ref": "#/$defs/personRole" },
+        "status": { "enum": ["BORRADOR", "EN VALIDACIÓN", "APROBADO"] }
+      }
+    },
+    "objectives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["general", "specific"],
+      "properties": {
+        "general": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "specific": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "problemDescription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentState", "operationalImpact"],
+      "properties": {
+        "currentState": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "operationalImpact": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["included", "excluded", "involvedSystems"],
+      "properties": {
+        "included": { "$ref": "#/$defs/stringList" },
+        "excluded": { "$ref": "#/$defs/stringList" },
+        "involvedSystems": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "processFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["notation", "content", "actors", "inputs", "outputs", "systems"],
+      "properties": {
+        "notation": { "enum": ["MERMAID", "BPMN_SIMPLIFIED", "IMAGE", "PENDING"] },
+        "content": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "actors": { "$ref": "#/$defs/stringList" },
+        "inputs": { "$ref": "#/$defs/stringList" },
+        "outputs": { "$ref": "#/$defs/stringList" },
+        "systems": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "milestones": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/milestone" }
+    },
+    "nonFunctionalRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["security", "traceability", "performance", "compatibility", "availability", "usability"],
+      "properties": {
+        "security": { "$ref": "#/$defs/stringList" },
+        "traceability": { "$ref": "#/$defs/stringList" },
+        "performance": { "$ref": "#/$defs/stringList" },
+        "compatibility": { "$ref": "#/$defs/stringList" },
+        "availability": { "$ref": "#/$defs/stringList" },
+        "usability": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objective", "minimumScenarios"],
+      "properties": {
+        "objective": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "minimumScenarios": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "assumptionsDependenciesPending": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assumptions", "dependencies", "pendingItems"],
+      "properties": {
+        "assumptions": { "$ref": "#/$defs/stringList" },
+        "dependencies": { "$ref": "#/$defs/stringList" },
+        "pendingItems": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "approvalsAndChangeControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changeControl", "approvals"],
+      "properties": {
+        "changeControl": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["version", "date", "modification", "approvedBy"],
+            "properties": {
+              "version": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "date": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "modification": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "approvedBy": { "$ref": "#/$defs/nonEmptyOrPending" }
+            }
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "name", "position", "date", "status"],
+            "properties": {
+              "role": { "enum": ["Elaboró", "Revisó", "Aprobó"] },
+              "name": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "position": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "date": { "$ref": "#/$defs/nonEmptyOrPending" },
+              "status": { "$ref": "#/$defs/nonEmptyOrPending" }
+            }
+          }
+        }
+      }
+    },
+    "writingRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateControlled"],
+      "properties": {
+        "templateControlled": { "const": true }
+      }
+    },
+    "visualFormat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateControlled"],
+      "properties": {
+        "templateControlled": { "const": true }
+      }
+    },
+    "automationInstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templateControlled"],
+      "properties": {
+        "templateControlled": { "const": true }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyOrPending": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/nonEmptyOrPending" }
+    },
+    "personRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "position"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "position": { "$ref": "#/$defs/nonEmptyOrPending" }
+      }
+    },
+    "requiredField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "required", "validationOrObservation"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "type": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "required": { "type": "boolean" },
+        "validationOrObservation": { "$ref": "#/$defs/nonEmptyOrPending" }
+      }
+    },
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "name",
+        "description",
+        "keyActivities",
+        "userStory",
+        "acceptanceCriteria",
+        "businessRules",
+        "requiredFields"
+      ],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "name": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "description": { "$ref": "#/$defs/nonEmptyOrPending" },
+        "keyActivities": { "$ref": "#/$defs/stringList" },
+        "userStory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "asA", "iWant", "soThat"],
+          "properties": {
+            "code": { "type": "string", "pattern": "^HU-[0-9]+$" },
+            "asA": { "$ref": "#/$defs/nonEmptyOrPending" },
+            "iWant": { "$ref": "#/$defs/nonEmptyOrPending" },
+            "soThat": { "$ref": "#/$defs/nonEmptyOrPending" }
+          }
+        },
+        "acceptanceCriteria": { "$ref": "#/$defs/stringList" },
+        "businessRules": { "$ref": "#/$defs/stringList" },
+        "requiredFields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/requiredField" }
+        }
+      }
+    }
+  }
+}

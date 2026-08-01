@@ -1,69 +1,74 @@
-# Plan para definir la estructura documental
+# Modelo documental de Levantamiento RQ
 
-## Momento de definición
+## Estado
+
+Definido en el Paso 3.1.
+
+## Estándar canónico
+
+La plataforma generará documentos con la estructura del estándar:
 
 ```text
-Paso 3.1 — Diseñar estructura documental y plantillas
+ESTÁNDAR COMPACTO PARA LEVANTAMIENTO DE REQUERIMIENTOS
+Versión 1.0.0
+Alineado con ISO/IEC/IEEE 29148:2018
 ```
 
-Este subpaso se ejecutará después de aprobar la arquitectura y antes de
-crear infraestructura, bases de datos o el Documents Service.
+El orden de las trece secciones es obligatorio y no podrá alterarse sin
+crear una nueva versión formal de la plantilla.
 
-## El modelo determinará
+## Secciones obligatorias
 
-- Entidades y relaciones de Documents Service.
-- Contratos HTTP.
-- Esquemas JSON para la IA.
-- Reglas de validación.
-- Versionamiento.
-- Editor frontend.
-- Generación de PDF.
-- Trazabilidad.
-- Flujo de aprobación.
+1. Encabezado del documento.
+2. Objetivos del proyecto.
+3. Descripción del problema.
+4. Alcance.
+5. Diagrama de flujo.
+6. Requerimientos por hito o funcionalidad.
+7. Requerimientos no funcionales.
+8. Pruebas.
+9. Supuestos, dependencias y pendientes.
+10. Aprobaciones y control de cambios.
+11. Reglas de redacción.
+12. Formato visual recomendado.
+13. Instrucción para automatización.
 
-## Elementos que se definirán
+## Documentos del modelo
 
-### Plantilla
+- [Plantilla canónica 1.0.0](templates/levantamiento-requerimientos-v1.0.0.md)
+- [Catálogo de campos](field-catalog.md)
+- [Reglas de validación](validation-rules.md)
+- [Contrato de salida de IA](ai-output-contract.md)
+- [Versionamiento y aprobaciones](versioning-and-approval.md)
+- [Reglas de exportación](export-format.md)
+- [Mapeo del análisis ERP](erp-fit-gap-mapping.md)
+- [Esquema JSON](schemas/requirement-document-v1.0.0.schema.json)
 
-Nombre, código, descripción, tipo, estado, versión, publicación y
-organización propietaria.
+## Principios
 
-### Sección
+- No inventar información.
+- Usar `[PENDIENTE POR DEFINIR]` cuando falte una definición.
+- Mantener nombres reales de áreas, sistemas, campos y responsables.
+- Mantener la estructura compacta.
+- No agregar secciones automáticamente.
+- No aprobar documentos automáticamente.
+- Conservar evidencias y trazabilidad.
+- Crear una nueva versión ante cambios aprobados.
+- Separar metadatos técnicos del contenido visible del documento.
 
-Código, nombre, descripción, orden, obligatoriedad, repetición y
-condiciones de visibilidad.
+## Metadatos técnicos no visibles
 
-### Campo
+El sistema podrá conservar identificadores, estados internos, evidencias,
+confianza de IA, autoría y trazabilidad. Estos datos no crearán capítulos
+adicionales en el documento exportado.
 
-Código, etiqueta, descripción, tipo, obligatoriedad, edición,
-repetición, catálogo, longitud, validaciones, instrucción para IA,
-permiso, evidencia y participación en PDF.
+## Relación con Dynamics 365
 
-### Contenido
+El análisis fit-gap se incorporará sin modificar las trece secciones.
+Sus resultados se ubicarán en:
 
-Valor, origen, estado, autor, fecha, evidencias, confianza de IA,
-comentarios, historial, aprobación y bloqueo.
+- 4.3 Sistemas o fuentes involucradas.
+- 6. Requerimientos por hito o funcionalidad.
+- 9. Supuestos, dependencias y pendientes.
 
-### Requerimientos
-
-Código, nombre, descripción, actor, precondiciones, flujo, excepciones,
-reglas, criterios de aceptación, prioridad, evidencias, clasificación
-fit-gap e impacto ERP.
-
-## Principios ya aprobados
-
-- Plantillas configurables.
-- Versiones publicadas inmutables.
-- Documento vinculado a una versión de plantilla.
-- Campos obligatorios u opcionales.
-- IA con salida JSON estructurada.
-- IA sin modificación de contenido aprobado.
-- Evidencias relacionadas con afirmaciones importantes.
-- Documento editable antes de exportar.
-- Trazabilidad de cambios.
-- PDF generado desde una versión específica.
-
-## Fuera del alcance del Paso 3
-
-No se definirán todavía las secciones, campos, orden final, diseño visual
-del PDF, catálogos ni reglas específicas de cada plantilla.
+La evidencia técnica completa permanecerá como metadato trazable.
