@@ -1,0 +1,78 @@
+version: 1
+
+services:
+  - id: web
+    kind: frontend
+    scope: web
+    implementation_stage: planned
+    database: null
+    externally_exposed: true
+
+  - id: gateway
+    kind: bff
+    scope: gateway
+    implementation_stage: planned
+    database: null
+    externally_exposed: true
+
+  - id: identity-service
+    kind: service
+    scope: identity
+    implementation_stage: planned
+    database: RqIdentityDb
+    externally_exposed: false
+
+  - id: projects-service
+    kind: service
+    scope: projects
+    implementation_stage: planned
+    database: RqProjectsDb
+    externally_exposed: false
+
+  - id: sources-service
+    kind: service
+    scope: sources
+    implementation_stage: planned
+    database: RqSourcesDb
+    object_storage: true
+    bullmq: true
+    externally_exposed: false
+
+  - id: documents-service
+    kind: service
+    scope: documents
+    implementation_stage: planned
+    database: RqDocumentsDb
+    externally_exposed: false
+
+  - id: ai-analysis-service
+    kind: worker-service
+    scope: ai
+    implementation_stage: planned
+    database: RqAiDb
+    bullmq: true
+    externally_exposed: false
+
+  - id: erp-knowledge-service
+    kind: knowledge-service
+    scope: erp-knowledge
+    implementation_stage: future
+    database: RqErpKnowledgeDb
+    bullmq: true
+    operational_integration: false
+    externally_exposed: false
+
+  - id: workflow-service
+    kind: service
+    scope: workflow
+    implementation_stage: planned
+    database: RqWorkflowDb
+    externally_exposed: false
+
+  - id: operations-service
+    kind: worker-service
+    scope: operations
+    implementation_stage: planned
+    database: RqOperationsDb
+    bullmq: true
+    externally_exposed: false
