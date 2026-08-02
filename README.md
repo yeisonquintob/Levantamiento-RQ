@@ -103,3 +103,10 @@ Identity Service contiene el modelo de usuarios, roles, permisos y sesiones.
 El Gateway expone inicio, renovación, consulta y cierre de sesión mediante
 cookies HttpOnly. La autenticación permanece deshabilitada hasta configurar
 RqIdentityDb y los secretos JWT; no se incluyen usuarios predeterminados.
+
+## Paso 11: activación real de identidad
+
+La autenticación local puede conectarse a RqIdentityDb mediante archivos
+de entorno ignorados por Git. El proceso controlado confirma o crea la base,
+aplica la migración, prepara el primer administrador y valida la sesión real
+a través de Identity Service, Gateway y frontend.

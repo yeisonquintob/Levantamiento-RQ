@@ -19,7 +19,12 @@
     "validate:auth": "nx run-many --target=lint,build --projects=identity-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:auth",
     "identity:migration:run": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-run-migrations.ts",
     "identity:migration:revert": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-revert-migration.ts",
-    "identity:create-user": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-create-user.ts"
+    "identity:create-user": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-create-user.ts",
+    "identity:db:ensure": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-ensure-database.ts",
+    "identity:bootstrap-admin": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-bootstrap-admin.ts",
+    "auth:local:up": "bash scripts/local-auth-up.sh",
+    "auth:local:down": "bash scripts/local-auth-down.sh",
+    "auth:local:status": "bash scripts/local-auth-status.sh"
   },
   "private": true,
   "devDependencies": {
