@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import {
   loadBaseServiceConfig,
@@ -30,6 +31,25 @@ async function bootstrap(): Promise<void> {
   const globalPrefix = "api/v1";
 
   app.setGlobalPrefix(globalPrefix);
+  if (config.environment === "development") {
+    const openApiConfig = new DocumentBuilder()
+      .setTitle("Levantamiento RQ - AI Analysis Service API")
+      .setDescription("Análisis asistido por inteligencia artificial.")
+      .setVersion("1.0.0")
+      .addTag("health", "Disponibilidad técnica del servicio")
+      .build();
+
+    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+
+    SwaggerModule.setup("api/docs", app, openApiDocument, {
+      customSiteTitle: "Levantamiento RQ - AI Analysis Service API",
+      swaggerOptions: {
+        displayRequestDuration: true,
+        persistAuthorization: false,
+        withCredentials: true,
+      },
+    });
+  }
   app.enableShutdownHooks();
 
   await app.listen(config.port, config.host);

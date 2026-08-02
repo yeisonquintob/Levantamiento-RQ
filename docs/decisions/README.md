@@ -24,3 +24,4 @@
 - [ADR-0017: Frontend responsive y sistema visual](0017-responsive-web-and-visual-system.md)
 - [ADR-0018: Identidad, autenticación y autorización](0018-identity-authentication-and-authorization.md)
 - [ADR-0019: Activación real y bootstrap del administrador](0019-identity-real-activation.md)
+- [ADR-0020: OpenAPI y Swagger en todos los servicios backend](0020-openapi-swagger-all-backend-services.md)

@@ -12,3 +12,4 @@ allowBuilds:
   "@nestjs/core": false
   sharp: true
   core-js: true
+  "@scarf/scarf": false

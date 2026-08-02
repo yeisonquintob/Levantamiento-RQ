@@ -1,7 +1,18 @@
 const { NxAppWebpackPlugin } = require("@nx/webpack/app-plugin");
-const { join } = require("path");
+const { dirname, join } = require("path");
+
+const classTransformerStorage = join(
+  dirname(require.resolve("class-transformer/package.json")),
+  "cjs",
+  "storage.js",
+);
 
 module.exports = {
+  resolve: {
+    alias: {
+      "class-transformer/storage$": classTransformerStorage,
+    },
+  },
   output: {
     path: join(__dirname, "dist"),
     clean: true,

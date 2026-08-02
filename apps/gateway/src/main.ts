@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { loadEnvironmentFiles } from "@levantamiento-rq/shared-config";
 import {
@@ -36,6 +37,30 @@ async function bootstrap(): Promise<void> {
   });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new ApplicationExceptionFilter());
+  if (config.environment === "development") {
+    const openApiConfig = new DocumentBuilder()
+      .setTitle("Levantamiento RQ - Gateway API")
+      .setDescription(
+        "Punto de entrada del frontend y autenticación por cookies HttpOnly.",
+      )
+      .setVersion("1.0.0")
+      .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag("authentication", "Identidad y sesiones")
+      .addCookieAuth("rq_access")
+      .addCookieAuth("rq_refresh")
+      .build();
+
+    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+
+    SwaggerModule.setup("api/docs", app, openApiDocument, {
+      customSiteTitle: "Levantamiento RQ - Gateway API",
+      swaggerOptions: {
+        displayRequestDuration: true,
+        persistAuthorization: false,
+        withCredentials: true,
+      },
+    });
+  }
   app.enableShutdownHooks();
 
   await app.listen(config.port, config.host);

@@ -10,6 +10,14 @@ import {
   UseGuards,
 } from "@nestjs/common";
 
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
+
 import type {
   AuthSessionResponse,
   AuthenticatedUser,
@@ -49,10 +57,28 @@ function requiredText(
   return value.trim();
 }
 
+@ApiTags("authentication")
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @ApiOperation({ summary: "Validar credenciales y crear tokens" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["email", "password"],
+      properties: {
+        email: {
+          type: "string",
+          format: "email",
+          example: "usuario@empresa.com",
+        },
+        password: { type: "string", format: "password", minLength: 8 },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: "Tokens y usuario autenticado." })
+  @ApiResponse({ status: 401, description: "Credenciales inválidas." })
   @Post("sign-in")
   @HttpCode(200)
   signIn(
@@ -71,6 +97,19 @@ export class AuthController {
     );
   }
 
+  @ApiOperation({ summary: "Rotar el refresh token" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["refreshToken"],
+      properties: { refreshToken: { type: "string", minLength: 20 } },
+    },
+  })
+  @ApiResponse({ status: 200, description: "Tokens renovados." })
+  @ApiResponse({
+    status: 401,
+    description: "Refresh token inválido o revocado.",
+  })
   @Post("refresh")
   @HttpCode(200)
   refresh(
@@ -86,6 +125,15 @@ export class AuthController {
     );
   }
 
+  @ApiOperation({ summary: "Revocar el refresh token" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["refreshToken"],
+      properties: { refreshToken: { type: "string", minLength: 20 } },
+    },
+  })
+  @ApiResponse({ status: 200, description: "Sesión revocada." })
   @Post("sign-out")
   @HttpCode(200)
   async signOut(@Body() body: unknown): Promise<SignOutResponse> {
@@ -96,6 +144,10 @@ export class AuthController {
     return { signedOut: true };
   }
 
+  @ApiOperation({ summary: "Consultar identidad desde access token" })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: "Identidad autenticada." })
+  @ApiResponse({ status: 401, description: "Access token ausente o inválido." })
   @Get("me")
   @UseGuards(AccessTokenGuard, PermissionsGuard)
   me(@Req() request: AuthenticatedRequest): AuthenticatedUser {

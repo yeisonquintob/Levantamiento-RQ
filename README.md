@@ -110,3 +110,14 @@ La autenticación local puede conectarse a RqIdentityDb mediante archivos
 de entorno ignorados por Git. El proceso controlado confirma o crea la base,
 aplica la migración, prepara el primer administrador y valida la sesión real
 a través de Identity Service, Gateway y frontend.
+
+## Swagger y OpenAPI
+
+Los nueve servicios backend publican Swagger UI únicamente en desarrollo.
+El Gateway está disponible en `http://127.0.0.1:3000/api/docs`.
+
+La validación completa se ejecuta con:
+
+```bash
+pnpm swagger:validate
+```
