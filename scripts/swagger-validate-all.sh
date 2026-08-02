@@ -102,6 +102,19 @@ for entry in "${SERVICES[@]}"; do
 
   curl -fsS "http://127.0.0.1:$port/api/docs" >/dev/null
 
+  swagger_assets=(
+    "swagger-ui.css"
+    "swagger-ui-bundle.js"
+    "swagger-ui-standalone-preset.js"
+    "swagger-ui-init.js"
+    "favicon-32x32.png"
+    "favicon-16x16.png"
+  )
+
+  for asset in "${swagger_assets[@]}"; do
+    curl -fsS       "http://127.0.0.1:$port/api/docs/$asset"       >/dev/null
+  done
+
   python3 - "$service" "$json_file" <<'PY_JSON'
 from __future__ import annotations
 
@@ -130,7 +143,7 @@ if service in {"gateway", "identity-service"}:
         if route not in paths:
             raise SystemExit(f"{service}: falta {route}.")
 
-print(f"✓ {service}: OpenAPI y Swagger UI válidos.")
+print(f"✓ {service}: OpenAPI, UI y recursos estáticos válidos.")
 PY_JSON
 
   stop_current

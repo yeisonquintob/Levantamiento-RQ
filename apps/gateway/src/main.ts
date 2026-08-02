@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -53,6 +55,10 @@ async function bootstrap(): Promise<void> {
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
+      customSwaggerUiPath: resolve(
+        __dirname,
+        "../../../node_modules/swagger-ui-dist",
+      ),
       customSiteTitle: "Levantamiento RQ - Gateway API",
       swaggerOptions: {
         displayRequestDuration: true,
