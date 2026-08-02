@@ -58,6 +58,8 @@ function resolveHttpException(exception: HttpException): ResolvedError {
 
   const record = response as Readonly<Record<string, unknown>>;
   const rawMessage = record.message;
+  const rawDetail = record.detail;
+  const rawTitle = record.title;
 
   if (Array.isArray(rawMessage)) {
     const messages = rawMessage.map(String);
@@ -65,8 +67,12 @@ function resolveHttpException(exception: HttpException): ResolvedError {
     return {
       statusCode,
       code: "VALIDATION_ERROR",
-      title: titleForStatus(statusCode),
-      detail: "Uno o más campos presentan errores.",
+      title:
+        typeof rawTitle === "string" ? rawTitle : titleForStatus(statusCode),
+      detail:
+        typeof rawDetail === "string"
+          ? rawDetail
+          : "Uno o más campos presentan errores.",
       errors: {
         request: messages,
       },
@@ -77,11 +83,38 @@ function resolveHttpException(exception: HttpException): ResolvedError {
     statusCode,
     code: "HTTP_ERROR",
     title:
-      typeof record.error === "string"
-        ? record.error
-        : titleForStatus(statusCode),
-    detail: typeof rawMessage === "string" ? rawMessage : exception.message,
+      typeof rawTitle === "string"
+        ? rawTitle
+        : typeof record.error === "string"
+          ? record.error
+          : titleForStatus(statusCode),
+    detail:
+      typeof rawDetail === "string"
+        ? rawDetail
+        : typeof rawMessage === "string"
+          ? rawMessage
+          : exception.message,
   };
+}
+
+function isHttpException(exception: unknown): exception is HttpException {
+  if (exception instanceof HttpException) {
+    return true;
+  }
+
+  if (typeof exception !== "object" || exception === null) {
+    return false;
+  }
+
+  const candidate = exception as Readonly<{
+    getStatus?: unknown;
+    getResponse?: unknown;
+  }>;
+
+  return (
+    typeof candidate.getStatus === "function" &&
+    typeof candidate.getResponse === "function"
+  );
 }
 
 function resolveError(exception: unknown): ResolvedError {
@@ -94,7 +127,7 @@ function resolveError(exception: unknown): ResolvedError {
     };
   }
 
-  if (exception instanceof HttpException) {
+  if (isHttpException(exception)) {
     return resolveHttpException(exception);
   }
 

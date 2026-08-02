@@ -28,8 +28,8 @@ export default function SignInPage() {
           <SignInForm />
 
           <aside className="rq-auth-note">
-            La autenticación permanece deshabilitada hasta configurar la base
-            de identidad y los secretos JWT del entorno.
+            El acceso requiere una cuenta activa registrada en RqIdentityDb. Las
+            credenciales se validan de forma segura por medio del Gateway.
           </aside>
         </section>
       </main>
