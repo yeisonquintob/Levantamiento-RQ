@@ -20,6 +20,23 @@ for file in "${required_files[@]}"; do
   }
 done
 
+bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
+
+cd "$ROOT"
+NX_DAEMON=false pnpm exec nx reset >/dev/null
+
+mkdir -p "$PID_DIR" "$LOG_DIR"
+
+[ -d "$PID_DIR" ] || {
+  echo "ERROR: No se pudo recrear $PID_DIR."
+  exit 1
+}
+
+[ -d "$LOG_DIR" ] || {
+  echo "ERROR: No se pudo recrear $LOG_DIR."
+  exit 1
+}
+
 for port in 3000 3001 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
@@ -27,29 +44,12 @@ for port in 3000 3001 4200; do
   fi
 done
 
-cd "$ROOT"
-
-nohup env NX_DAEMON=false NX_INTERACTIVE=false \
-  pnpm exec nx serve identity-service \
-  > "$LOG_DIR/identity-service.log" 2>&1 &
-echo $! > "$PID_DIR/identity-service.pid"
-
-nohup env NX_DAEMON=false NX_INTERACTIVE=false \
-  pnpm exec nx serve gateway \
-  > "$LOG_DIR/gateway.log" 2>&1 &
-echo $! > "$PID_DIR/gateway.pid"
-
-nohup env NX_DAEMON=false NX_INTERACTIVE=false \
-  pnpm exec nx dev web --port=4200 \
-  > "$LOG_DIR/web.log" 2>&1 &
-echo $! > "$PID_DIR/web.pid"
-
 wait_for_url() {
   local name="$1"
   local url="$2"
   local log_file="$3"
 
-  for _ in $(seq 1 90); do
+  for _ in $(seq 1 120); do
     if curl -fsS "$url" >/dev/null 2>&1; then
       echo "✓ $name disponible."
       return 0
@@ -59,20 +59,44 @@ wait_for_url() {
 
   echo "ERROR: $name no respondió."
   echo "Log: $log_file"
-  tail -n 30 "$log_file" || true
+  tail -n 40 "$log_file" || true
   bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
   exit 1
 }
+
+nohup env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx serve identity-service \
+  > "$LOG_DIR/identity-service.log" 2>&1 &
+echo $! > "$PID_DIR/identity-service.pid"
 
 wait_for_url \
   "Identity Service" \
   "http://127.0.0.1:3001/api/v1/health" \
   "$LOG_DIR/identity-service.log"
 
+nohup env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx serve gateway \
+  > "$LOG_DIR/gateway.log" 2>&1 &
+echo $! > "$PID_DIR/gateway.pid"
+
 wait_for_url \
   "Gateway" \
   "http://127.0.0.1:3000/api/v1/health" \
   "$LOG_DIR/gateway.log"
+
+nohup env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx dev web --port=4200 \
+  > "$LOG_DIR/web.log" 2>&1 &
+echo $! > "$PID_DIR/web.pid"
 
 wait_for_url \
   "Frontend" \
