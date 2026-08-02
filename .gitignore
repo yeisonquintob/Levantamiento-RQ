@@ -68,3 +68,5 @@ infrastructure/docker/.env
 # Next.js
 .next
 out
+# Next.js generated TypeScript declarations
+/apps/web/next-env.d.ts
