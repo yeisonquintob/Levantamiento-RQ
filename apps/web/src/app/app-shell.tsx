@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppearanceControls } from "./appearance-controls";
 import { SignOutButton } from "./sign-out-button";
@@ -11,6 +11,7 @@ interface AppShellProps {
   user: {
     displayName: string;
     email: string;
+    roles: readonly string[];
   };
 }
 
@@ -22,8 +23,68 @@ const futureNavigation = [
   ["Configuración", "C"],
 ] as const;
 
+function resolveInitials(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return "U";
+  }
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function resolveProfile(roles: readonly string[]): string {
+  if (roles.some((role) => role.toUpperCase() === "ADMIN")) {
+    return "Administrador";
+  }
+
+  const primaryRole = roles[0]?.trim();
+
+  if (!primaryRole) {
+    return "Usuario";
+  }
+
+  return primaryRole
+    .toLowerCase()
+    .replace(/(^|[\s_-])\p{L}/gu, (match) => match.toUpperCase())
+    .replace(/[_-]+/g, " ");
+}
+
 export function AppShell({ children, user }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const initials = resolveInitials(user.displayName);
+  const profile = resolveProfile(user.roles);
+
+  useEffect(() => {
+    function closeFromOutside(event: MouseEvent): void {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    function closeFromEscape(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeFromOutside);
+    document.addEventListener("keydown", closeFromEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
+  }, []);
 
   return (
     <div className="rq-shell">
@@ -51,14 +112,63 @@ export function AppShell({ children, user }: AppShellProps) {
 
         <div className="rq-topbar__actions">
           <AppearanceControls />
-          <span
-            className="rq-status"
-            data-rq-status="success"
-            title={user.email}
-          >
-            {user.displayName}
-          </span>
-          <SignOutButton />
+
+          <div className="rq-user-menu" ref={userMenuRef}>
+            <button
+              aria-controls="rq-user-menu-panel"
+              aria-expanded={userMenuOpen}
+              aria-haspopup="menu"
+              aria-label={
+                userMenuOpen
+                  ? "Cerrar menú del usuario"
+                  : "Abrir menú del usuario"
+              }
+              className="rq-user-menu__trigger"
+              onClick={() => setUserMenuOpen((current) => !current)}
+              type="button"
+            >
+              <span className="rq-user-menu__trigger-name">
+                {user.displayName}
+              </span>
+              <span aria-hidden="true" className="rq-user-avatar">
+                {initials}
+              </span>
+            </button>
+
+            {userMenuOpen ? (
+              <section
+                aria-label="Información del usuario"
+                className="rq-user-menu__panel"
+                id="rq-user-menu-panel"
+                role="menu"
+              >
+                <header className="rq-user-menu__header">
+                  <span
+                    aria-hidden="true"
+                    className="rq-user-avatar rq-user-avatar--large"
+                  >
+                    {initials}
+                  </span>
+
+                  <div className="rq-user-menu__identity">
+                    <strong>{user.displayName}</strong>
+                    <span>{user.email}</span>
+                  </div>
+                </header>
+
+                <div className="rq-user-menu__content">
+                  <article className="rq-user-menu__profile">
+                    <span>Perfil</span>
+                    <strong>{profile}</strong>
+                  </article>
+
+                  <div className="rq-user-menu__signout">
+                    <SignOutButton />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+          </div>
         </div>
       </header>
 

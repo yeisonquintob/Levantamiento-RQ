@@ -10,6 +10,7 @@ const GATEWAY_URL =
 interface SessionUser {
   displayName: string;
   email: string;
+  roles: readonly string[];
 }
 
 async function resolveUser(): Promise<SessionUser> {
@@ -36,7 +37,9 @@ async function resolveUser(): Promise<SessionUser> {
 
     if (
       typeof payload.displayName !== "string" ||
-      typeof payload.email !== "string"
+      typeof payload.email !== "string" ||
+      !Array.isArray(payload.roles) ||
+      !payload.roles.every((role) => typeof role === "string")
     ) {
       redirect("/sign-in");
     }
@@ -44,6 +47,7 @@ async function resolveUser(): Promise<SessionUser> {
     return {
       displayName: payload.displayName,
       email: payload.email,
+      roles: payload.roles,
     };
   } catch {
     redirect("/sign-in");
