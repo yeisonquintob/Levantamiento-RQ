@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "@levantamiento-rq/shared-ui/styles.css";
-
-import { AppShell } from "./app-shell";
+import "./auth.css";
 
 export const metadata: Metadata = {
   title: "Levantamiento RQ",
@@ -16,9 +15,7 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html data-rq-font="normal" data-rq-theme="normal" lang="es">
-      <body>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

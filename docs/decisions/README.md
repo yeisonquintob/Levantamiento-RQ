@@ -22,3 +22,4 @@
 - [ADR-0016: Base de persistencia TypeORM para SQL Server](0016-typeorm-sql-server-persistence-foundation.md)
 
 - [ADR-0017: Frontend responsive y sistema visual](0017-responsive-web-and-visual-system.md)
+- [ADR-0018: Identidad, autenticación y autorización](0018-identity-authentication-and-authorization.md)

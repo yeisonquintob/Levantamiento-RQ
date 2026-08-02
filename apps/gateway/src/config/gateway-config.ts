@@ -8,6 +8,10 @@ export const GATEWAY_CONFIG = Symbol("GATEWAY_CONFIG");
 export interface GatewayConfig extends BaseServiceConfig {
   globalPrefix: string;
   version: string;
+  identityServiceUrl: string;
+  webOrigin: string;
+  identityTimeoutMs: number;
+  cookieSecure: boolean;
 }
 
 function readText(
@@ -41,6 +45,50 @@ function readGlobalPrefix(value: string | undefined): string {
   return resolved;
 }
 
+function readUrl(
+  value: string | undefined,
+  fallback: string,
+  name: string,
+): string {
+  const resolved = readText(value, fallback, name);
+
+  try {
+    return new URL(resolved).toString().replace(/\/$/, "");
+  } catch {
+    throw new Error(`${name} debe ser una URL absoluta válida.`);
+  }
+}
+
+function readBoolean(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) return fallback;
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+
+  throw new Error(`${name} debe ser true o false.`);
+}
+
+function readInteger(
+  value: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  name: string,
+): number {
+  const resolved = value?.trim() ? Number(value) : fallback;
+
+  if (!Number.isInteger(resolved) || resolved < minimum || resolved > maximum) {
+    throw new Error(`${name} debe estar entre ${minimum} y ${maximum}.`);
+  }
+
+  return resolved;
+}
+
 export function loadGatewayConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): GatewayConfig {
@@ -54,5 +102,27 @@ export function loadGatewayConfig(
     ),
     globalPrefix: readGlobalPrefix(environment.API_GLOBAL_PREFIX),
     version: readText(environment.APP_VERSION, "0.0.0", "APP_VERSION"),
+    identityServiceUrl: readUrl(
+      environment.IDENTITY_SERVICE_URL,
+      "http://127.0.0.1:3001",
+      "IDENTITY_SERVICE_URL",
+    ),
+    webOrigin: readUrl(
+      environment.WEB_ORIGIN,
+      "http://127.0.0.1:4200",
+      "WEB_ORIGIN",
+    ),
+    identityTimeoutMs: readInteger(
+      environment.IDENTITY_TIMEOUT_MS,
+      5000,
+      500,
+      30000,
+      "IDENTITY_TIMEOUT_MS",
+    ),
+    cookieSecure: readBoolean(
+      environment.AUTH_COOKIE_SECURE,
+      false,
+      "AUTH_COOKIE_SECURE",
+    ),
   };
 }

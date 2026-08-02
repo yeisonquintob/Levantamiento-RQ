@@ -4,9 +4,14 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { AppearanceControls } from "./appearance-controls";
+import { SignOutButton } from "./sign-out-button";
 
 interface AppShellProps {
   children: ReactNode;
+  user: {
+    displayName: string;
+    email: string;
+  };
 }
 
 const futureNavigation = [
@@ -17,7 +22,7 @@ const futureNavigation = [
   ["Configuración", "C"],
 ] as const;
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, user }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -46,9 +51,14 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="rq-topbar__actions">
           <AppearanceControls />
-          <span className="rq-status" data-rq-status="neutral">
-            Base visual
+          <span
+            className="rq-status"
+            data-rq-status="success"
+            title={user.email}
+          >
+            {user.displayName}
           </span>
+          <SignOutButton />
         </div>
       </header>
 
@@ -63,7 +73,7 @@ export function AppShell({ children }: AppShellProps) {
 
           <a
             aria-current="page"
-            href="#inicio"
+            href="/workspace"
             onClick={() => setMenuOpen(false)}
           >
             <span aria-hidden="true" className="rq-nav__icon">
@@ -102,7 +112,9 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </main>
 
-      <footer className="rq-footer">Base responsive · Paso 9</footer>
+      <footer className="rq-footer">
+        Identidad, autenticación y autorización · Paso 10
+      </footer>
     </div>
   );
 }

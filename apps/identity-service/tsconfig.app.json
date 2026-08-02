@@ -21,6 +21,12 @@
       "path": "../../libs/shared/persistence/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/shared/http/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/shared/contracts/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/shared/config/tsconfig.lib.json"
     }
   ]

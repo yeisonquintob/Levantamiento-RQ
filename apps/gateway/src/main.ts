@@ -28,6 +28,12 @@ async function bootstrap(): Promise<void> {
   );
 
   app.setGlobalPrefix(config.globalPrefix);
+  app.enableCors({
+    origin: config.webOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["content-type", "authorization", "x-correlation-id"],
+  });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
@@ -43,6 +49,8 @@ async function bootstrap(): Promise<void> {
       port: config.port,
       globalPrefix: config.globalPrefix,
       version: config.version,
+      identityServiceUrl: config.identityServiceUrl,
+      webOrigin: config.webOrigin,
     },
   });
 

@@ -9,6 +9,10 @@ import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
+import {
+  ApplicationExceptionFilter,
+  CorrelationIdInterceptor,
+} from "@levantamiento-rq/shared-http";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/identity-service/.env"],
@@ -27,15 +31,15 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
-  const globalPrefix = "api/v1";
-
-  app.setGlobalPrefix(globalPrefix);
+  app.setGlobalPrefix("api/v1");
+  app.useGlobalInterceptors(new CorrelationIdInterceptor());
+  app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
 
   await app.listen(config.port, config.host);
 
   Logger.log(
-    `Identity Service disponible en http://${config.host}:${config.port}/${globalPrefix} (${config.environment})`,
+    `Identity Service disponible en http://${config.host}:${config.port}/api/v1 (${config.environment})`,
     "Bootstrap",
   );
 }

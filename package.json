@@ -13,7 +13,13 @@
     "serve:gateway": "nx serve gateway",
     "validate:gateway": "nx run gateway:lint && nx run gateway:build",
     "validate:persistence": "nx run-many --target=lint,build --projects=shared-persistence,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service",
-    "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui"
+    "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui",
+    "serve:identity": "nx serve identity-service",
+    "test:auth": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx --test tests/identity/auth-foundation.test.ts",
+    "validate:auth": "nx run-many --target=lint,build --projects=identity-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:auth",
+    "identity:migration:run": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-run-migrations.ts",
+    "identity:migration:revert": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-revert-migration.ts",
+    "identity:create-user": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx scripts/identity-create-user.ts"
   },
   "private": true,
   "devDependencies": {
@@ -60,7 +66,9 @@
     "typescript-eslint": "^8.58.0",
     "webpack": "^5.101.3",
     "webpack-cli": "^7.0.0",
-    "webpack-dev-server": "^5.2.1"
+    "webpack-dev-server": "^5.2.1",
+    "tsx": "4.20.6",
+    "typeorm": "0.3.31"
   },
   "packageManager": "pnpm@11.18.0",
   "engines": {

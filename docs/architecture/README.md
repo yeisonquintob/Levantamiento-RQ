@@ -55,3 +55,4 @@
 ## Frontend
 
 - [Base frontend responsive y estándar visual](frontend-visual-foundation.md)
+- [Identidad, autenticación y autorización base](identity-authentication-foundation.md)

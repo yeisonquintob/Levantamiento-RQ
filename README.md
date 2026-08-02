@@ -96,3 +96,10 @@ Los ocho servicios propietarios de datos cuentan con configuración TypeORM para
 ## Paso 9: frontend responsive
 
 Existe una aplicación Next.js llamada `web` y una librería `shared-ui` con temas, escalas de accesibilidad y componentes base.
+
+## Paso 10: identidad, autenticación y autorización
+
+Identity Service contiene el modelo de usuarios, roles, permisos y sesiones.
+El Gateway expone inicio, renovación, consulta y cierre de sesión mediante
+cookies HttpOnly. La autenticación permanece deshabilitada hasta configurar
+RqIdentityDb y los secretos JWT; no se incluyen usuarios predeterminados.
