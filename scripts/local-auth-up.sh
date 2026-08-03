@@ -9,6 +9,7 @@ mkdir -p "$PID_DIR" "$LOG_DIR"
 
 required_files=(
   "$ROOT/apps/identity-service/.env"
+  "$ROOT/apps/projects-service/.env"
   "$ROOT/apps/gateway/.env"
   "$ROOT/apps/web/.env.local"
 )
@@ -27,17 +28,7 @@ NX_DAEMON=false pnpm exec nx reset >/dev/null
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-[ -d "$PID_DIR" ] || {
-  echo "ERROR: No se pudo recrear $PID_DIR."
-  exit 1
-}
-
-[ -d "$LOG_DIR" ] || {
-  echo "ERROR: No se pudo recrear $LOG_DIR."
-  exit 1
-}
-
-for port in 3000 3001 4200; do
+for port in 3000 3001 3002 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
     exit 1
@@ -81,6 +72,19 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx serve projects-service \
+  > "$LOG_DIR/projects-service.log" 2>&1 &
+echo $! > "$PID_DIR/projects-service.pid"
+
+wait_for_url \
+  "Projects Service" \
+  "http://127.0.0.1:3002/api/v1/health" \
+  "$LOG_DIR/projects-service.log"
+
+nohup env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   pnpm exec nx serve gateway \
   > "$LOG_DIR/gateway.log" 2>&1 &
 echo $! > "$PID_DIR/gateway.pid"
@@ -109,6 +113,7 @@ echo "  Acceso:    http://127.0.0.1:4200/sign-in"
 echo "  Workspace: http://127.0.0.1:4200/workspace"
 echo "  Gateway:   http://127.0.0.1:3000/api/v1/health"
 echo "  Identity:  http://127.0.0.1:3001/api/v1/health"
+echo "  Projects:  http://127.0.0.1:3002/api/v1/health"
 echo
 echo "Detener:"
 echo "  pnpm auth:local:down"

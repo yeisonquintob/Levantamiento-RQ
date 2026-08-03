@@ -9,8 +9,10 @@ export interface GatewayConfig extends BaseServiceConfig {
   globalPrefix: string;
   version: string;
   identityServiceUrl: string;
+  projectsServiceUrl: string;
   webOrigin: string;
   identityTimeoutMs: number;
+  projectsTimeoutMs: number;
   cookieSecure: boolean;
 }
 
@@ -107,6 +109,11 @@ export function loadGatewayConfig(
       "http://127.0.0.1:3001",
       "IDENTITY_SERVICE_URL",
     ),
+    projectsServiceUrl: readUrl(
+      environment.PROJECTS_SERVICE_URL,
+      "http://127.0.0.1:3002",
+      "PROJECTS_SERVICE_URL",
+    ),
     webOrigin: readUrl(
       environment.WEB_ORIGIN,
       "http://127.0.0.1:4200",
@@ -118,6 +125,13 @@ export function loadGatewayConfig(
       500,
       30000,
       "IDENTITY_TIMEOUT_MS",
+    ),
+    projectsTimeoutMs: readInteger(
+      environment.PROJECTS_TIMEOUT_MS,
+      8000,
+      500,
+      30000,
+      "PROJECTS_TIMEOUT_MS",
     ),
     cookieSecure: readBoolean(
       environment.AUTH_COOKIE_SECURE,

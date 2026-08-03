@@ -25,3 +25,4 @@
 - [ADR-0018: Identidad, autenticación y autorización](0018-identity-authentication-and-authorization.md)
 - [ADR-0019: Activación real y bootstrap del administrador](0019-identity-real-activation.md)
 - [ADR-0020: OpenAPI y Swagger en todos los servicios backend](0020-openapi-swagger-all-backend-services.md)
+- [ADR-0021: Dominio de proyectos y Workspace integrado](0021-projects-domain-and-workspace.md)

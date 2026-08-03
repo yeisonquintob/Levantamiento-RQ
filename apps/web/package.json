@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@levantamiento-rq/shared-contracts": "workspace:*",
     "@levantamiento-rq/shared-ui": "workspace:*",
     "next": "~16.1.6",
     "react": "^19.0.0",

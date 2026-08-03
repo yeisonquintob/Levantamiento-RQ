@@ -34,22 +34,25 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: config.webOrigin,
     credentials: true,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["content-type", "authorization", "x-correlation-id"],
   });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new ApplicationExceptionFilter());
+
   if (config.environment === "development") {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Gateway API")
       .setDescription(
-        "Punto de entrada del frontend y autenticación por cookies HttpOnly.",
+        "Punto de entrada del frontend para identidad y proyectos.",
       )
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
       .addTag("authentication", "Identidad y sesiones")
+      .addTag("projects", "Proyectos y participantes")
       .addCookieAuth("rq_access")
       .addCookieAuth("rq_refresh")
+      .addBearerAuth()
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
@@ -67,8 +70,8 @@ async function bootstrap(): Promise<void> {
       },
     });
   }
-  app.enableShutdownHooks();
 
+  app.enableShutdownHooks();
   await app.listen(config.port, config.host);
 
   const entry = createStructuredLogEntry("info", "Gateway iniciado", {
@@ -81,6 +84,7 @@ async function bootstrap(): Promise<void> {
       globalPrefix: config.globalPrefix,
       version: config.version,
       identityServiceUrl: config.identityServiceUrl,
+      projectsServiceUrl: config.projectsServiceUrl,
       webOrigin: config.webOrigin,
     },
   });

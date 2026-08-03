@@ -16,7 +16,6 @@ interface AppShellProps {
 }
 
 const futureNavigation = [
-  ["Proyectos", "P"],
   ["Fuentes", "F"],
   ["Documentos", "D"],
   ["Validación", "V"],
@@ -181,15 +180,22 @@ export function AppShell({ children, user }: AppShellProps) {
         <nav className="rq-nav" aria-label="Navegación principal">
           <span className="rq-nav__label">Gestión</span>
 
-          <a
-            aria-current="page"
-            href="/workspace"
-            onClick={() => setMenuOpen(false)}
-          >
+          <a href="/workspace#inicio" onClick={() => setMenuOpen(false)}>
             <span aria-hidden="true" className="rq-nav__icon">
               ⌂
             </span>
             <span>Inicio</span>
+          </a>
+
+          <a
+            aria-current="page"
+            href="/workspace#proyectos"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              P
+            </span>
+            <span>Proyectos</span>
           </a>
 
           {futureNavigation.map(([label, icon]) => (
@@ -223,7 +229,7 @@ export function AppShell({ children, user }: AppShellProps) {
       </main>
 
       <footer className="rq-footer">
-        Identidad, autenticación y autorización · Paso 10
+        Proyectos, participantes y acceso · Paso 12
       </footer>
     </div>
   );

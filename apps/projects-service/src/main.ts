@@ -12,6 +12,7 @@ import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
+import { ApplicationExceptionFilter } from "@levantamiento-rq/shared-http";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/projects-service/.env"],
@@ -33,12 +34,18 @@ async function bootstrap(): Promise<void> {
   const globalPrefix = "api/v1";
 
   app.setGlobalPrefix(globalPrefix);
+  app.useGlobalFilters(new ApplicationExceptionFilter());
+
   if (config.environment === "development") {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Projects Service API")
-      .setDescription("Proyectos de levantamiento de requerimientos.")
+      .setDescription(
+        "Proyectos, participantes y acceso del levantamiento de requerimientos.",
+      )
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag("projects", "Gestión de proyectos y participantes")
+      .addBearerAuth()
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
@@ -52,12 +59,11 @@ async function bootstrap(): Promise<void> {
       swaggerOptions: {
         displayRequestDuration: true,
         persistAuthorization: false,
-        withCredentials: true,
       },
     });
   }
-  app.enableShutdownHooks();
 
+  app.enableShutdownHooks();
   await app.listen(config.port, config.host);
 
   Logger.log(

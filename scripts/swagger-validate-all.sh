@@ -143,6 +143,15 @@ if service in {"gateway", "identity-service"}:
         if route not in paths:
             raise SystemExit(f"{service}: falta {route}.")
 
+if service in {"gateway", "projects-service"}:
+    for route in (
+        "/api/v1/projects",
+        "/api/v1/projects/summary",
+        "/api/v1/projects/{projectId}",
+    ):
+        if route not in paths:
+            raise SystemExit(f"{service}: falta {route}.")
+
 print(f"✓ {service}: OpenAPI, UI y recursos estáticos válidos.")
 PY_JSON
 

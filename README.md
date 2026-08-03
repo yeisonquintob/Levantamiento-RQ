@@ -121,3 +121,9 @@ La validación completa se ejecuta con:
 ```bash
 pnpm swagger:validate
 ```
+
+## Paso 12: Projects Service y Workspace
+
+`RqProjectsDb` almacena proyectos y participantes sin relaciones entre bases.
+Projects Service valida access tokens, el Gateway publica la API de proyectos
+y el Workspace permite crear, consultar, filtrar y actualizar registros reales.
