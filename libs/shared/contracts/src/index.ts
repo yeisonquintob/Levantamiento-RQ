@@ -5,3 +5,4 @@ export * from "./lib/integration-event.js";
 export * from "./lib/pagination.js";
 export * from "./lib/problem-details.js";
 export * from "./lib/projects.js";
+export * from "./lib/sources.js";

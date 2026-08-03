@@ -10,9 +10,11 @@ export interface GatewayConfig extends BaseServiceConfig {
   version: string;
   identityServiceUrl: string;
   projectsServiceUrl: string;
+  sourcesServiceUrl: string;
   webOrigin: string;
   identityTimeoutMs: number;
   projectsTimeoutMs: number;
+  sourcesTimeoutMs: number;
   cookieSecure: boolean;
 }
 
@@ -114,6 +116,11 @@ export function loadGatewayConfig(
       "http://127.0.0.1:3002",
       "PROJECTS_SERVICE_URL",
     ),
+    sourcesServiceUrl: readUrl(
+      environment.SOURCES_SERVICE_URL,
+      "http://127.0.0.1:3003",
+      "SOURCES_SERVICE_URL",
+    ),
     webOrigin: readUrl(
       environment.WEB_ORIGIN,
       "http://127.0.0.1:4200",
@@ -132,6 +139,13 @@ export function loadGatewayConfig(
       500,
       30000,
       "PROJECTS_TIMEOUT_MS",
+    ),
+    sourcesTimeoutMs: readInteger(
+      environment.SOURCES_TIMEOUT_MS,
+      8000,
+      500,
+      30000,
+      "SOURCES_TIMEOUT_MS",
     ),
     cookieSecure: readBoolean(
       environment.AUTH_COOKIE_SECURE,

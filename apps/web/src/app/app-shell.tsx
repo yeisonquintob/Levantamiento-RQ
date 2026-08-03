@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -16,7 +17,6 @@ interface AppShellProps {
 }
 
 const futureNavigation = [
-  ["Fuentes", "F"],
   ["Documentos", "D"],
   ["Validación", "V"],
   ["Configuración", "C"],
@@ -53,6 +53,7 @@ function resolveProfile(roles: readonly string[]): string {
 }
 
 export function AppShell({ children, user }: AppShellProps) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -188,7 +189,7 @@ export function AppShell({ children, user }: AppShellProps) {
           </a>
 
           <a
-            aria-current="page"
+            aria-current={pathname === "/workspace" ? "page" : undefined}
             href="/workspace#proyectos"
             onClick={() => setMenuOpen(false)}
           >
@@ -196,6 +197,19 @@ export function AppShell({ children, user }: AppShellProps) {
               P
             </span>
             <span>Proyectos</span>
+          </a>
+
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/sources") ? "page" : undefined
+            }
+            href="/workspace/sources"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              F
+            </span>
+            <span>Fuentes</span>
           </a>
 
           {futureNavigation.map(([label, icon]) => (
@@ -229,7 +243,7 @@ export function AppShell({ children, user }: AppShellProps) {
       </main>
 
       <footer className="rq-footer">
-        Proyectos, participantes y acceso · Paso 12
+        Fuentes textuales y trazabilidad por proyecto · Paso 13.1
       </footer>
     </div>
   );

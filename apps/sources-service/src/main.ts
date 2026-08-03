@@ -38,7 +38,9 @@ async function bootstrap(): Promise<void> {
       .setTitle("Levantamiento RQ - Sources Service API")
       .setDescription("Fuentes, archivos, notas y metadatos.")
       .setVersion("1.0.0")
+      .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag("sources", "Fuentes textuales y metadatos del proyecto")
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);

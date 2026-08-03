@@ -59,3 +59,4 @@
 - [Activación real de identidad](identity-real-activation.md)
 - [OpenAPI y Swagger](../api/openapi-swagger.md)
 - [Projects Service y Workspace](projects-service-foundation.md)
+- [Sources Service y fuentes textuales](sources-service-foundation.md)

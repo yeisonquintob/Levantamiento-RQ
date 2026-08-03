@@ -2,9 +2,9 @@
 
 | Servicio      | Base prevista    | Estado      |
 | ------------- | ---------------- | ----------- |
-| Identity      | RqIdentityDb     | Planificada |
-| Projects      | RqProjectsDb     | Planificada |
-| Sources       | RqSourcesDb      | Planificada |
+| Identity      | RqIdentityDb     | Implementada |
+| Projects      | RqProjectsDb     | Implementada |
+| Sources       | RqSourcesDb      | Implementada |
 | Documents     | RqDocumentsDb    | Planificada |
 | AI Analysis   | RqAiDb           | Planificada |
 | ERP Knowledge | RqErpKnowledgeDb | Futura      |

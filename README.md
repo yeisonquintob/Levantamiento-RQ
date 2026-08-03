@@ -127,3 +127,16 @@ pnpm swagger:validate
 `RqProjectsDb` almacena proyectos y participantes sin relaciones entre bases.
 Projects Service valida access tokens, el Gateway publica la API de proyectos
 y el Workspace permite crear, consultar, filtrar y actualizar registros reales.
+
+## Paso 13.1: Sources Service y fuentes textuales
+
+`RqSourcesDb` almacena notas, conversaciones, transcripciones y metadatos de
+fuentes sin relaciones entre bases. Sources Service valida el access token y
+consulta Projects Service para confirmar el acceso al proyecto.
+
+El Gateway publica la API de fuentes y el Workspace permite seleccionar un
+proyecto, consultar indicadores, buscar, registrar, editar y archivar fuentes
+textuales.
+
+La carga binaria de archivos y el almacenamiento en Azurite se implementarán
+en el Paso 13.2.

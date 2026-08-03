@@ -1250,3 +1250,124 @@ textarea {
 }
 
 /* RQ PROJECTS WORKSPACE END */
+
+/* Paso 13.1 - Sources Service y fuentes textuales */
+.rq-project-table__actions,
+.rq-source-table__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--rq-space-2);
+}
+
+a.rq-action {
+  text-decoration: none;
+}
+
+.rq-source-project-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(280px, 1.2fr);
+  align-items: end;
+  gap: var(--rq-space-4);
+  margin-bottom: var(--rq-space-4);
+  padding: var(--rq-space-4);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-lg);
+  background: var(--rq-color-surface);
+  box-shadow: var(--rq-shadow-xs);
+}
+
+.rq-source-project-card__summary {
+  display: grid;
+  min-height: var(--rq-control-height);
+  align-content: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-source-project-card__summary span,
+.rq-source-project-card__summary small {
+  color: var(--rq-color-muted);
+}
+
+.rq-source-project-card__summary strong {
+  overflow-wrap: anywhere;
+}
+
+.rq-source-filter-bar {
+  grid-template-columns:
+    minmax(220px, 1.5fr)
+    minmax(150px, 0.65fr)
+    minmax(140px, 0.55fr)
+    auto;
+}
+
+.rq-source-table {
+  min-width: 940px;
+}
+
+.rq-source-table__title {
+  display: grid;
+  gap: 3px;
+  max-width: 460px;
+}
+
+.rq-source-table__title span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--rq-color-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rq-source-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.rq-source-form__content {
+  grid-column: 1 / -1;
+}
+
+.rq-source-form__content textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .rq-source-project-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rq-source-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rq-source-filter-bar .rq-filter-bar__actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .rq-source-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .rq-source-filter-bar .rq-filter-bar__actions {
+    grid-column: auto;
+  }
+
+  .rq-project-table__actions,
+  .rq-source-table__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rq-project-table__actions .rq-action,
+  .rq-source-table__actions .rq-action {
+    width: 100%;
+  }
+}

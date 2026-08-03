@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
@@ -484,14 +485,23 @@ export function ProjectsWorkspace({
                     <td>{project.participantCount}</td>
                     <td>{formatDate(project.updatedAt)}</td>
                     <td>
-                      <RqActionButton
-                        compact
-                        disabled={loading}
-                        onClick={() => void openEdit(project)}
-                        tone="operation"
-                      >
-                        Ver / editar
-                      </RqActionButton>
+                      <div className="rq-project-table__actions">
+                        <Link
+                          className="rq-action rq-action--compact"
+                          data-rq-tone="consult"
+                          href={`/workspace/sources?projectId=${encodeURIComponent(project.id)}`}
+                        >
+                          Fuentes
+                        </Link>
+                        <RqActionButton
+                          compact
+                          disabled={loading}
+                          onClick={() => void openEdit(project)}
+                          tone="operation"
+                        >
+                          Ver / editar
+                        </RqActionButton>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -505,8 +515,8 @@ export function ProjectsWorkspace({
         <strong>Estado del Paso 12</strong>
         <span>
           Projects Service, RqProjectsDb, acceso por participantes, Gateway y
-          Workspace están integrados. Fuentes y documentos se habilitarán en sus
-          pasos correspondientes.
+          Workspace están integrados. El botón Fuentes abre la gestión textual
+          implementada en el Paso 13.1.
         </span>
       </aside>
 
