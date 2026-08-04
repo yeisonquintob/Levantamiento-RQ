@@ -36,11 +36,13 @@ test("la creación normaliza campos obligatorios", () => {
       title: "  Automatización comercial  ",
       requestingArea: "  Ventas  ",
       description: "  Consolidar fuentes  ",
+      templateId: "14000000-0000-4000-8000-000000000001",
     }),
     {
       title: "Automatización comercial",
       requestingArea: "Ventas",
       description: "Consolidar fuentes",
+      templateId: "14000000-0000-4000-8000-000000000001",
     },
   );
 });
@@ -89,6 +91,37 @@ test("la migración no crea relaciones con RqIdentityDb", async () => {
   assert.doesNotMatch(migration, /IdentityUsers/i);
 });
 
+test("el proyecto conserva la versión publicada exacta de la plantilla", async () => {
+  const migration = await readFile(
+    "apps/projects-service/src/database/migrations/1786060800000-AddProjectTemplateSelection.ts",
+    "utf8",
+  );
+  const service = await readFile(
+    "apps/projects-service/src/projects/projects.service.ts",
+    "utf8",
+  );
+  const client = await readFile(
+    "apps/projects-service/src/projects/document-templates-access.client.ts",
+    "utf8",
+  );
+
+  assert.match(migration, /TemplateId uniqueidentifier/);
+  assert.match(migration, /TemplateVersion nvarchar/);
+  assert.doesNotMatch(migration, /FOREIGN KEY/i);
+  assert.match(service, /requirePublished/);
+  assert.match(service, /templateVersion: template\.version/);
+  assert.match(service, /INSERT INTO dbo\.Projects/);
+  assert.match(service, /INSERT INTO dbo\.ProjectParticipants/);
+  assert.match(service, /randomUUID/);
+  assert.match(service, /ServiceUnavailableException/);
+  assert.match(service, /function normalizeUuid/);
+  assert.match(service, /function sameUuid/);
+  assert.match(service, /id: normalizeUuid\(project\.id\)/);
+  assert.match(service, /sameUuid\(participant\.userId, actor\.id\)/);
+  assert.doesNotMatch(service, /projectRepository\.save\(project\)/);
+  assert.match(client, /template\.status !== "PUBLISHED"/);
+});
+
 test("Inicio y Proyectos son vistas independientes", async () => {
   const home = await readFile("apps/web/src/app/workspace/page.tsx", "utf8");
   const homeWorkspace = await readFile(
@@ -109,12 +142,17 @@ test("Inicio y Proyectos son vistas independientes", async () => {
   assert.match(home, /HomeWorkspace/);
   assert.match(homeWorkspace, /Etapas del levantamiento/);
   assert.match(homeWorkspace, /Cargar datos y fuentes/);
+  assert.match(homeWorkspace, /Etapa actual: crear proyecto y encabezado/);
+  assert.match(homeWorkspace, /"locked"/);
   assert.match(homeWorkspace, /Estado del proyecto/);
   assert.match(homeWorkspace, /projectStageLabel/);
   assert.doesNotMatch(homeWorkspace, /Acceso rápido/);
   assert.match(projectsPage, /\/api\/v1\/projects/);
   assert.match(projectsPage, /ProjectsWorkspace/);
+  assert.match(projectsPage, /status=PUBLISHED/);
   assert.match(projectsWorkspace, /Nuevo proyecto/);
+  assert.match(projectsWorkspace, /Plantilla publicada/);
+  assert.match(projectsWorkspace, /templateId/);
   assert.match(projectsWorkspace, /rq-module-commandbar/);
   assert.doesNotMatch(projectsWorkspace, /RqPageHero/);
   assert.match(projectsWorkspace, /credentials: "include"/);
@@ -126,4 +164,14 @@ test("Inicio y Proyectos son vistas independientes", async () => {
   assert.doesNotMatch(shell, /workspace#proyectos/);
   assert.match(nextConfig, /devIndicators:\s*false/);
   assert.doesNotMatch(projectsWorkspace, /127\.0\.0\.1:3002/);
+
+  const smoke = await readFile("scripts/projects-smoke-test.ts", "utf8");
+
+  assert.match(smoke, /3004\/api\/v1\/templates/);
+  assert.match(smoke, /3002\/api\/v1\/projects/);
+  assert.match(smoke, /3000\/api\/v1\/projects/);
+  assert.match(smoke, /Etapa fallida/);
+  assert.match(smoke, /function sameUuid/);
+  assert.match(smoke, /listar los proyectos creados/);
+  assert.match(smoke, /identificador diferente/);
 });

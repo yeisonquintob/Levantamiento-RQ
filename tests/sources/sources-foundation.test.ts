@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  SOURCE_CLASSIFICATIONS,
   SOURCE_FILE_EXTENSIONS,
   SOURCE_PROCESSING_STATUSES,
   SOURCE_STATUSES,
@@ -13,6 +14,7 @@ import {
   parseCreateTextSource,
   parseSourceListQuery,
   parseUpdateSource,
+  parseUploadMetadata,
 } from "../../apps/sources-service/src/sources/sources-input.js";
 import {
   titleFromFileName,
@@ -43,6 +45,17 @@ test("el contrato publica tipos, formatos y estados controlados", () => {
     "PROCESSING",
     "READY",
     "FAILED",
+  ]);
+  assert.deepEqual(SOURCE_CLASSIFICATIONS, [
+    "REQUIREMENT",
+    "MEETING",
+    "CURRENT_PROCESS",
+    "BUSINESS_RULE",
+    "EVIDENCE",
+    "MANUAL",
+    "INTEGRATION",
+    "DATA",
+    "OTHER",
   ]);
   assert.deepEqual(SOURCE_FILE_EXTENSIONS, [
     "pdf",
@@ -86,6 +99,50 @@ test("FILE utiliza la ruta multipart y no la creación textual", () => {
 
 test("la actualización exige al menos un campo", () => {
   assert.throws(() => parseUpdateSource({}), /al menos un campo/i);
+});
+
+test("cada archivo exige clasificación y admite descripción", () => {
+  assert.deepEqual(
+    parseUploadMetadata(
+      JSON.stringify([
+        {
+          fileName: "acta.pdf",
+          classification: "MEETING",
+          description: "  Reunión inicial  ",
+        },
+        {
+          fileName: "reglas.docx",
+          classification: "BUSINESS_RULE",
+          description: "",
+        },
+      ]),
+    ),
+    [
+      {
+        fileName: "acta.pdf",
+        classification: "MEETING",
+        description: "Reunión inicial",
+      },
+      {
+        fileName: "reglas.docx",
+        classification: "BUSINESS_RULE",
+        description: null,
+      },
+    ],
+  );
+
+  assert.throws(
+    () =>
+      parseUploadMetadata(
+        JSON.stringify([
+          {
+            fileName: "sin-clasificar.pdf",
+            classification: "",
+          },
+        ]),
+      ),
+    /clasificación válida/i,
+  );
 });
 
 test("los filtros incluyen paginación y procesamiento", () => {
@@ -197,6 +254,10 @@ test("las migraciones mantienen la autonomía de RqSourcesDb", async () => {
     "apps/sources-service/src/database/migrations/1785888000000-AddSourceFilesAndExtraction.ts",
     "utf8",
   );
+  const metadata = await readFile(
+    "apps/sources-service/src/database/migrations/1786060801000-AddSourceClassificationAndDescription.ts",
+    "utf8",
+  );
 
   assert.match(foundation, /CREATE TABLE dbo\.Sources/);
   assert.match(foundation, /ProjectId uniqueidentifier NOT NULL/);
@@ -204,8 +265,14 @@ test("las migraciones mantienen la autonomía de RqSourcesDb", async () => {
   assert.match(files, /FileExtension nvarchar\(24\)/);
   assert.match(files, /UX_Sources_ProjectId_Sha256_ActiveFile/);
   assert.match(files, /'PROCESSING'/);
-  assert.doesNotMatch(`${foundation}\n${files}`, /FOREIGN KEY\s*\(ProjectId\)/i);
-  assert.doesNotMatch(`${foundation}\n${files}`, /RqProjectsDb/i);
+  assert.match(metadata, /Description nvarchar\(2000\)/);
+  assert.match(metadata, /Classification nvarchar\(40\)/);
+  assert.match(metadata, /IX_Sources_ProjectId_Classification/);
+  assert.doesNotMatch(
+    `${foundation}\n${files}\n${metadata}`,
+    /FOREIGN KEY\s*\(ProjectId\)/i,
+  );
+  assert.doesNotMatch(`${foundation}\n${files}\n${metadata}`, /RqProjectsDb/i);
 });
 
 test("Sources valida el proyecto por API y no por repositorio externo", async () => {
@@ -273,12 +340,17 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
 
   assert.match(gateway, /requestMultipart/);
   assert.match(gateway, /FormData/);
-  assert.match(controller, /request\.files\(\)/);
+  assert.match(controller, /request\.parts\(\)/);
   assert.match(client, />\s*Nueva fuente\s*</);
   assert.match(client, />\s*Fuente textual\s*</);
   assert.match(client, />\s*Subir archivos\s*</);
   assert.match(client, /multiple/);
   assert.match(client, /onDrop=\{handleDrop\}/);
+  assert.match(client, /Clasificación/);
+  assert.match(client, /Descripción opcional/);
+  assert.match(client, />\s*Editar\s*</);
+  assert.match(client, />\s*Eliminar\s*</);
+  assert.match(client, /data\.append\(\s*"metadata"/);
   assert.match(client, /Reprocesar/);
   assert.match(client, /Descargar/);
   assert.doesNotMatch(client, /127\.0\.0\.1:3003/);

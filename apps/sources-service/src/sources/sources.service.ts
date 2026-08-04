@@ -12,6 +12,7 @@ import { Repository } from "typeorm";
 import type {
   AuthenticatedUser,
   CreateTextSourceRequest,
+  SourceClassification,
   SourceDetail,
   SourceFileExtension,
   SourceListResponse,
@@ -40,6 +41,8 @@ export interface IncomingSourceFile {
   fileName: string;
   mediaType: string;
   buffer: Buffer;
+  classification: SourceClassification;
+  description: string | null;
 }
 
 export interface SourceDownloadPayload {
@@ -109,6 +112,8 @@ export class SourcesService {
       projectId,
       sourceType: request.sourceType,
       title: request.title,
+      description: null,
+      classification: null,
       content: request.content,
       extractedText: request.content,
       processingStatus: "READY",
@@ -203,6 +208,8 @@ export class SourcesService {
             validated.mediaType,
             validated.buffer,
             fileSha256,
+            incoming.classification,
+            incoming.description,
           ),
         );
       } catch (error) {
@@ -239,7 +246,9 @@ export class SourcesService {
         `(source.title LIKE :search
           OR source.content LIKE :search
           OR source.extractedText LIKE :search
-          OR source.originalFileName LIKE :search)`,
+          OR source.originalFileName LIKE :search
+          OR source.description LIKE :search
+          OR source.classification LIKE :search)`,
         { search: `%${query.search}%` },
       );
     }
@@ -388,6 +397,20 @@ export class SourcesService {
       source.sha256 = textSha256(request.content);
     }
 
+    if (request.description !== undefined) {
+      source.description = request.description;
+    }
+
+    if (request.classification !== undefined) {
+      if (source.sourceType !== "FILE") {
+        throw new BadRequestException(
+          "La clasificación se aplica únicamente a archivos.",
+        );
+      }
+
+      source.classification = request.classification;
+    }
+
     source.updatedByUserId = actor.id;
     source.updatedAt = new Date();
 
@@ -464,6 +487,8 @@ export class SourcesService {
     mediaType: string,
     buffer: Buffer,
     fileSha256: string,
+    classification: SourceClassification,
+    description: string | null,
   ): Promise<SourceDetail> {
     const sourceId = randomUUID();
     const blobPath =
@@ -487,6 +512,8 @@ export class SourcesService {
         projectId,
         sourceType: "FILE",
         title: titleFromFileName(originalFileName),
+        description,
+        classification,
         content: null,
         extractedText: null,
         processingStatus: "PENDING",
@@ -620,6 +647,8 @@ export class SourcesService {
       projectId: source.projectId,
       sourceType: source.sourceType,
       title: source.title,
+      description: source.description,
+      classification: source.classification,
       contentPreview: contentPreview(
         source.extractedText ?? source.content,
       ),

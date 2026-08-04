@@ -86,11 +86,16 @@ export class ProjectsGatewayController {
   @ApiBody({
     schema: {
       type: "object",
-      required: ["title", "requestingArea"],
+      required: ["title", "requestingArea", "templateId"],
       properties: {
         title: { type: "string", minLength: 3, maxLength: 200 },
         requestingArea: { type: "string", minLength: 2, maxLength: 160 },
         description: { type: "string", nullable: true, maxLength: 2000 },
+        templateId: {
+          type: "string",
+          format: "uuid",
+          description: "Versión publicada exacta de la plantilla.",
+        },
       },
     },
   })

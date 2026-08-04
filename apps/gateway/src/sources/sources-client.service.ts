@@ -128,8 +128,10 @@ export class SourcesClientService {
     accessToken: string,
     projectId: string,
     files: readonly GatewayUploadFile[],
+    metadata: string,
   ): Promise<SourceUploadBatchResponse> {
     const form = new FormData();
+    form.append("metadata", metadata);
 
     for (const file of files) {
       form.append(

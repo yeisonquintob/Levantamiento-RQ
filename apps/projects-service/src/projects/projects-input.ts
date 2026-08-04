@@ -127,6 +127,7 @@ export function parseCreateProject(value: unknown): CreateProjectRequest {
     title: requiredText(record, "title", 3, 200),
     requestingArea: requiredText(record, "requestingArea", 2, 160),
     description: optionalText(record, "description", 2000),
+    templateId: requiredUuid(record.templateId, "templateId"),
   };
 }
 

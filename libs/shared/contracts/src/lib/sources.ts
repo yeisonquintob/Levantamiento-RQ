@@ -29,6 +29,21 @@ export const SOURCE_PROCESSING_STATUSES = [
 export type SourceProcessingStatus =
   (typeof SOURCE_PROCESSING_STATUSES)[number];
 
+export const SOURCE_CLASSIFICATIONS = [
+  "REQUIREMENT",
+  "MEETING",
+  "CURRENT_PROCESS",
+  "BUSINESS_RULE",
+  "EVIDENCE",
+  "MANUAL",
+  "INTEGRATION",
+  "DATA",
+  "OTHER",
+] as const;
+
+export type SourceClassification =
+  (typeof SOURCE_CLASSIFICATIONS)[number];
+
 export const SOURCE_FILE_EXTENSIONS = [
   "pdf",
   "docx",
@@ -48,6 +63,8 @@ export interface SourceSummary {
   projectId: string;
   sourceType: SourceType;
   title: string;
+  description: string | null;
+  classification: SourceClassification | null;
   contentPreview: string | null;
   processingStatus: SourceProcessingStatus;
   processingMessage: string | null;
@@ -102,6 +119,14 @@ export interface CreateTextSourceRequest {
 export interface UpdateSourceRequest {
   title?: string;
   content?: string;
+  description?: string | null;
+  classification?: SourceClassification;
+}
+
+export interface SourceUploadFileMetadata {
+  fileName: string;
+  classification: SourceClassification;
+  description?: string | null;
 }
 
 export interface SourceUploadRejected {

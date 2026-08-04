@@ -9,6 +9,7 @@ import {
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { ProjectEntity, ProjectParticipantEntity } from "../projects/entities";
+import { DocumentTemplatesAccessClient } from "../projects/document-templates-access.client";
 import {
   loadProjectsAuthConfig,
   PROJECTS_AUTH_CONFIG,
@@ -47,6 +48,7 @@ const projectEntities = [ProjectEntity, ProjectParticipantEntity];
             useFactory: loadProjectsAuthConfig,
           },
           ProjectsAccessTokenGuard,
+          DocumentTemplatesAccessClient,
           ProjectsService,
         ]
       : []),

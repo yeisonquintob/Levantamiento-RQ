@@ -33,6 +33,7 @@ import {
   parseSourceId,
   parseSourceListQuery,
   parseUpdateSource,
+  parseUploadMetadata,
 } from "./sources-input";
 import type { SourcesRequest } from "./sources-request";
 import {
@@ -151,8 +152,13 @@ export class SourcesController {
   @ApiBody({
     schema: {
       type: "object",
-      required: ["files"],
+      required: ["metadata", "files"],
       properties: {
+        metadata: {
+          type: "string",
+          description:
+            "JSON ordenado con fileName, classification y description.",
+        },
         files: {
           type: "array",
           items: {
@@ -175,15 +181,51 @@ export class SourcesController {
     }
 
     const context = requireContext(request);
-    const files: IncomingSourceFile[] = [];
+    const rawFiles: Array<{
+      fileName: string;
+      mediaType: string;
+      buffer: Buffer;
+    }> = [];
+    let metadataValue: string | null = null;
 
-    for await (const part of request.files()) {
-      files.push({
-        fileName: part.filename,
-        mediaType: part.mimetype,
-        buffer: await part.toBuffer(),
-      });
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        rawFiles.push({
+          fileName: part.filename,
+          mediaType: part.mimetype,
+          buffer: await part.toBuffer(),
+        });
+      } else if (
+        part.fieldname === "metadata" &&
+        typeof part.value === "string"
+      ) {
+        metadataValue = part.value;
+      }
     }
+
+    const metadata = parseUploadMetadata(metadataValue);
+
+    if (metadata.length !== rawFiles.length) {
+      throw new BadRequestException(
+        "Cada archivo debe tener una clasificación y descripción asociadas.",
+      );
+    }
+
+    const files: IncomingSourceFile[] = rawFiles.map((file, index) => {
+      const item = metadata[index];
+
+      if (!item || item.fileName !== file.fileName) {
+        throw new BadRequestException(
+          "La configuración de archivos no coincide con los archivos seleccionados.",
+        );
+      }
+
+      return {
+        ...file,
+        classification: item.classification,
+        description: item.description ?? null,
+      };
+    });
 
     return this.sources.uploadFiles(
       context.actor,
@@ -280,7 +322,7 @@ export class SourcesController {
     );
   }
 
-  @ApiOperation({ summary: "Archivar una fuente" })
+  @ApiOperation({ summary: "Eliminar una fuente de la vista activa" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "sourceId", format: "uuid" })
   @Delete(":sourceId")

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type {
+  DocumentTemplateListResponse,
   ProjectListResponse,
   ProjectMetrics,
 } from "@levantamiento-rq/shared-contracts";
@@ -14,6 +15,7 @@ const GATEWAY_URL =
 async function loadInitialData(): Promise<{
   list?: ProjectListResponse;
   metrics?: ProjectMetrics;
+  templates?: DocumentTemplateListResponse;
   error?: string;
   unauthorized?: boolean;
 }> {
@@ -29,22 +31,38 @@ async function loadInitialData(): Promise<{
   };
 
   try {
-    const [listResponse, metricsResponse] = await Promise.all([
-      fetch(`${GATEWAY_URL}/api/v1/projects?page=1&pageSize=50`, {
-        cache: "no-store",
-        headers,
-      }),
-      fetch(`${GATEWAY_URL}/api/v1/projects/summary`, {
-        cache: "no-store",
-        headers,
-      }),
-    ]);
+    const [listResponse, metricsResponse, templatesResponse] =
+      await Promise.all([
+        fetch(`${GATEWAY_URL}/api/v1/projects?page=1&pageSize=50`, {
+          cache: "no-store",
+          headers,
+        }),
+        fetch(`${GATEWAY_URL}/api/v1/projects/summary`, {
+          cache: "no-store",
+          headers,
+        }),
+        fetch(
+          `${GATEWAY_URL}/api/v1/templates?page=1&pageSize=50&status=PUBLISHED`,
+          {
+            cache: "no-store",
+            headers,
+          },
+        ),
+      ]);
 
-    if (listResponse.status === 401 || metricsResponse.status === 401) {
+    if (
+      listResponse.status === 401 ||
+      metricsResponse.status === 401 ||
+      templatesResponse.status === 401
+    ) {
       return { unauthorized: true };
     }
 
-    if (!listResponse.ok || !metricsResponse.ok) {
+    if (
+      !listResponse.ok ||
+      !metricsResponse.ok ||
+      !templatesResponse.ok
+    ) {
       return {
         error:
           "Projects Service no respondió correctamente. Recarga la vista después de validar los servicios.",
@@ -54,6 +72,8 @@ async function loadInitialData(): Promise<{
     return {
       list: (await listResponse.json()) as ProjectListResponse,
       metrics: (await metricsResponse.json()) as ProjectMetrics,
+      templates:
+        (await templatesResponse.json()) as DocumentTemplateListResponse,
     };
   } catch {
     return {
@@ -75,6 +95,7 @@ export default async function WorkspacePage() {
       initialError={initial.error}
       initialList={initial.list}
       initialMetrics={initial.metrics}
+      initialTemplates={initial.templates}
     />
   );
 }

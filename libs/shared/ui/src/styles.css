@@ -2723,3 +2723,79 @@ a.rq-action {
 
 
 /* FIN PASO 14 */
+
+.rq-action--disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.rq-home-flow-list li[data-state="locked"] {
+  background: var(--rq-color-surface-soft);
+  opacity: 0.68;
+}
+
+.rq-home-flow-list li[data-state="locked"] .rq-home-flow-number {
+  color: var(--rq-color-muted);
+}
+
+.rq-project-template,
+.rq-project-template-readonly {
+  display: grid;
+  gap: 2px;
+}
+
+.rq-project-template small,
+.rq-project-template-readonly span {
+  color: var(--rq-color-muted);
+}
+
+.rq-project-template-readonly {
+  padding: 10px 12px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-source-file-config-list {
+  display: grid;
+  max-height: 520px;
+  overflow-y: auto;
+  gap: var(--rq-space-3);
+}
+
+.rq-source-file-config {
+  display: grid;
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-source-file-config > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rq-space-3);
+}
+
+.rq-source-file-config > header > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.rq-source-file-config > header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-source-file-config > header small {
+  color: var(--rq-color-muted);
+}
+
+.rq-source-form__description textarea {
+  min-height: 90px;
+}

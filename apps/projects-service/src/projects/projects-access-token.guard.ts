@@ -79,6 +79,7 @@ export class ProjectsAccessTokenGuard implements CanActivate {
       };
 
       request.authPrincipal = principal;
+      request.accessToken = token;
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) {

@@ -6,7 +6,10 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import type { ProjectStatus } from "@levantamiento-rq/shared-contracts";
+import type {
+  DocumentTemplateType,
+  ProjectStatus,
+} from "@levantamiento-rq/shared-contracts";
 
 import { ProjectParticipantEntity } from "./project-participant.entity";
 
@@ -14,6 +17,7 @@ import { ProjectParticipantEntity } from "./project-participant.entity";
 @Index("UQ_Projects_Code", ["code"], { unique: true })
 @Index("IX_Projects_Status_UpdatedAt", ["status", "updatedAt"])
 @Index("IX_Projects_OwnerUserId", ["ownerUserId"])
+@Index("IX_Projects_TemplateId", ["templateId"])
 export class ProjectEntity {
   @PrimaryGeneratedColumn("uuid", { name: "Id" })
   id!: string;
@@ -36,6 +40,40 @@ export class ProjectEntity {
 
   @Column("nvarchar", { name: "Status", length: 32, default: "DRAFT" })
   status!: ProjectStatus;
+
+  @Column("uniqueidentifier", {
+    name: "TemplateId",
+    nullable: true,
+  })
+  templateId!: string | null;
+
+  @Column("nvarchar", {
+    name: "TemplateCode",
+    length: 40,
+    nullable: true,
+  })
+  templateCode!: string | null;
+
+  @Column("nvarchar", {
+    name: "TemplateName",
+    length: 200,
+    nullable: true,
+  })
+  templateName!: string | null;
+
+  @Column("nvarchar", {
+    name: "TemplateVersion",
+    length: 32,
+    nullable: true,
+  })
+  templateVersion!: string | null;
+
+  @Column("nvarchar", {
+    name: "TemplateType",
+    length: 40,
+    nullable: true,
+  })
+  templateType!: DocumentTemplateType | null;
 
   @Column("uniqueidentifier", { name: "OwnerUserId" })
   ownerUserId!: string;

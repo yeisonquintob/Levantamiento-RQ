@@ -22,44 +22,40 @@ const EMPTY_METRICS: ProjectMetrics = {
   archived: 0,
 };
 
-const DOCUMENT_FLOW = [
+const DOCUMENT_FLOW_BASE = [
   {
     number: "1",
-    title: "Título y encabezado",
+    title: "Crear proyecto y encabezado",
     description: "Crear el proyecto y definir la información principal.",
-    state: "available",
   },
   {
     number: "2",
     title: "Cargar datos y fuentes",
     description: "Registrar notas, conversaciones, transcripciones y archivos.",
-    state: "current",
   },
   {
     number: "3",
     title: "Analizar con IA",
     description: "Interpretar las fuentes y detectar vacíos o contradicciones.",
-    state: "pending",
   },
   {
     number: "4",
     title: "Borradores versionados",
     description: "Generar el primer borrador y las versiones siguientes.",
-    state: "pending",
   },
   {
     number: "5",
     title: "Aprobar",
     description: "Validar el contenido y bloquear la versión aprobada.",
-    state: "pending",
   },
   {
     number: "6",
     title: "PDF y Markdown",
     description: "Publicar los entregables desde el contenido aprobado.",
-    state: "pending",
   },
 ] as const;
+
+type FlowState = "current" | "available" | "pending" | "locked";
 
 interface HomeWorkspaceProps {
   initialList?: ProjectListResponse;
@@ -107,6 +103,21 @@ export function HomeWorkspace({
   const metrics = initialMetrics ?? EMPTY_METRICS;
   const recentProjects = initialList?.items ?? [];
   const activeProjects = metrics.inProgress + metrics.validation;
+  const hasProject = recentProjects.length > 0;
+  const currentStageLabel = hasProject
+    ? "Etapa actual: cargar datos y fuentes"
+    : "Etapa actual: crear proyecto y encabezado";
+  const documentFlow = DOCUMENT_FLOW_BASE.map((step, index) => {
+    let state: FlowState = "pending";
+
+    if (index === 0) {
+      state = hasProject ? "available" : "current";
+    } else if (index === 1) {
+      state = hasProject ? "current" : "locked";
+    }
+
+    return { ...step, state };
+  });
 
   return (
     <section className="rq-home-workspace">
@@ -146,13 +157,24 @@ export function HomeWorkspace({
           >
             Gestionar proyectos
           </Link>
-          <Link
-            className="rq-action"
-            data-rq-tone="consult"
-            href="/workspace/sources"
-          >
-            Cargar fuentes
-          </Link>
+          {hasProject ? (
+            <Link
+              className="rq-action"
+              data-rq-tone="consult"
+              href="/workspace/sources"
+            >
+              Cargar fuentes
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="rq-action rq-action--disabled"
+              data-rq-tone="consult"
+              title="Primero crea un proyecto"
+            >
+              Cargar fuentes
+            </span>
+          )}
         </div>
       </section>
 
@@ -168,12 +190,12 @@ export function HomeWorkspace({
               </p>
             </div>
             <strong className="rq-home-current-stage">
-              Etapa actual: cargar datos
+              {currentStageLabel}
             </strong>
           </header>
 
           <ol className="rq-home-flow-list">
-            {DOCUMENT_FLOW.map((step) => (
+            {documentFlow.map((step) => (
               <li data-state={step.state} key={step.number}>
                 <span className="rq-home-flow-number">{step.number}</span>
                 <span className="rq-home-flow-copy">
@@ -185,7 +207,9 @@ export function HomeWorkspace({
                     ? "En desarrollo"
                     : step.state === "available"
                       ? "Disponible"
-                      : "Pendiente"}
+                      : step.state === "locked"
+                        ? "Bloqueado"
+                        : "Pendiente"}
                 </span>
               </li>
             ))}

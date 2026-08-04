@@ -28,17 +28,44 @@ async function main(): Promise<void> {
       FROM sys.sequences
       WHERE name = 'ProjectCodeSequence' AND schema_id = SCHEMA_ID('dbo')
     `);
-    const migration = await count(`
+    const foundationMigration = await count(`
       SELECT COUNT(1) AS countValue
       FROM dbo.migrations
       WHERE name = 'CreateProjectsFoundation1785715200000'
+    `);
+    const templateMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddProjectTemplateSelection1786060800000'
+    `);
+    const templateColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND TABLE_NAME = 'Projects'
+        AND COLUMN_NAME IN (
+          'TemplateId',
+          'TemplateCode',
+          'TemplateName',
+          'TemplateVersion',
+          'TemplateType'
+        )
+    `);
+    const templateIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE name = 'IX_Projects_TemplateId'
+        AND object_id = OBJECT_ID('dbo.Projects')
     `);
 
     if (
       projectsTable !== 1 ||
       participantsTable !== 1 ||
       codeSequence !== 1 ||
-      migration !== 1
+      foundationMigration !== 1 ||
+      templateMigration !== 1 ||
+      templateColumns !== 5 ||
+      templateIndex !== 1
     ) {
       throw new Error(
         "RqProjectsDb no contiene la estructura completa del Paso 12.",
@@ -50,6 +77,8 @@ async function main(): Promise<void> {
     console.log("Tabla confirmada: dbo.ProjectParticipants");
     console.log("Secuencia confirmada: dbo.ProjectCodeSequence");
     console.log("Migración confirmada: CreateProjectsFoundation1785715200000");
+    console.log("Migración confirmada: AddProjectTemplateSelection1786060800000");
+    console.log("Selección exacta de plantilla confirmada en dbo.Projects.");
   } finally {
     await dataSource.destroy();
   }

@@ -37,10 +37,18 @@ import {
   SourcesClientService,
 } from "./sources-client.service";
 
+interface MultipartField {
+  type: "field";
+  fieldname: string;
+  value: unknown;
+}
+
+type GatewayMultipartPart = MultipartFile | MultipartField;
+
 interface RequestLike {
   headers: Readonly<Record<string, string | string[] | undefined>>;
   isMultipart(): boolean;
-  files(): AsyncIterableIterator<MultipartFile>;
+  parts(): AsyncIterableIterator<GatewayMultipartPart>;
 }
 
 function firstHeader(
@@ -156,8 +164,13 @@ export class SourcesGatewayController {
   @ApiBody({
     schema: {
       type: "object",
-      required: ["files"],
+      required: ["metadata", "files"],
       properties: {
+        metadata: {
+          type: "string",
+          description:
+            "JSON ordenado con fileName, classification y description.",
+        },
         files: {
           type: "array",
           items: {
@@ -180,19 +193,34 @@ export class SourcesGatewayController {
     }
 
     const files: GatewayUploadFile[] = [];
+    let metadata: string | null = null;
 
-    for await (const part of request.files()) {
-      files.push({
-        fileName: part.filename,
-        mediaType: part.mimetype,
-        buffer: await part.toBuffer(),
-      });
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        files.push({
+          fileName: part.filename,
+          mediaType: part.mimetype,
+          buffer: await part.toBuffer(),
+        });
+      } else if (
+        part.fieldname === "metadata" &&
+        typeof part.value === "string"
+      ) {
+        metadata = part.value;
+      }
+    }
+
+    if (!metadata) {
+      throw new BadRequestException(
+        "Cada archivo debe tener clasificación y descripción configuradas.",
+      );
     }
 
     return this.sources.uploadFiles(
       requireAccessToken(request),
       projectId,
       files,
+      metadata,
     );
   }
 
@@ -272,7 +300,7 @@ export class SourcesGatewayController {
     );
   }
 
-  @ApiOperation({ summary: "Archivar una fuente" })
+  @ApiOperation({ summary: "Eliminar una fuente de la vista activa" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "sourceId", format: "uuid" })
   @Delete(":sourceId")

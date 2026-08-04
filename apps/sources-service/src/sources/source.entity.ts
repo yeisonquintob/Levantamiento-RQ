@@ -6,6 +6,7 @@ import {
 } from "typeorm";
 
 import type {
+  SourceClassification,
   SourceFileExtension,
   SourceProcessingStatus,
   SourceStatus,
@@ -36,6 +37,20 @@ export class SourceEntity {
 
   @Column("nvarchar", { name: "Title", length: 240 })
   title!: string;
+
+  @Column("nvarchar", {
+    name: "Description",
+    length: 2000,
+    nullable: true,
+  })
+  description!: string | null;
+
+  @Column("nvarchar", {
+    name: "Classification",
+    length: 40,
+    nullable: true,
+  })
+  classification!: SourceClassification | null;
 
   @Column("nvarchar", {
     name: "Content",

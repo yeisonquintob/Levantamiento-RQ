@@ -42,6 +42,14 @@ function requireActor(request: ProjectsRequest): AuthenticatedUser {
   return request.authPrincipal;
 }
 
+function requireAccessToken(request: ProjectsRequest): string {
+  if (!request.accessToken) {
+    throw new Error("No se resolvió el token de acceso.");
+  }
+
+  return request.accessToken;
+}
+
 @ApiTags("projects")
 @ApiBearerAuth()
 @UseGuards(ProjectsAccessTokenGuard)
@@ -70,7 +78,7 @@ export class ProjectsController {
   @ApiBody({
     schema: {
       type: "object",
-      required: ["title", "requestingArea"],
+      required: ["title", "requestingArea", "templateId"],
       properties: {
         title: { type: "string", minLength: 3, maxLength: 200 },
         requestingArea: { type: "string", minLength: 2, maxLength: 160 },
@@ -78,6 +86,11 @@ export class ProjectsController {
           type: "string",
           nullable: true,
           maxLength: 2000,
+        },
+        templateId: {
+          type: "string",
+          format: "uuid",
+          description: "Versión publicada exacta de la plantilla.",
         },
       },
     },
@@ -87,6 +100,7 @@ export class ProjectsController {
   create(@Req() request: ProjectsRequest, @Body() body: unknown) {
     return this.projects.create(
       requireActor(request),
+      requireAccessToken(request),
       parseCreateProject(body),
     );
   }

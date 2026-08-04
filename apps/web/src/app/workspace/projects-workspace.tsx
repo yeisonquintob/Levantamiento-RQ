@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 import type {
   CreateProjectRequest,
+  DocumentTemplateListResponse,
+  DocumentTemplateSummary,
   ProjectDetail,
   ProjectListResponse,
   ProjectMetrics,
@@ -56,6 +58,7 @@ const STATUS_OPTIONS: readonly {
 interface ProjectsWorkspaceProps {
   initialList?: ProjectListResponse;
   initialMetrics?: ProjectMetrics;
+  initialTemplates?: DocumentTemplateListResponse;
   initialError?: string | null;
 }
 
@@ -63,6 +66,7 @@ interface ProjectFormState {
   title: string;
   requestingArea: string;
   description: string;
+  templateId: string;
   status: ProjectStatus;
 }
 
@@ -75,6 +79,7 @@ const EMPTY_FORM: ProjectFormState = {
   title: "",
   requestingArea: "",
   description: "",
+  templateId: "",
   status: "DRAFT",
 };
 
@@ -148,10 +153,13 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
 export function ProjectsWorkspace({
   initialList = EMPTY_LIST,
   initialMetrics = EMPTY_METRICS,
+  initialTemplates,
   initialError = null,
 }: ProjectsWorkspaceProps) {
   const [projects, setProjects] = useState<ProjectListResponse>(initialList);
   const [metrics, setMetrics] = useState<ProjectMetrics>(initialMetrics);
+  const templates: readonly DocumentTemplateSummary[] =
+    initialTemplates?.items ?? [];
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"" | ProjectStatus>("");
   const [loading, setLoading] = useState(false);
@@ -218,6 +226,15 @@ export function ProjectsWorkspace({
   }
 
   function openCreate(): void {
+    if (templates.length === 0) {
+      setAlert({
+        tone: "danger",
+        message:
+          "No hay plantillas publicadas disponibles. Publica una plantilla antes de crear el proyecto.",
+      });
+      return;
+    }
+
     setEditing(null);
     setForm(EMPTY_FORM);
     setModalOpen(true);
@@ -236,6 +253,7 @@ export function ProjectsWorkspace({
         title: detail.title,
         requestingArea: detail.requestingArea,
         description: detail.description ?? "",
+        templateId: detail.template?.id ?? "",
         status: detail.status,
       });
       setModalOpen(true);
@@ -288,6 +306,7 @@ export function ProjectsWorkspace({
           title: form.title,
           requestingArea: form.requestingArea,
           description: form.description || null,
+          templateId: form.templateId,
         };
 
         await requestJson<ProjectDetail>("/api/v1/projects", {
@@ -444,6 +463,7 @@ export function ProjectsWorkspace({
                 <th scope="col">Código</th>
                 <th scope="col">Proyecto</th>
                 <th scope="col">Área solicitante</th>
+                <th scope="col">Plantilla</th>
                 <th scope="col">Estado</th>
                 <th scope="col">Participantes</th>
                 <th scope="col">Actualización</th>
@@ -453,7 +473,7 @@ export function ProjectsWorkspace({
             <tbody>
               {projects.items.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <RqEmptyState
                       title="Sin proyectos para mostrar"
                       description="Crea el primer proyecto o ajusta los filtros de búsqueda."
@@ -473,6 +493,18 @@ export function ProjectsWorkspace({
                       </div>
                     </td>
                     <td>{project.requestingArea}</td>
+                    <td>
+                      {project.template ? (
+                        <span className="rq-project-template">
+                          <strong>{project.template.name}</strong>
+                          <small>
+                            {project.template.code} · {project.template.version}
+                          </small>
+                        </span>
+                      ) : (
+                        <span>Sin plantilla asignada</span>
+                      )}
+                    </td>
                     <td>
                       <RqStatusBadge tone={statusTone(project.status)}>
                         {statusLabel(project.status)}
@@ -510,9 +542,9 @@ export function ProjectsWorkspace({
       <aside className="rq-foundation-note" role="status">
         <strong>Estado del Paso 12</strong>
         <span>
-          Projects Service, RqProjectsDb, acceso por participantes, Gateway y
-          Workspace están integrados. El botón Fuentes abre la gestión textual
-          implementada en el Paso 13.1.
+          Projects Service, RqProjectsDb, Gateway y Workspace están
+          integrados. Cada proyecto nuevo exige una versión publicada exacta
+          de la plantilla antes de habilitar la carga de fuentes.
         </span>
       </aside>
 
@@ -576,6 +608,49 @@ export function ProjectsWorkspace({
                   value={form.requestingArea}
                 />
               </div>
+
+              {editing ? (
+                <div className="rq-field">
+                  <label>Plantilla seleccionada</label>
+                  <div className="rq-project-template-readonly">
+                    {editing.template ? (
+                      <>
+                        <strong>{editing.template.name}</strong>
+                        <span>
+                          {editing.template.code} · {editing.template.version}
+                        </span>
+                      </>
+                    ) : (
+                      <span>Proyecto anterior sin plantilla asignada</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="rq-field">
+                  <label htmlFor="project-template">Plantilla publicada</label>
+                  <select
+                    id="project-template"
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        templateId: event.target.value,
+                      }))
+                    }
+                    required
+                    value={form.templateId}
+                  >
+                    <option value="">Selecciona una plantilla</option>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} — {template.version}
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    El proyecto conservará esta versión exacta como referencia.
+                  </small>
+                </div>
+              )}
 
               {editing ? (
                 <div className="rq-field">

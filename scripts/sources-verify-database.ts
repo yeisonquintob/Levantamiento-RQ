@@ -60,6 +60,24 @@ async function main(): Promise<void> {
       FROM dbo.migrations
       WHERE name = 'AddSourceFilesAndExtraction1785888000000'
     `);
+    const metadataMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddSourceClassificationAndDescription1786060801000'
+    `);
+    const metadataColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND TABLE_NAME = 'Sources'
+        AND COLUMN_NAME IN ('Description', 'Classification')
+    `);
+    const classificationIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE name = 'IX_Sources_ProjectId_Classification'
+        AND object_id = OBJECT_ID('dbo.Sources')
+    `);
 
     if (
       sourcesTable !== 1 ||
@@ -69,7 +87,10 @@ async function main(): Promise<void> {
       duplicateIndex !== 1 ||
       newColumns !== 5 ||
       foundationMigration !== 1 ||
-      filesMigration !== 1
+      filesMigration !== 1 ||
+      metadataMigration !== 1 ||
+      metadataColumns !== 2 ||
+      classificationIndex !== 1
     ) {
       throw new Error(
         "RqSourcesDb no contiene la estructura completa del Paso 13.",
@@ -85,6 +106,10 @@ async function main(): Promise<void> {
     console.log("Índice único confirmado: UX_Sources_ProjectId_Sha256_ActiveFile");
     console.log("Migración confirmada: CreateSourcesFoundation1785801600000");
     console.log("Migración confirmada: AddSourceFilesAndExtraction1785888000000");
+    console.log(
+      "Migración confirmada: AddSourceClassificationAndDescription1786060801000",
+    );
+    console.log("Clasificación y descripción de archivos confirmadas.");
   } finally {
     await dataSource.destroy();
   }

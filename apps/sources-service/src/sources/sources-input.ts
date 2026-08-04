@@ -1,13 +1,16 @@
 import { BadRequestException } from "@nestjs/common";
 
 import {
+  SOURCE_CLASSIFICATIONS,
   SOURCE_PROCESSING_STATUSES,
   SOURCE_STATUSES,
   SOURCE_TYPES,
   TEXT_SOURCE_TYPES,
   type CreateTextSourceRequest,
+  type SourceClassification,
   type SourceProcessingStatus,
   type SourceStatus,
+  type SourceUploadFileMetadata,
   type SourceType,
   type TextSourceType,
   type UpdateSourceRequest,
@@ -84,6 +87,46 @@ function readInteger(
   }
 
   return resolved;
+}
+
+function optionalText(
+  record: Readonly<Record<string, unknown>>,
+  field: string,
+  maximum: number,
+): string | null | undefined {
+  const value = record[field];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string" || value.trim().length > maximum) {
+    throw new BadRequestException(
+      `${field} debe tener máximo ${maximum} caracteres.`,
+    );
+  }
+
+  return value.trim() || null;
+}
+
+function requiredClassification(
+  value: unknown,
+  field = "classification",
+): SourceClassification {
+  if (
+    typeof value !== "string" ||
+    !SOURCE_CLASSIFICATIONS.includes(value as SourceClassification)
+  ) {
+    throw new BadRequestException(
+      `${field} debe contener una clasificación válida.`,
+    );
+  }
+
+  return value as SourceClassification;
 }
 
 function optionalSourceType(value: unknown): SourceType | null {
@@ -179,6 +222,14 @@ export function parseUpdateSource(value: unknown): UpdateSourceRequest {
     result.content = requiredText(record, "content", 1, 200000);
   }
 
+  if (record.description !== undefined) {
+    result.description = optionalText(record, "description", 2000);
+  }
+
+  if (record.classification !== undefined) {
+    result.classification = requiredClassification(record.classification);
+  }
+
   if (Object.keys(result).length === 0) {
     throw new BadRequestException(
       "Debes enviar al menos un campo para actualizar.",
@@ -186,6 +237,45 @@ export function parseUpdateSource(value: unknown): UpdateSourceRequest {
   }
 
   return result;
+}
+
+export function parseUploadMetadata(
+  value: unknown,
+): readonly SourceUploadFileMetadata[] {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new BadRequestException(
+      "Debes clasificar y describir los archivos antes de cargarlos.",
+    );
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    throw new BadRequestException(
+      "La configuración de los archivos no contiene JSON válido.",
+    );
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 20) {
+    throw new BadRequestException(
+      "La configuración debe contener entre 1 y 20 archivos.",
+    );
+  }
+
+  return parsed.map((item, index) => {
+    const record = asRecord(item);
+
+    return {
+      fileName: requiredText(record, "fileName", 1, 260),
+      classification: requiredClassification(
+        record.classification,
+        `metadata[${index}].classification`,
+      ),
+      description: optionalText(record, "description", 2000) ?? null,
+    };
+  });
 }
 
 export function parseSourceListQuery(value: unknown): SourceListQuery {

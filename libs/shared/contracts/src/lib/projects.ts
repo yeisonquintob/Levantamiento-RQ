@@ -1,3 +1,5 @@
+import type { DocumentTemplateType } from "./document-templates.js";
+
 export const PROJECT_STATUSES = [
   "DRAFT",
   "IN_PROGRESS",
@@ -15,13 +17,22 @@ export const PROJECT_PARTICIPANT_ROLES = [
   "VIEWER",
 ] as const;
 
-export type ProjectParticipantRole = (typeof PROJECT_PARTICIPANT_ROLES)[number];
+export type ProjectParticipantRole =
+  (typeof PROJECT_PARTICIPANT_ROLES)[number];
 
 export interface ProjectParticipant {
   id: string;
   userId: string;
   role: ProjectParticipantRole;
   createdAt: string;
+}
+
+export interface ProjectTemplateReference {
+  id: string;
+  code: string;
+  name: string;
+  version: string;
+  templateType: DocumentTemplateType;
 }
 
 export interface ProjectSummary {
@@ -31,6 +42,7 @@ export interface ProjectSummary {
   requestingArea: string;
   description: string | null;
   status: ProjectStatus;
+  template: ProjectTemplateReference | null;
   ownerUserId: string;
   participantCount: number;
   createdAt: string;
@@ -62,6 +74,7 @@ export interface CreateProjectRequest {
   title: string;
   requestingArea: string;
   description?: string | null;
+  templateId: string;
 }
 
 export interface UpdateProjectRequest {

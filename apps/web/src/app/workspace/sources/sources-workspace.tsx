@@ -12,6 +12,7 @@ import type {
   CreateTextSourceRequest,
   ProjectListResponse,
   ProjectStatus,
+  SourceClassification,
   SourceDetail,
   SourceListResponse,
   SourceMetrics,
@@ -75,6 +76,21 @@ const TYPE_OPTIONS: readonly {
   { value: "TRANSCRIPT", label: "Transcripción" },
 ];
 
+const CLASSIFICATION_OPTIONS: readonly {
+  value: SourceClassification;
+  label: string;
+}[] = [
+  { value: "REQUIREMENT", label: "Requerimiento" },
+  { value: "MEETING", label: "Acta o reunión" },
+  { value: "CURRENT_PROCESS", label: "Proceso actual" },
+  { value: "BUSINESS_RULE", label: "Regla de negocio" },
+  { value: "EVIDENCE", label: "Evidencia" },
+  { value: "MANUAL", label: "Manual" },
+  { value: "INTEGRATION", label: "Integración" },
+  { value: "DATA", label: "Datos" },
+  { value: "OTHER", label: "Otro" },
+];
+
 interface SourcesWorkspaceProps {
   initialProjects?: ProjectListResponse;
   initialProjectId?: string;
@@ -85,6 +101,15 @@ interface SourceFormState {
   sourceType: TextSourceType;
   title: string;
   content: string;
+  description: string;
+  classification: "" | SourceClassification;
+}
+
+interface SelectedSourceFile {
+  key: string;
+  file: File;
+  classification: "" | SourceClassification;
+  description: string;
 }
 
 interface AlertState {
@@ -98,6 +123,8 @@ const EMPTY_FORM: SourceFormState = {
   sourceType: "NOTE",
   title: "",
   content: "",
+  description: "",
+  classification: "",
 };
 
 function sourceTypeLabel(sourceType: SourceType): string {
@@ -109,8 +136,20 @@ function sourceTypeLabel(sourceType: SourceType): string {
   );
 }
 
+function classificationLabel(
+  classification: SourceClassification | null,
+): string {
+  if (!classification) return "Sin clasificar";
+
+  return (
+    CLASSIFICATION_OPTIONS.find(
+      (option) => option.value === classification,
+    )?.label ?? classification
+  );
+}
+
 function sourceStatusLabel(status: SourceStatus): string {
-  return status === "ACTIVE" ? "Activa" : "Archivada";
+  return status === "ACTIVE" ? "Activa" : "Eliminada";
 }
 
 function projectStatusLabel(status: ProjectStatus): string {
@@ -271,7 +310,7 @@ export function SourcesWorkspace({
   const [creationMode, setCreationMode] =
     useState<CreationMode>("TEXT");
   const [form, setForm] = useState<SourceFormState>(EMPTY_FORM);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedSourceFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(
     initialError
@@ -412,6 +451,8 @@ export function SourcesWorkspace({
             : detail.sourceType,
         title: detail.title,
         content: detail.content ?? "",
+        description: detail.description ?? "",
+        classification: detail.classification ?? "",
       });
       setSelectedFiles([]);
       setModalOpen(true);
@@ -440,8 +481,35 @@ export function SourcesWorkspace({
   }
 
   function selectFiles(files: FileList | readonly File[]): void {
-    const next = Array.from(files).slice(0, 20);
+    const next = Array.from(files)
+      .slice(0, 20)
+      .map((file) => ({
+        key: `${file.name}-${file.size}-${file.lastModified}`,
+        file,
+        classification: "" as const,
+        description: "",
+      }));
+
     setSelectedFiles(next);
+  }
+
+  function updateSelectedFile(
+    key: string,
+    changes: Partial<
+      Pick<SelectedSourceFile, "classification" | "description">
+    >,
+  ): void {
+    setSelectedFiles((current) =>
+      current.map((item) =>
+        item.key === key ? { ...item, ...changes } : item,
+      ),
+    );
+  }
+
+  function removeSelectedFile(key: string): void {
+    setSelectedFiles((current) =>
+      current.filter((item) => item.key !== key),
+    );
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>): void {
@@ -463,8 +531,9 @@ export function SourcesWorkspace({
       if (editing) {
         const body: UpdateSourceRequest = {
           title: form.title,
+          description: form.description || null,
           ...(editing.sourceType === "FILE"
-            ? {}
+            ? { classification: form.classification as SourceClassification }
             : { content: form.content }),
         };
 
@@ -479,9 +548,19 @@ export function SourcesWorkspace({
         message = "La fuente fue actualizada.";
       } else if (creationMode === "FILES") {
         const data = new FormData();
+        data.append(
+          "metadata",
+          JSON.stringify(
+            selectedFiles.map((item) => ({
+              fileName: item.file.name,
+              classification: item.classification,
+              description: item.description.trim() || null,
+            })),
+          ),
+        );
 
-        for (const file of selectedFiles) {
-          data.append("files", file, file.name);
+        for (const item of selectedFiles) {
+          data.append("files", item.file, item.file.name);
         }
 
         const result = await requestJson<SourceUploadBatchResponse>(
@@ -629,7 +708,7 @@ export function SourcesWorkspace({
   async function archiveSource(source: SourceSummary): Promise<void> {
     if (
       !window.confirm(
-        `¿Archivar la fuente "${source.title}"? Podrás consultarla usando el filtro Archivadas.`,
+        `¿Eliminar la fuente "${source.title}" de la vista activa? Se conservará para trazabilidad y podrás consultarla con el filtro Eliminadas.`,
       )
     ) {
       return;
@@ -645,7 +724,7 @@ export function SourcesWorkspace({
 
       setAlert({
         tone: "success",
-        message: "La fuente fue archivada.",
+        message: "La fuente fue eliminada de la vista activa.",
       });
 
       await loadSources(
@@ -661,7 +740,7 @@ export function SourcesWorkspace({
         message:
           error instanceof Error
             ? error.message
-            : "No fue posible archivar la fuente.",
+            : "No fue posible eliminar la fuente.",
       });
     } finally {
       setLoading(false);
@@ -673,10 +752,12 @@ export function SourcesWorkspace({
     !saving &&
     (editing
       ? form.title.trim().length >= 3 &&
-        (editing.sourceType === "FILE" ||
-          form.content.trim().length >= 1)
+        (editing.sourceType === "FILE"
+          ? Boolean(form.classification)
+          : form.content.trim().length >= 1)
       : creationMode === "FILES"
-        ? selectedFiles.length > 0
+        ? selectedFiles.length > 0 &&
+          selectedFiles.every((item) => Boolean(item.classification))
         : form.title.trim().length >= 3 &&
           form.content.trim().length >= 1);
 
@@ -856,7 +937,7 @@ export function SourcesWorkspace({
             value={status}
           >
             <option value="ACTIVE">Activas</option>
-            <option value="ARCHIVED">Archivadas</option>
+            <option value="ARCHIVED">Eliminadas</option>
           </select>
         </div>
 
@@ -900,6 +981,7 @@ export function SourcesWorkspace({
             <tr>
               <th scope="col">Fuente</th>
               <th scope="col">Tipo</th>
+              <th scope="col">Clasificación</th>
               <th scope="col">Archivo</th>
               <th scope="col">Procesamiento</th>
               <th scope="col">Estado</th>
@@ -910,7 +992,7 @@ export function SourcesWorkspace({
           <tbody>
             {sources.items.length === 0 ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <RqEmptyState
                     title={
                       projectId
@@ -932,12 +1014,15 @@ export function SourcesWorkspace({
                     <div className="rq-source-table__title">
                       <strong>{source.title}</strong>
                       <span>
-                        {source.contentPreview || source.processingMessage ||
-                          "Sin vista previa"}
+                        {source.description ||
+                          source.contentPreview ||
+                          source.processingMessage ||
+                          "Sin descripción"}
                       </span>
                     </div>
                   </td>
                   <td>{sourceTypeLabel(source.sourceType)}</td>
+                  <td>{classificationLabel(source.classification)}</td>
                   <td>{fileDescription(source)}</td>
                   <td>
                     <RqStatusBadge
@@ -966,7 +1051,7 @@ export function SourcesWorkspace({
                         onClick={() => void openDetail(source)}
                         tone="operation"
                       >
-                        Ver
+                        Editar
                       </RqActionButton>
                       {source.sourceType === "FILE" ? (
                         <>
@@ -995,7 +1080,7 @@ export function SourcesWorkspace({
                           onClick={() => void archiveSource(source)}
                           tone="danger"
                         >
-                          Archivar
+                          Eliminar
                         </RqActionButton>
                       ) : null}
                     </div>
@@ -1033,7 +1118,7 @@ export function SourcesWorkspace({
                 <h2 id="source-modal-title">
                   {editing
                     ? editing.sourceType === "FILE"
-                      ? "Detalle del archivo"
+                      ? "Editar archivo"
                       : "Editar fuente"
                     : "Nueva fuente"}
                 </h2>
@@ -1114,14 +1199,90 @@ export function SourcesWorkspace({
                     {selectedFiles.length === 0 ? (
                       <span>No has seleccionado archivos.</span>
                     ) : (
-                      <ul>
-                        {selectedFiles.map((file) => (
-                          <li key={`${file.name}-${file.lastModified}`}>
-                            <span>{file.name}</span>
-                            <small>{formatBytes(String(file.size))}</small>
-                          </li>
+                      <div className="rq-source-file-config-list">
+                        {selectedFiles.map((item, index) => (
+                          <article
+                            className="rq-source-file-config"
+                            key={item.key}
+                          >
+                            <header>
+                              <div>
+                                <strong>
+                                  {index + 1}. {item.file.name}
+                                </strong>
+                                <small>
+                                  {formatBytes(String(item.file.size))}
+                                </small>
+                              </div>
+                              <RqActionButton
+                                compact
+                                onClick={() =>
+                                  removeSelectedFile(item.key)
+                                }
+                                tone="danger"
+                              >
+                                Quitar
+                              </RqActionButton>
+                            </header>
+
+                            <div className="rq-field">
+                              <label
+                                htmlFor={`source-classification-${index}`}
+                              >
+                                Clasificación
+                              </label>
+                              <select
+                                id={`source-classification-${index}`}
+                                onChange={(event) =>
+                                  updateSelectedFile(item.key, {
+                                    classification:
+                                      event.target.value as
+                                        | ""
+                                        | SourceClassification,
+                                  })
+                                }
+                                required
+                                value={item.classification}
+                              >
+                                <option value="">
+                                  Selecciona una clasificación
+                                </option>
+                                {CLASSIFICATION_OPTIONS.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="rq-field">
+                              <label
+                                htmlFor={`source-description-${index}`}
+                              >
+                                Descripción opcional
+                              </label>
+                              <textarea
+                                id={`source-description-${index}`}
+                                maxLength={2000}
+                                onChange={(event) =>
+                                  updateSelectedFile(item.key, {
+                                    description: event.target.value,
+                                  })
+                                }
+                                placeholder="Contexto o propósito de este archivo"
+                                rows={3}
+                                value={item.description}
+                              />
+                              <small>
+                                {item.description.length}/2000
+                              </small>
+                            </div>
+                          </article>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
                 </>
@@ -1203,14 +1364,68 @@ export function SourcesWorkspace({
                   </div>
 
                   {fileDetail ? (
-                    <div className="rq-source-extracted-preview">
+                    <>
+                      <div className="rq-field">
+                        <label htmlFor="source-form-classification">
+                          Clasificación
+                        </label>
+                        <select
+                          id="source-form-classification"
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              classification:
+                                event.target.value as
+                                  | ""
+                                  | SourceClassification,
+                            }))
+                          }
+                          required
+                          value={form.classification}
+                        >
+                          <option value="">
+                            Selecciona una clasificación
+                          </option>
+                          {CLASSIFICATION_OPTIONS.map((option) => (
+                            <option
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="rq-field rq-source-form__description">
+                        <label htmlFor="source-form-description">
+                          Descripción opcional
+                        </label>
+                        <textarea
+                          id="source-form-description"
+                          maxLength={2000}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              description: event.target.value,
+                            }))
+                          }
+                          placeholder="Contexto o propósito del archivo"
+                          rows={4}
+                          value={form.description}
+                        />
+                        <small>{form.description.length}/2000</small>
+                      </div>
+
+                      <div className="rq-source-extracted-preview">
                       <span>Contenido extraído</span>
                       <pre>
                         {fileDetail.extractedText ||
                           fileDetail.processingMessage ||
                           "Este archivo no contiene texto extraíble."}
                       </pre>
-                    </div>
+                      </div>
+                    </>
                   ) : (
                     <div className="rq-field rq-source-form__content">
                       <label htmlFor="source-form-content">
