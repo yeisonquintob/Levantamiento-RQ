@@ -122,12 +122,14 @@ export interface CreateDocumentTemplateRequest {
   templateType: DocumentTemplateType;
   version: string;
   includesScrum: boolean;
+  sections?: readonly DocumentTemplateSection[];
 }
 
 export interface UpdateDocumentTemplateRequest {
   name?: string;
   description?: string | null;
   includesScrum?: boolean;
+  sections?: readonly DocumentTemplateSection[];
 }
 
 export interface CloneDocumentTemplateRequest {
@@ -135,4 +137,5 @@ export interface CloneDocumentTemplateRequest {
   name?: string;
   description?: string | null;
   includesScrum?: boolean;
+  sections?: readonly DocumentTemplateSection[];
 }

@@ -23,10 +23,15 @@ Markdown finales.
 | RQ-LARGE  | Requerimiento grande    | Sí                   |
 | ERP-FDD   | FDD puntual para ERP    | No                   |
 
-Las cuatro plantillas conservan las trece secciones canónicas. Pequeño,
-mediano y grande preparan Epic, Feature, historias de usuario y criterios de
-aceptación. FDD ERP puede habilitar Scrum únicamente en una versión configurada
-de forma expresa.
+Las cuatro plantillas iniciales parten de las trece secciones canónicas.
+En una versión `DRAFT`, un administrador puede cambiar el título y la guía de
+cada punto, marcarlo como obligatorio u opcional, agregar nuevos puntos,
+eliminar los que ya no apliquen y reordenarlos. La definición admite entre 1 y
+50 puntos y normaliza el orden antes de guardarlo.
+
+Pequeño, mediano y grande preparan Epic, Feature, historias de usuario y
+criterios de aceptación. FDD ERP puede habilitar Scrum únicamente en una
+versión configurada de forma expresa.
 
 ## Uso de la plantilla por la IA
 
@@ -45,7 +50,7 @@ del sistema, plantilla publicada, fuentes del proyecto y contrato de salida.
 DRAFT → PUBLISHED → RETIRED
 ```
 
-- `DRAFT` es editable.
+- `DRAFT` es editable, incluidos sus puntos y reglas de análisis.
 - `PUBLISHED` es inmutable y utilizable.
 - `RETIRED` es inmutable y permanece trazable.
 - Publicadas o retiradas se clonan como una versión nueva en `DRAFT`.
@@ -61,3 +66,9 @@ rol `ADMIN`, permiso `system.admin` o permiso
 
 El frontend consume exclusivamente el Gateway. El Gateway reenvía el token de
 acceso a Documents Service y no consulta `RqDocumentsDb` directamente.
+
+## Validación HTTP
+
+El comando `pnpm documents:http:smoke` valida listado, filtros, indicadores y
+detalle a través del Gateway o directamente contra Documents Service. Esta
+prueba evita cerrar el cambio cuando `/api/v1/templates` responde con error.

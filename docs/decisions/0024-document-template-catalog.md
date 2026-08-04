@@ -21,14 +21,17 @@ Cada plantilla tendrá:
 - Tipo controlado.
 - Versión SemVer.
 - Estado `DRAFT`, `PUBLISHED` o `RETIRED`.
-- Definición JSON con las trece secciones.
+- Definición JSON que inicialmente contiene las trece secciones canónicas.
+- Puntos configurables en borrador: título, guía, obligatoriedad y orden.
+- Entre 1 y 50 puntos por versión, con claves únicas y orden normalizado.
 - Contexto de análisis para IA y reglas seguras de tratamiento de fuentes.
 - Contrato JSON de salida para el documento estructurado.
 - Configuración Scrum y ERP.
 - Trazabilidad de creación, publicación, retiro y versión de origen.
 
-Una versión publicada o retirada será inmutable. Los cambios se realizarán
-mediante clonación hacia una versión SemVer superior en borrador.
+Una versión publicada o retirada será inmutable. Los cambios de estructura,
+incluidos agregar, eliminar, reordenar o redactar nuevamente un punto, se
+realizarán mediante clonación hacia una versión SemVer superior en borrador.
 
 Las plantillas pequeñas, medianas y grandes incluirán Epic, Feature, historia
 de usuario y criterios de aceptación. FDD ERP no incluirá Scrum por defecto.

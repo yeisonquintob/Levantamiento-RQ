@@ -5,6 +5,7 @@ import {
   DOCUMENT_TEMPLATE_TYPES,
   type CloneDocumentTemplateRequest,
   type CreateDocumentTemplateRequest,
+  type DocumentTemplateSection,
   type DocumentTemplateStatus,
   type DocumentTemplateType,
   type UpdateDocumentTemplateRequest,
@@ -23,6 +24,8 @@ const UUID_PATTERN =
 const SEMVER_PATTERN =
   /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const CODE_PATTERN = /^[A-Z][A-Z0-9-]{2,39}$/;
+const SECTION_KEY_PATTERN = /^[a-z][a-zA-Z0-9]{2,63}$/;
+const MAX_TEMPLATE_SECTIONS = 50;
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -105,6 +108,53 @@ function optionalBoolean(
   }
 
   return value;
+}
+
+function optionalSections(
+  value: unknown,
+): readonly DocumentTemplateSection[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > MAX_TEMPLATE_SECTIONS
+  ) {
+    throw new BadRequestException(
+      `sections debe contener entre 1 y ${MAX_TEMPLATE_SECTIONS} puntos.`,
+    );
+  }
+
+  const keys = new Set<string>();
+
+  return value.map((item, index) => {
+    const record = asRecord(item);
+    const key = requiredText(record, "key", 3, 64);
+
+    if (!SECTION_KEY_PATTERN.test(key)) {
+      throw new BadRequestException(
+        "Cada key de sección debe iniciar con letra minúscula y usar solo letras o números.",
+      );
+    }
+
+    if (keys.has(key)) {
+      throw new BadRequestException(
+        `La key de sección ${key} está repetida.`,
+      );
+    }
+
+    keys.add(key);
+
+    return {
+      key,
+      order: index + 1,
+      title: requiredText(record, "title", 1, 200),
+      required: requiredBoolean(record, "required"),
+      guidance: requiredText(record, "guidance", 1, 2000),
+    };
+  });
 }
 
 function templateType(value: unknown): DocumentTemplateType {
@@ -237,6 +287,7 @@ export function parseCreateDocumentTemplate(
     templateType: resolvedType,
     version: semanticVersion(record.version),
     includesScrum,
+    sections: optionalSections(record.sections),
   };
 }
 
@@ -256,6 +307,10 @@ export function parseUpdateDocumentTemplate(
 
   if (record.includesScrum !== undefined) {
     result.includesScrum = optionalBoolean(record, "includesScrum");
+  }
+
+  if (record.sections !== undefined) {
+    result.sections = optionalSections(record.sections);
   }
 
   if (Object.keys(result).length === 0) {
@@ -280,6 +335,7 @@ export function parseCloneDocumentTemplate(
         : requiredText(record, "name", 3, 200),
     description: optionalText(record, "description", 2000),
     includesScrum: optionalBoolean(record, "includesScrum"),
+    sections: optionalSections(record.sections),
   };
 }
 

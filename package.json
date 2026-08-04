@@ -14,6 +14,7 @@
     "documents:db:ensure": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-ensure-database.ts",
     "documents:db:state": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-database-state.ts",
     "documents:db:verify": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-verify-database.ts",
+    "documents:http:smoke": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-templates-http-smoke-test.ts",
     "documents:migration:revert": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-revert-migration.ts",
     "documents:migration:run": "TSX_TSCONFIG_PATH=apps/documents-service/tsconfig.app.json node --import tsx scripts/documents-run-migrations.ts",
     "graph": "nx graph",

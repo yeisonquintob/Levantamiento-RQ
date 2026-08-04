@@ -117,6 +117,9 @@ const GUIDANCE: Readonly<
   ],
 };
 
+const MAX_TEMPLATE_SECTIONS = 50;
+const SECTION_KEY_PATTERN = /^[a-z][a-zA-Z0-9]{2,63}$/;
+
 const AI_PROMPT_PURPOSE: Readonly<Record<DocumentTemplateType, string>> = {
   SMALL_REQUIREMENT:
     "Analizar fuentes y producir un levantamiento compacto, suficiente y verificable para una necesidad puntual.",
@@ -136,7 +139,7 @@ function buildAiPrompt(
     systemInstruction:
       "Actúa como analista senior de requerimientos. Usa la plantilla seleccionada como contrato obligatorio de análisis y redacción.",
     templateInstruction:
-      "Conserva exactamente las trece secciones, su orden, obligatoriedad y guía. No agregues ni elimines secciones.",
+      "Conserva exactamente las secciones configuradas en esta versión, su orden, obligatoriedad y guía. No agregues ni elimines secciones fuera de la plantilla.",
     sourceInstruction:
       "Analiza únicamente las fuentes entregadas para el proyecto y relaciona cada afirmación relevante con evidencia disponible.",
     missingInformationInstruction:
@@ -161,8 +164,28 @@ function buildOutputContract(): DocumentTemplateDefinition["outputContract"] {
   };
 }
 
-function toIso(value: Date | null): string | null {
-  return value ? value.toISOString() : null;
+function toIso(value: Date | string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("La plantilla contiene una fecha inválida.");
+  }
+
+  return date.toISOString();
+}
+
+function requiredIso(value: Date | string): string {
+  const resolved = toIso(value);
+
+  if (!resolved) {
+    throw new Error("La plantilla no contiene una fecha obligatoria.");
+  }
+
+  return resolved;
 }
 
 export function canManageDocumentTemplates(
@@ -201,6 +224,36 @@ function withScrum(
       fdd: templateType === "ERP_FDD",
       scrumByDefault:
         templateType === "ERP_FDD" && includesScrum,
+    },
+  };
+}
+
+function normalizeSections(
+  sections: readonly DocumentTemplateSection[],
+): DocumentTemplateSection[] {
+  return sections.map((section, index) => ({
+    key: section.key.trim(),
+    order: index + 1,
+    title: section.title.trim(),
+    required: section.required,
+    guidance: section.guidance.trim(),
+  }));
+}
+
+function withSections(
+  definition: DocumentTemplateDefinition,
+  sections: readonly DocumentTemplateSection[],
+): DocumentTemplateDefinition {
+  const normalized = normalizeSections(sections);
+
+  return {
+    ...definition,
+    sectionOrder: normalized.map((section) => section.key),
+    sections: normalized,
+    aiPrompt: {
+      ...definition.aiPrompt,
+      templateInstruction:
+        "Conserva exactamente las secciones configuradas en esta versión, su orden, obligatoriedad y guía. No agregues ni elimines secciones fuera de la plantilla.",
     },
   };
 }
@@ -271,43 +324,48 @@ function validateDefinition(
   }
 
   const definition = value as Partial<DocumentTemplateDefinition>;
-  const expectedOrder = CANONICAL_SECTIONS.map(([key]) => key);
 
   if (definition.standard !== "ISO_IEC_IEEE_29148_2018") {
     throw new Error("La plantilla no declara el estándar documental.");
   }
 
   if (
-    !Array.isArray(definition.sectionOrder) ||
-    definition.sectionOrder.length !== expectedOrder.length ||
-    definition.sectionOrder.some(
-      (key, index) => key !== expectedOrder[index],
-    )
+    !Array.isArray(definition.sections) ||
+    definition.sections.length < 1 ||
+    definition.sections.length > MAX_TEMPLATE_SECTIONS
   ) {
     throw new Error(
-      "La plantilla debe conservar el orden canónico de trece secciones.",
+      `La plantilla debe contener entre 1 y ${MAX_TEMPLATE_SECTIONS} secciones.`,
     );
   }
 
   if (
-    !Array.isArray(definition.sections) ||
-    definition.sections.length !== expectedOrder.length
+    !Array.isArray(definition.sectionOrder) ||
+    definition.sectionOrder.length !== definition.sections.length
   ) {
-    throw new Error("La plantilla debe contener trece secciones.");
+    throw new Error(
+      "El orden de secciones no coincide con los puntos configurados.",
+    );
   }
+
+  const keys = new Set<string>();
 
   for (const [index, section] of definition.sections.entries()) {
     if (
-      section.key !== expectedOrder[index] ||
+      !SECTION_KEY_PATTERN.test(section.key) ||
+      keys.has(section.key) ||
       section.order !== index + 1 ||
-      section.required !== true ||
+      typeof section.required !== "boolean" ||
       !section.title.trim() ||
-      !section.guidance.trim()
+      !section.guidance.trim() ||
+      definition.sectionOrder[index] !== section.key
     ) {
       throw new Error(
         `La sección ${index + 1} de la plantilla no es válida.`,
       );
     }
+
+    keys.add(section.key);
   }
 
   const aiPrompt = definition.aiPrompt;
@@ -382,14 +440,12 @@ export class DocumentTemplatesService {
     const base = this.templates.createQueryBuilder("template");
     this.applyFilters(base, query);
 
-    const totalItems = await base.getCount();
-    const rows = await base
-      .clone()
+    const [rows, totalItems] = await base
       .orderBy("template.code", "ASC")
       .addOrderBy("template.createdAt", "DESC")
       .skip((query.page - 1) * query.pageSize)
       .take(query.pageSize)
-      .getMany();
+      .getManyAndCount();
 
     return {
       items: rows.map((template) => this.toSummary(template)),
@@ -483,10 +539,18 @@ export class DocumentTemplatesService {
       status: "DRAFT",
       includesScrum: request.includesScrum,
       definitionJson: JSON.stringify(
-        buildDefaultTemplateDefinition(
-          request.templateType,
-          request.includesScrum,
-        ),
+        request.sections
+          ? withSections(
+              buildDefaultTemplateDefinition(
+                request.templateType,
+                request.includesScrum,
+              ),
+              request.sections,
+            )
+          : buildDefaultTemplateDefinition(
+              request.templateType,
+              request.includesScrum,
+            ),
       ),
       sourceTemplateId: null,
       createdByUserId: actor.id,
@@ -522,16 +586,32 @@ export class DocumentTemplatesService {
       entity.description = request.description;
     }
 
-    if (request.includesScrum !== undefined) {
-      assertScrumRule(entity.templateType, request.includesScrum);
-      entity.includesScrum = request.includesScrum;
-      entity.definitionJson = JSON.stringify(
-        withScrum(
-          parseDefinition(entity),
-          entity.templateType,
-          request.includesScrum,
-        ),
+    if (
+      request.includesScrum !== undefined ||
+      request.sections !== undefined
+    ) {
+      const includesScrum =
+        request.includesScrum ?? entity.includesScrum;
+      assertScrumRule(entity.templateType, includesScrum);
+
+      let definition = withScrum(
+        parseDefinition(entity),
+        entity.templateType,
+        includesScrum,
       );
+
+      if (request.sections !== undefined) {
+        definition = withSections(definition, request.sections);
+      }
+
+      validateDefinition(
+        definition,
+        entity.templateType,
+        includesScrum,
+      );
+
+      entity.includesScrum = includesScrum;
+      entity.definitionJson = JSON.stringify(definition);
     }
 
     entity.updatedByUserId = actor.id;
@@ -630,11 +710,20 @@ export class DocumentTemplatesService {
       status: "DRAFT",
       includesScrum,
       definitionJson: JSON.stringify(
-        withScrum(
-          parseDefinition(source),
-          source.templateType,
-          includesScrum,
-        ),
+        request.sections
+          ? withSections(
+              withScrum(
+                parseDefinition(source),
+                source.templateType,
+                includesScrum,
+              ),
+              request.sections,
+            )
+          : withScrum(
+              parseDefinition(source),
+              source.templateType,
+              includesScrum,
+            ),
       ),
       sourceTemplateId: source.id,
       createdByUserId: actor.id,
@@ -734,8 +823,8 @@ export class DocumentTemplatesService {
       status: entity.status,
       includesScrum: entity.includesScrum,
       sourceTemplateId: entity.sourceTemplateId,
-      createdAt: entity.createdAt.toISOString(),
-      updatedAt: entity.updatedAt.toISOString(),
+      createdAt: requiredIso(entity.createdAt),
+      updatedAt: requiredIso(entity.updatedAt),
       publishedAt: toIso(entity.publishedAt),
       retiredAt: toIso(entity.retiredAt),
     };

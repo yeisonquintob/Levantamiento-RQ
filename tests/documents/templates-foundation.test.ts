@@ -44,6 +44,7 @@ test("la creación normaliza código, nombre y SemVer", () => {
       templateType: "SMALL_REQUIREMENT",
       version: "1.0.0",
       includesScrum: true,
+      sections: undefined,
     },
   );
 });
@@ -79,6 +80,68 @@ test("la actualización exige al menos un campo", () => {
   );
 });
 
+test("los puntos se pueden editar, agregar, eliminar y reordenar", () => {
+  assert.deepEqual(
+    parseUpdateDocumentTemplate({
+      sections: [
+        {
+          key: "header",
+          order: 9,
+          title: " Encabezado ajustado ",
+          required: true,
+          guidance: " Registrar X, Y y Z. ",
+        },
+        {
+          key: "customSectionOne",
+          order: 4,
+          title: " Punto adicional ",
+          required: false,
+          guidance: " Analizar una nueva regla de negocio. ",
+        },
+      ],
+    }),
+    {
+      sections: [
+        {
+          key: "header",
+          order: 1,
+          title: "Encabezado ajustado",
+          required: true,
+          guidance: "Registrar X, Y y Z.",
+        },
+        {
+          key: "customSectionOne",
+          order: 2,
+          title: "Punto adicional",
+          required: false,
+          guidance: "Analizar una nueva regla de negocio.",
+        },
+      ],
+    },
+  );
+
+  assert.throws(
+    () =>
+      parseUpdateDocumentTemplate({
+        sections: [
+          {
+            key: "repeatedKey",
+            title: "Uno",
+            required: true,
+            guidance: "Guía uno",
+          },
+          {
+            key: "repeatedKey",
+            title: "Dos",
+            required: true,
+            guidance: "Guía dos",
+          },
+        ],
+      }),
+    /repetida/i,
+  );
+});
+
 test("la clonación y los filtros validan SemVer y paginación", () => {
   assert.deepEqual(
     parseCloneDocumentTemplate({
@@ -90,6 +153,7 @@ test("la clonación y los filtros validan SemVer y paginación", () => {
       name: undefined,
       description: undefined,
       includesScrum: true,
+      sections: undefined,
     },
   );
 
@@ -133,7 +197,7 @@ test("las plantillas son estructura y contexto seguro para IA", async () => {
   assert.equal((migration.match(/"outputContract":/g) ?? []).length, 4);
 });
 
-test("las cuatro definiciones conservan las trece secciones", async () => {
+test("las plantillas iniciales parten de trece puntos y los borradores son flexibles", async () => {
   const service = await readFile(
     "apps/documents-service/src/templates/document-templates.service.ts",
     "utf8",
@@ -145,7 +209,10 @@ test("las cuatro definiciones conservan las trece secciones", async () => {
 
   assert.match(service, /ISO_IEC_IEEE_29148_2018/);
   assert.match(service, /CANONICAL_SECTIONS/);
-  assert.match(service, /DOCUMENT_TEMPLATE_SCRUM_OUTPUTS/);
+  assert.match(service, /MAX_TEMPLATE_SECTIONS = 50/);
+  assert.match(service, /withSections/);
+  assert.match(service, /getManyAndCount/);
+  assert.match(service, /requiredIso/);
   assert.equal(
     (migration.match(/"standard":"ISO_IEC_IEEE_29148_2018"/g) ?? [])
       .length,
@@ -226,6 +293,11 @@ test("Gateway y Workspace exponen Plantillas como vista independiente", async ()
   assert.match(workspace, /Epic, Feature, historia de usuario/);
   assert.match(workspace, /Contexto para análisis con IA/);
   assert.match(workspace, /Las fuentes se tratan como datos/);
+  assert.match(workspace, /Puntos de la plantilla/);
+  assert.match(workspace, /Agregar punto/);
+  assert.match(workspace, /moveSection/);
+  assert.match(workspace, /removeSection/);
+  assert.match(workspace, /payload\.detail/);
   assert.match(workspace, /credentials: "include"/);
   assert.match(shell, /href="\/workspace\/templates"/);
   assert.match(shell, /Catálogo de plantillas/);

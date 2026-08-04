@@ -6,6 +6,7 @@ import type {
   DocumentTemplateDetail,
   DocumentTemplateListResponse,
   DocumentTemplateMetrics,
+  DocumentTemplateSection,
   DocumentTemplateStatus,
   DocumentTemplateSummary,
   DocumentTemplateType,
@@ -60,6 +61,7 @@ interface TemplateForm {
   templateType: DocumentTemplateType;
   version: string;
   includesScrum: boolean;
+  sections: DocumentTemplateSection[];
 }
 
 type ModalMode = "create" | "view" | "edit" | "clone";
@@ -78,6 +80,7 @@ function emptyForm(): TemplateForm {
     templateType: "SMALL_REQUIREMENT",
     version: "1.0.0",
     includesScrum: true,
+    sections: [],
   };
 }
 
@@ -122,21 +125,31 @@ async function errorMessage(response: Response): Promise<string> {
 
   try {
     const payload = JSON.parse(text) as {
+      detail?: string;
       message?: string | readonly string[];
+      correlationId?: string;
     };
 
+    const suffix = payload.correlationId
+      ? ` Código de seguimiento: ${payload.correlationId}.`
+      : "";
+
+    if (typeof payload.detail === "string") {
+      return `${payload.detail}${suffix}`;
+    }
+
     if (Array.isArray(payload.message)) {
-      return payload.message.join(" ");
+      return `${payload.message.join(" ")}${suffix}`;
     }
 
     if (typeof payload.message === "string") {
-      return payload.message;
+      return `${payload.message}${suffix}`;
     }
   } catch {
     return text;
   }
 
-  return text;
+  return "La operación no pudo completarse.";
 }
 
 export function TemplatesWorkspace({
@@ -224,6 +237,7 @@ export function TemplatesWorkspace({
     setMetrics(
       (await metricsResponse.json()) as DocumentTemplateMetrics,
     );
+    setAlert(null);
   }
 
   async function loadDetail(
@@ -254,7 +268,11 @@ export function TemplatesWorkspace({
         version:
           mode === "clone" ? nextVersion(detail.version) : detail.version,
         includesScrum: detail.includesScrum,
+        sections: detail.definition.sections.map((section) => ({
+          ...section,
+        })),
       });
+      setAlert(null);
       setModalMode(mode);
     } catch (error) {
       showAlert(
@@ -271,6 +289,114 @@ export function TemplatesWorkspace({
     return `${parts[0] ?? 1}.${(parts[1] ?? 0) + 1}.0`;
   }
 
+  function normalizedSections(): DocumentTemplateSection[] | undefined {
+    if (form.sections.length === 0) {
+      return undefined;
+    }
+
+    return form.sections.map((section, index) => ({
+      ...section,
+      order: index + 1,
+      title: section.title.trim(),
+      guidance: section.guidance.trim(),
+    }));
+  }
+
+  function addSection(): void {
+    setForm((current) => {
+      const usedKeys = new Set(
+        current.sections.map((section) => section.key),
+      );
+      const prefix = `customSection${Date.now().toString(36)}`;
+      let key = prefix;
+      let suffix = 1;
+
+      while (usedKeys.has(key)) {
+        key = `${prefix}${suffix}`;
+        suffix += 1;
+      }
+
+      return {
+        ...current,
+        sections: [
+          ...current.sections,
+          {
+            key,
+            order: current.sections.length + 1,
+            title: "Nuevo punto",
+            required: true,
+            guidance:
+              "Describe qué debe analizar y redactar la IA en este punto.",
+          },
+        ],
+      };
+    });
+  }
+
+  function updateSection(
+    index: number,
+    change: Partial<DocumentTemplateSection>,
+  ): void {
+    setForm((current) => ({
+      ...current,
+      sections: current.sections.map((section, currentIndex) =>
+        currentIndex === index
+          ? { ...section, ...change }
+          : section,
+      ),
+    }));
+  }
+
+  function moveSection(index: number, offset: -1 | 1): void {
+    setForm((current) => {
+      const nextIndex = index + offset;
+
+      if (
+        nextIndex < 0 ||
+        nextIndex >= current.sections.length
+      ) {
+        return current;
+      }
+
+      const sections = [...current.sections];
+      const currentSection = sections[index];
+      const targetSection = sections[nextIndex];
+
+      if (!currentSection || !targetSection) {
+        return current;
+      }
+
+      sections[index] = targetSection;
+      sections[nextIndex] = currentSection;
+
+      return {
+        ...current,
+        sections: sections.map((section, sectionIndex) => ({
+          ...section,
+          order: sectionIndex + 1,
+        })),
+      };
+    });
+  }
+
+  function removeSection(index: number): void {
+    setForm((current) => {
+      if (current.sections.length <= 1) {
+        return current;
+      }
+
+      return {
+        ...current,
+        sections: current.sections
+          .filter((_, currentIndex) => currentIndex !== index)
+          .map((section, sectionIndex) => ({
+            ...section,
+            order: sectionIndex + 1,
+          })),
+      };
+    });
+  }
+
   async function submitModal(): Promise<void> {
     if (!modalMode || modalMode === "view") return;
 
@@ -278,6 +404,7 @@ export function TemplatesWorkspace({
 
     try {
       let response: Response;
+      const sections = normalizedSections();
 
       if (modalMode === "create") {
         response = await fetch(`${GATEWAY_URL}/api/v1/templates`, {
@@ -291,6 +418,7 @@ export function TemplatesWorkspace({
             templateType: form.templateType,
             version: form.version,
             includesScrum: form.includesScrum,
+            sections,
           }),
         });
       } else if (modalMode === "edit" && selected) {
@@ -304,6 +432,7 @@ export function TemplatesWorkspace({
               name: form.name,
               description: form.description || null,
               includesScrum: form.includesScrum,
+              sections,
             }),
           },
         );
@@ -319,6 +448,7 @@ export function TemplatesWorkspace({
               name: form.name,
               description: form.description || null,
               includesScrum: form.includesScrum,
+              sections,
             }),
           },
         );
@@ -749,6 +879,14 @@ export function TemplatesWorkspace({
                   ))}
                 </ol>
 
+                {selected.status !== "DRAFT" ? (
+                  <p className="rq-template-version-note">
+                    Para cambiar, agregar, eliminar o reordenar puntos,
+                    crea una nueva versión. La versión publicada se conserva
+                    sin modificaciones para mantener la trazabilidad.
+                  </p>
+                ) : null}
+
                 <div className="rq-project-modal__actions">
                   <RqActionButton onClick={() => closeModal()}>
                     Volver
@@ -878,6 +1016,133 @@ export function TemplatesWorkspace({
                     </small>
                   </span>
                 </label>
+
+                <section className="rq-template-section-editor">
+                  <header>
+                    <div>
+                      <h3>Puntos de la plantilla</h3>
+                      <p>
+                        Cambia el título y la instrucción de cada punto,
+                        agrega nuevos, elimina los innecesarios o modifica
+                        el orden. Estos puntos serán la estructura y el
+                        contexto que recibirá la IA.
+                      </p>
+                    </div>
+                    <RqActionButton
+                      compact
+                      disabled={busy || form.sections.length >= 50}
+                      onClick={addSection}
+                      tone="affirmative"
+                      type="button"
+                    >
+                      Agregar punto
+                    </RqActionButton>
+                  </header>
+
+                  {modalMode === "create" &&
+                  form.sections.length === 0 ? (
+                    <div className="rq-template-section-editor__empty">
+                      La plantilla se creará con los trece puntos base del
+                      tipo seleccionado. También puedes agregar aquí una
+                      estructura personalizada desde el inicio.
+                    </div>
+                  ) : (
+                    <ol className="rq-template-section-editor__list">
+                      {form.sections.map((section, index) => (
+                        <li key={section.key}>
+                          <div className="rq-template-section-editor__heading">
+                            <span>{index + 1}</span>
+                            <div>
+                              <button
+                                aria-label={`Subir punto ${index + 1}`}
+                                disabled={busy || index === 0}
+                                onClick={() => moveSection(index, -1)}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label={`Bajar punto ${index + 1}`}
+                                disabled={
+                                  busy ||
+                                  index === form.sections.length - 1
+                                }
+                                onClick={() => moveSection(index, 1)}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                aria-label={`Eliminar punto ${index + 1}`}
+                                disabled={
+                                  busy || form.sections.length <= 1
+                                }
+                                onClick={() => removeSection(index)}
+                                type="button"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </div>
+
+                          <label className="rq-field">
+                            <span>Título del punto</span>
+                            <input
+                              disabled={busy}
+                              maxLength={200}
+                              onChange={(event) =>
+                                updateSection(index, {
+                                  title: event.target.value,
+                                })
+                              }
+                              required
+                              value={section.title}
+                            />
+                          </label>
+
+                          <label className="rq-field">
+                            <span>
+                              Instrucción de análisis y redacción para la IA
+                            </span>
+                            <textarea
+                              disabled={busy}
+                              maxLength={2000}
+                              onChange={(event) =>
+                                updateSection(index, {
+                                  guidance: event.target.value,
+                                })
+                              }
+                              required
+                              rows={3}
+                              value={section.guidance}
+                            />
+                          </label>
+
+                          <label className="rq-template-section-required">
+                            <input
+                              checked={section.required}
+                              disabled={busy}
+                              onChange={(event) =>
+                                updateSection(index, {
+                                  required: event.target.checked,
+                                })
+                              }
+                              type="checkbox"
+                            />
+                            <span>Punto obligatorio</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
+                  {modalMode === "clone" ? (
+                    <small>
+                      Los cambios se guardarán en una nueva versión
+                      borrador. La versión publicada permanecerá intacta.
+                    </small>
+                  ) : null}
+                </section>
 
                 <div className="rq-project-modal__actions">
                   <RqActionButton
