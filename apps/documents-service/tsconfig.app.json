@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "experimentalDecorators": true,
@@ -14,14 +16,26 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["eslint.config.js", "eslint.config.cjs", "eslint.config.mjs"],
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "eslint.config.js",
+    "eslint.config.cjs",
+    "eslint.config.mjs"
+  ],
   "references": [
     {
       "path": "../../libs/shared/persistence/tsconfig.lib.json"
     },
     {
       "path": "../../libs/shared/config/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/shared/contracts/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/shared/http/tsconfig.lib.json"
     }
   ]
 }

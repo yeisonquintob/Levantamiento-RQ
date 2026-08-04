@@ -60,3 +60,4 @@
 - [OpenAPI y Swagger](../api/openapi-swagger.md)
 - [Projects Service y Workspace](projects-service-foundation.md)
 - [Sources Service, archivos y extracción](sources-service-foundation.md)
+- [Documents Service y catálogo de plantillas](documents-template-catalog.md)

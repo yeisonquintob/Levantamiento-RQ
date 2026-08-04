@@ -2367,3 +2367,223 @@ a.rq-action {
     justify-content: flex-start;
   }
 }
+
+/* PASO 14 - CATÁLOGO DE PLANTILLAS */
+
+.rq-template-workspace {
+  display: grid;
+  gap: var(--rq-space-4);
+}
+
+.rq-template-filter-bar {
+  grid-template-columns:
+    minmax(220px, 1.4fr)
+    minmax(190px, 0.8fr)
+    minmax(150px, 0.6fr)
+    auto;
+}
+
+.rq-template-table {
+  min-width: 1180px;
+}
+
+.rq-template-table__name {
+  display: grid;
+  min-width: 260px;
+  max-width: 440px;
+  gap: 3px;
+}
+
+.rq-template-table__name span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--rq-color-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rq-template-table__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--rq-space-2);
+}
+
+.rq-template-modal {
+  width: min(900px, calc(100vw - 32px));
+}
+
+.rq-template-form__description,
+.rq-template-scrum-option {
+  grid-column: 1 / -1;
+}
+
+.rq-template-scrum-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-4);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-template-scrum-option input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 2px;
+}
+
+.rq-template-scrum-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.rq-template-scrum-option small {
+  color: var(--rq-color-muted);
+}
+
+.rq-template-detail {
+  display: grid;
+  gap: var(--rq-space-4);
+  padding: var(--rq-space-5);
+}
+
+.rq-template-detail article {
+  padding: var(--rq-space-4);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-template-detail article h3,
+.rq-template-detail article p {
+  margin: 0;
+}
+
+.rq-template-detail article p {
+  margin-top: var(--rq-space-2);
+  color: var(--rq-color-muted);
+}
+
+.rq-template-ai-context {
+  border-color: var(--rq-color-info);
+}
+
+.rq-template-ai-context small {
+  display: block;
+  margin-top: var(--rq-space-3);
+  color: var(--rq-color-muted);
+  line-height: 1.5;
+}
+
+.rq-template-detail__metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--rq-space-3);
+}
+
+.rq-template-detail__metadata span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+}
+
+.rq-template-detail__metadata small {
+  color: var(--rq-color-muted);
+  font-weight: 700;
+}
+
+.rq-template-detail__metadata strong {
+  overflow-wrap: anywhere;
+}
+
+.rq-template-sections {
+  display: grid;
+  gap: var(--rq-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rq-template-sections li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+}
+
+.rq-template-sections > li > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-action-operation);
+  color: var(--rq-action-on-solid);
+  font-weight: 800;
+}
+
+.rq-template-sections div {
+  display: grid;
+  gap: 4px;
+}
+
+.rq-template-sections p {
+  margin: 0;
+  color: var(--rq-color-muted);
+}
+
+@media (max-width: 900px) {
+  .rq-template-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rq-template-filter-bar .rq-filter-bar__actions {
+    grid-column: 1 / -1;
+  }
+
+  .rq-template-detail__metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .rq-template-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .rq-template-filter-bar .rq-filter-bar__actions,
+  .rq-template-form__description,
+  .rq-template-scrum-option {
+    grid-column: auto;
+  }
+
+  .rq-template-table__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rq-template-table__actions .rq-action {
+    width: 100%;
+  }
+
+  .rq-template-detail {
+    padding: var(--rq-space-4);
+  }
+
+  .rq-template-detail__metadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* FIN PASO 14 */

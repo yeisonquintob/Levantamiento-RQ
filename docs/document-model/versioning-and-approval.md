@@ -2,10 +2,20 @@
 
 ## Plantillas
 
+Estados del catálogo:
+
+```text
+BORRADOR → PUBLICADA → RETIRADA
+```
+
 - La plantilla canónica inicia en la versión `1.0.0`.
-- Una versión publicada es inmutable.
+- Una versión publicada o retirada es inmutable.
 - Cambiar estructura, orden o reglas exige nueva versión.
 - Los documentos conservan la versión de plantilla utilizada.
+- El prompt de análisis y el contrato de salida pertenecen a esa misma versión.
+- Una nueva versión se crea clonando una versión publicada o retirada.
+- La nueva versión debe ser SemVer superior a la versión de origen.
+- Código y versión forman una combinación única dentro del catálogo.
 
 ## Documentos
 

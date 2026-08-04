@@ -67,6 +67,10 @@ async function bootstrap(): Promise<void> {
         "sources",
         "Fuentes textuales, archivos y procesamiento",
       )
+      .addTag(
+        "templates",
+        "Catálogo de plantillas documentales versionadas",
+      )
       .addCookieAuth("rq_access")
       .addCookieAuth("rq_refresh")
       .addBearerAuth()
@@ -106,6 +110,7 @@ async function bootstrap(): Promise<void> {
       identityServiceUrl: config.identityServiceUrl,
       projectsServiceUrl: config.projectsServiceUrl,
       sourcesServiceUrl: config.sourcesServiceUrl,
+      documentsServiceUrl: config.documentsServiceUrl,
       webOrigin: config.webOrigin,
     },
   });

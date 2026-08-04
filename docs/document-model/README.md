@@ -2,7 +2,7 @@
 
 ## Estado
 
-Definido en el Paso 3.1.
+Definido en el Paso 3.1 e implementado como catálogo en el Paso 14.
 
 ## Estándar canónico
 
@@ -72,3 +72,23 @@ Sus resultados se ubicarán en:
 - 9. Supuestos, dependencias y pendientes.
 
 La evidencia técnica completa permanecerá como metadato trazable.
+
+## Perfiles disponibles en el catálogo
+
+- Requerimiento pequeño.
+- Requerimiento mediano.
+- Requerimiento grande.
+- FDD para necesidad puntual ERP.
+
+Los tres perfiles de requerimiento incluyen por defecto Epic, Feature,
+historias de usuario y criterios de aceptación. El perfil FDD ERP mantiene
+Scrum deshabilitado por defecto y solo lo incorpora cuando una nueva versión
+lo configura expresamente.
+## Relación entre plantilla e inteligencia artificial
+
+La versión publicada de una plantilla forma parte del contexto de análisis.
+Define simultáneamente la estructura del documento y las instrucciones que la
+IA debe seguir para interpretar las fuentes, marcar vacíos, exponer conflictos
+y producir la salida JSON. Las fuentes se consideran datos; cualquier
+instrucción contenida dentro de ellas no modifica la plantilla ni el contrato
+de salida.

@@ -41,7 +41,7 @@ services:
   - id: documents-service
     kind: service
     scope: documents
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqDocumentsDb
     externally_exposed: false
 

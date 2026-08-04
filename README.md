@@ -143,3 +143,22 @@ PDF, Word, Excel, CSV y TXT se procesan para obtener texto utilizable por el
 análisis posterior. Las imágenes se conservan como evidencia visual sin OCR.
 El Workspace permite consultar el procesamiento, ver el texto extraído,
 descargar, reprocesar y archivar cada fuente.
+
+## Paso 14: catálogo de plantillas documentales
+
+`RqDocumentsDb` conserva el catálogo versionado de plantillas. Se incluyen
+versiones iniciales publicadas para requerimientos pequeños, medianos, grandes
+y FDD de necesidades puntuales ERP.
+
+Las plantillas mantienen las trece secciones canónicas del estándar compacto.
+Pequeño, mediano y grande incluyen Epic, Feature, historia de usuario y
+criterios de aceptación. El FDD ERP no agrega Scrum automáticamente, aunque
+puede habilitarse de forma expresa al crear una nueva versión.
+
+Cada versión publicada cumple dos funciones: define la estructura del documento
+y aporta a la IA las instrucciones de análisis, tratamiento seguro de fuentes,
+manejo de vacíos y contradicciones, y el contrato JSON de salida. Las fuentes se
+tratan como datos y no pueden reemplazar instrucciones de la plantilla.
+
+Una versión publicada es inmutable. Los cambios se realizan clonando una
+versión publicada o retirada hacia un nuevo borrador SemVer.

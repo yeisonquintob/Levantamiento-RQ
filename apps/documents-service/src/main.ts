@@ -12,6 +12,7 @@ import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
+import { ApplicationExceptionFilter } from "@levantamiento-rq/shared-http";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/documents-service/.env"],
@@ -33,15 +34,27 @@ async function bootstrap(): Promise<void> {
   const globalPrefix = "api/v1";
 
   app.setGlobalPrefix(globalPrefix);
+  app.useGlobalFilters(new ApplicationExceptionFilter());
+
   if (config.environment === "development") {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Documents Service API")
-      .setDescription("Documento canónico y control de versiones.")
+      .setDescription(
+        "Catálogo de plantillas documentales configurables y versionadas.",
+      )
       .setVersion("1.0.0")
+      .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag(
+        "templates",
+        "Plantillas pequeñas, medianas, grandes y FDD ERP",
+      )
       .build();
 
-    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+    const openApiDocument = SwaggerModule.createDocument(
+      app,
+      openApiConfig,
+    );
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
       customSwaggerUiPath: resolve(
@@ -52,12 +65,11 @@ async function bootstrap(): Promise<void> {
       swaggerOptions: {
         displayRequestDuration: true,
         persistAuthorization: false,
-        withCredentials: true,
       },
     });
   }
-  app.enableShutdownHooks();
 
+  app.enableShutdownHooks();
   await app.listen(config.port, config.host);
 
   Logger.log(
@@ -68,7 +80,9 @@ async function bootstrap(): Promise<void> {
 
 void bootstrap().catch((error: unknown) => {
   const message =
-    error instanceof Error ? (error.stack ?? error.message) : String(error);
+    error instanceof Error
+      ? (error.stack ?? error.message)
+      : String(error);
 
   Logger.error(message, "Bootstrap");
   process.exitCode = 1;

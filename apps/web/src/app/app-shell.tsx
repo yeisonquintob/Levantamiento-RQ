@@ -29,6 +29,15 @@ interface WorkspacePageContext {
 }
 
 function resolvePageContext(pathname: string): WorkspacePageContext {
+  if (pathname.startsWith("/workspace/templates")) {
+    return {
+      eyebrow: "Configuración documental",
+      title: "Plantillas",
+      description:
+        "Catálogo versionado para requerimientos pequeños, medianos, grandes y FDD ERP.",
+    };
+  }
+
   if (pathname.startsWith("/workspace/sources")) {
     return {
       eyebrow: "Carga de datos",
@@ -275,6 +284,21 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Fuentes</span>
           </a>
 
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/templates")
+                ? "page"
+                : undefined
+            }
+            href="/workspace/templates"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              T
+            </span>
+            <span>Plantillas</span>
+          </a>
+
           {futureNavigation.map(([label, icon]) => (
             <span
               aria-disabled="true"
@@ -304,11 +328,13 @@ export function AppShell({ children, user }: AppShellProps) {
       </main>
 
       <footer className="rq-footer">
-        {pathname.startsWith("/workspace/sources")
-          ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-          : pathname.startsWith("/workspace/projects")
-            ? "Gestión de proyectos y participantes · Paso 12"
-            : "Flujo documental: datos, análisis, borradores y aprobación"}
+        {pathname.startsWith("/workspace/templates")
+          ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+          : pathname.startsWith("/workspace/sources")
+            ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+            : pathname.startsWith("/workspace/projects")
+              ? "Gestión de proyectos y participantes · Paso 12"
+              : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );

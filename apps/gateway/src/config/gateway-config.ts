@@ -11,10 +11,12 @@ export interface GatewayConfig extends BaseServiceConfig {
   identityServiceUrl: string;
   projectsServiceUrl: string;
   sourcesServiceUrl: string;
+  documentsServiceUrl: string;
   webOrigin: string;
   identityTimeoutMs: number;
   projectsTimeoutMs: number;
   sourcesTimeoutMs: number;
+  documentsTimeoutMs: number;
   sourcesUploadTimeoutMs: number;
   sourcesMaxFileBytes: number;
   sourcesMaxFilesPerUpload: number;
@@ -140,6 +142,11 @@ export function loadGatewayConfig(
       "http://127.0.0.1:3003",
       "SOURCES_SERVICE_URL",
     ),
+    documentsServiceUrl: readUrl(
+      environment.DOCUMENTS_SERVICE_URL,
+      "http://127.0.0.1:3004",
+      "DOCUMENTS_SERVICE_URL",
+    ),
     webOrigin: readUrl(
       environment.WEB_ORIGIN,
       "http://127.0.0.1:4200",
@@ -165,6 +172,13 @@ export function loadGatewayConfig(
       500,
       30000,
       "SOURCES_TIMEOUT_MS",
+    ),
+    documentsTimeoutMs: readInteger(
+      environment.DOCUMENTS_TIMEOUT_MS,
+      8000,
+      500,
+      30000,
+      "DOCUMENTS_TIMEOUT_MS",
     ),
     sourcesUploadTimeoutMs: readInteger(
       environment.SOURCES_UPLOAD_TIMEOUT_MS,
