@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import fastifyMultipart from "@fastify/multipart";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -30,12 +31,24 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
+  await app.register(fastifyMultipart, {
+    limits: {
+      files: config.sourcesMaxFilesPerUpload,
+      fileSize: config.sourcesMaxFileBytes,
+      parts: config.sourcesMaxFilesPerUpload + 5,
+    },
+  });
+
   app.setGlobalPrefix(config.globalPrefix);
   app.enableCors({
     origin: config.webOrigin,
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["content-type", "authorization", "x-correlation-id"],
+    allowedHeaders: [
+      "content-type",
+      "authorization",
+      "x-correlation-id",
+    ],
   });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new ApplicationExceptionFilter());
@@ -44,18 +57,25 @@ async function bootstrap(): Promise<void> {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Gateway API")
       .setDescription(
-        "Punto de entrada del frontend para identidad y proyectos.",
+        "Punto de entrada del frontend para identidad, proyectos y fuentes.",
       )
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
       .addTag("authentication", "Identidad y sesiones")
       .addTag("projects", "Proyectos y participantes")
+      .addTag(
+        "sources",
+        "Fuentes textuales, archivos y procesamiento",
+      )
       .addCookieAuth("rq_access")
       .addCookieAuth("rq_refresh")
       .addBearerAuth()
       .build();
 
-    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+    const openApiDocument = SwaggerModule.createDocument(
+      app,
+      openApiConfig,
+    );
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
       customSwaggerUiPath: resolve(
@@ -85,6 +105,7 @@ async function bootstrap(): Promise<void> {
       version: config.version,
       identityServiceUrl: config.identityServiceUrl,
       projectsServiceUrl: config.projectsServiceUrl,
+      sourcesServiceUrl: config.sourcesServiceUrl,
       webOrigin: config.webOrigin,
     },
   });
@@ -94,7 +115,9 @@ async function bootstrap(): Promise<void> {
 
 void bootstrap().catch((error: unknown) => {
   const message =
-    error instanceof Error ? (error.stack ?? error.message) : String(error);
+    error instanceof Error
+      ? (error.stack ?? error.message)
+      : String(error);
 
   Logger.error(message, "Bootstrap");
   process.exitCode = 1;

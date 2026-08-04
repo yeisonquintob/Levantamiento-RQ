@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 
+import fastifyMultipart from "@fastify/multipart";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -13,6 +14,8 @@ import {
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
 
+import { loadSourcesStorageConfig } from "./sources/sources-storage.config";
+
 loadEnvironmentFiles({
   paths: [".env", "apps/sources-service/.env"],
 });
@@ -22,7 +25,7 @@ async function bootstrap(): Promise<void> {
     serviceName: "sources-service",
     defaultPort: 3003,
   });
-
+  const storageConfig = loadSourcesStorageConfig();
   const { AppModule } = await import("./app/app.module.js");
 
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -30,20 +33,37 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
+  await app.register(fastifyMultipart, {
+    limits: {
+      files: storageConfig.maxFilesPerUpload,
+      fileSize: storageConfig.maxFileBytes,
+      parts: storageConfig.maxFilesPerUpload + 5,
+    },
+  });
+
   const globalPrefix = "api/v1";
 
   app.setGlobalPrefix(globalPrefix);
+
   if (config.environment === "development") {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Sources Service API")
-      .setDescription("Fuentes, archivos, notas y metadatos.")
+      .setDescription(
+        "Fuentes textuales, archivos, almacenamiento y extracción.",
+      )
       .setVersion("1.0.0")
       .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
-      .addTag("sources", "Fuentes textuales y metadatos del proyecto")
+      .addTag(
+        "sources",
+        "Fuentes textuales, archivos y contenido extraído",
+      )
       .build();
 
-    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
+    const openApiDocument = SwaggerModule.createDocument(
+      app,
+      openApiConfig,
+    );
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
       customSwaggerUiPath: resolve(
@@ -58,8 +78,8 @@ async function bootstrap(): Promise<void> {
       },
     });
   }
-  app.enableShutdownHooks();
 
+  app.enableShutdownHooks();
   await app.listen(config.port, config.host);
 
   Logger.log(
@@ -70,7 +90,9 @@ async function bootstrap(): Promise<void> {
 
 void bootstrap().catch((error: unknown) => {
   const message =
-    error instanceof Error ? (error.stack ?? error.message) : String(error);
+    error instanceof Error
+      ? (error.stack ?? error.message)
+      : String(error);
 
   Logger.error(message, "Bootstrap");
   process.exitCode = 1;

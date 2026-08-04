@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,17 +10,21 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiCookieAuth,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import type { MultipartFile } from "@fastify/multipart";
+import type { FastifyReply } from "fastify";
 
 import type {
   CreateTextSourceRequest,
@@ -27,13 +32,20 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
-import { SourcesClientService } from "./sources-client.service";
+import {
+  type GatewayUploadFile,
+  SourcesClientService,
+} from "./sources-client.service";
 
 interface RequestLike {
   headers: Readonly<Record<string, string | string[] | undefined>>;
+  isMultipart(): boolean;
+  files(): AsyncIterableIterator<MultipartFile>;
 }
 
-function firstHeader(value: string | string[] | undefined): string | undefined {
+function firstHeader(
+  value: string | string[] | undefined,
+): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -47,7 +59,9 @@ function requireAccessToken(request: RequestLike): string {
     return cookieToken;
   }
 
-  const authorization = firstHeader(request.headers.authorization);
+  const authorization = firstHeader(
+    request.headers.authorization,
+  );
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
 
   if (!match?.[1]) {
@@ -55,6 +69,10 @@ function requireAccessToken(request: RequestLike): string {
   }
 
   return match[1];
+}
+
+function attachmentDisposition(fileName: string): string {
+  return `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
 @ApiTags("sources")
@@ -71,7 +89,10 @@ export class SourcesGatewayController {
     @Req() request: RequestLike,
     @Param("projectId") projectId: string,
   ) {
-    return this.sources.summary(requireAccessToken(request), projectId);
+    return this.sources.summary(
+      requireAccessToken(request),
+      projectId,
+    );
   }
 
   @ApiOperation({ summary: "Listar fuentes del proyecto" })
@@ -82,7 +103,11 @@ export class SourcesGatewayController {
     @Param("projectId") projectId: string,
     @Query() query: Readonly<Record<string, unknown>>,
   ) {
-    return this.sources.list(requireAccessToken(request), projectId, query);
+    return this.sources.list(
+      requireAccessToken(request),
+      projectId,
+      query,
+    );
   }
 
   @ApiOperation({ summary: "Crear una fuente textual" })
@@ -96,8 +121,16 @@ export class SourcesGatewayController {
           type: "string",
           enum: ["NOTE", "CONVERSATION", "TRANSCRIPT"],
         },
-        title: { type: "string", minLength: 3, maxLength: 240 },
-        content: { type: "string", minLength: 1, maxLength: 200000 },
+        title: {
+          type: "string",
+          minLength: 3,
+          maxLength: 240,
+        },
+        content: {
+          type: "string",
+          minLength: 1,
+          maxLength: 200000,
+        },
       },
     },
   })
@@ -112,6 +145,96 @@ export class SourcesGatewayController {
       requireAccessToken(request),
       projectId,
       body,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Cargar y procesar varios archivos",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["files"],
+      properties: {
+        files: {
+          type: "array",
+          items: {
+            type: "string",
+            format: "binary",
+          },
+        },
+      },
+    },
+  })
+  @Post("files")
+  async uploadFiles(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ) {
+    if (!request.isMultipart()) {
+      throw new BadRequestException(
+        "La carga debe usar multipart/form-data.",
+      );
+    }
+
+    const files: GatewayUploadFile[] = [];
+
+    for await (const part of request.files()) {
+      files.push({
+        fileName: part.filename,
+        mediaType: part.mimetype,
+        buffer: await part.toBuffer(),
+      });
+    }
+
+    return this.sources.uploadFiles(
+      requireAccessToken(request),
+      projectId,
+      files,
+    );
+  }
+
+  @ApiOperation({ summary: "Descargar archivo de fuente" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "sourceId", format: "uuid" })
+  @Get(":sourceId/download")
+  async download(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("sourceId") sourceId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const file = await this.sources.download(
+      requireAccessToken(request),
+      projectId,
+      sourceId,
+    );
+
+    return reply
+      .header("content-type", file.mediaType)
+      .header(
+        "content-disposition",
+        attachmentDisposition(file.fileName),
+      )
+      .header("content-length", String(file.buffer.length))
+      .send(file.buffer);
+  }
+
+  @ApiOperation({ summary: "Reprocesar un archivo" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "sourceId", format: "uuid" })
+  @Post(":sourceId/reprocess")
+  reprocess(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("sourceId") sourceId: string,
+  ) {
+    return this.sources.reprocess(
+      requireAccessToken(request),
+      projectId,
+      sourceId,
     );
   }
 
@@ -131,7 +254,7 @@ export class SourcesGatewayController {
     );
   }
 
-  @ApiOperation({ summary: "Actualizar una fuente textual" })
+  @ApiOperation({ summary: "Actualizar una fuente" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "sourceId", format: "uuid" })
   @Patch(":sourceId")

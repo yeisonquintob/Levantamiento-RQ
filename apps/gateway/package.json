@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@fastify/multipart": "10.1.0",
     "@fastify/static": "10.1.2",
     "@levantamiento-rq/shared-config": "workspace:*",
     "@levantamiento-rq/shared-contracts": "workspace:*",

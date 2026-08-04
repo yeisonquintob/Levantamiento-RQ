@@ -15,6 +15,10 @@ export interface GatewayConfig extends BaseServiceConfig {
   identityTimeoutMs: number;
   projectsTimeoutMs: number;
   sourcesTimeoutMs: number;
+  sourcesUploadTimeoutMs: number;
+  sourcesMaxFileBytes: number;
+  sourcesMaxFilesPerUpload: number;
+  sourcesMaxBatchBytes: number;
   cookieSecure: boolean;
 }
 
@@ -96,6 +100,21 @@ function readInteger(
 export function loadGatewayConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): GatewayConfig {
+  const sourcesMaxFileBytes = readInteger(
+    environment.SOURCES_MAX_FILE_BYTES,
+    20 * 1024 * 1024,
+    1024,
+    100 * 1024 * 1024,
+    "SOURCES_MAX_FILE_BYTES",
+  );
+  const sourcesMaxFilesPerUpload = readInteger(
+    environment.SOURCES_MAX_FILES_PER_UPLOAD,
+    20,
+    1,
+    50,
+    "SOURCES_MAX_FILES_PER_UPLOAD",
+  );
+
   return {
     ...loadBaseServiceConfig(
       {
@@ -146,6 +165,22 @@ export function loadGatewayConfig(
       500,
       30000,
       "SOURCES_TIMEOUT_MS",
+    ),
+    sourcesUploadTimeoutMs: readInteger(
+      environment.SOURCES_UPLOAD_TIMEOUT_MS,
+      300000,
+      5000,
+      600000,
+      "SOURCES_UPLOAD_TIMEOUT_MS",
+    ),
+    sourcesMaxFileBytes,
+    sourcesMaxFilesPerUpload,
+    sourcesMaxBatchBytes: readInteger(
+      environment.SOURCES_MAX_BATCH_BYTES,
+      100 * 1024 * 1024,
+      sourcesMaxFileBytes,
+      500 * 1024 * 1024,
+      "SOURCES_MAX_BATCH_BYTES",
     ),
     cookieSecure: readBoolean(
       environment.AUTH_COOKIE_SECURE,

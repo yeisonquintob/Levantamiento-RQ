@@ -1,10 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 
 import {
+  SOURCE_PROCESSING_STATUSES,
   SOURCE_STATUSES,
   SOURCE_TYPES,
   TEXT_SOURCE_TYPES,
   type CreateTextSourceRequest,
+  type SourceProcessingStatus,
   type SourceStatus,
   type SourceType,
   type TextSourceType,
@@ -14,6 +16,7 @@ import {
 export interface SourceListQuery {
   search: string;
   sourceType: SourceType | null;
+  processingStatus: SourceProcessingStatus | null;
   status: SourceStatus | null;
   page: number;
   pageSize: number;
@@ -98,6 +101,27 @@ function optionalSourceType(value: unknown): SourceType | null {
   return value as SourceType;
 }
 
+function optionalProcessingStatus(
+  value: unknown,
+): SourceProcessingStatus | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (
+    typeof value !== "string" ||
+    !SOURCE_PROCESSING_STATUSES.includes(
+      value as SourceProcessingStatus,
+    )
+  ) {
+    throw new BadRequestException(
+      "El estado de procesamiento no es válido.",
+    );
+  }
+
+  return value as SourceProcessingStatus;
+}
+
 function optionalStatus(value: unknown): SourceStatus | null {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -177,6 +201,7 @@ export function parseSourceListQuery(value: unknown): SourceListQuery {
   return {
     search,
     sourceType: optionalSourceType(record.sourceType),
+    processingStatus: optionalProcessingStatus(record.processingStatus),
     status: optionalStatus(record.status),
     page: readInteger(record.page, 1, 1, 100000, "page"),
     pageSize: readInteger(record.pageSize, 20, 1, 50, "pageSize"),

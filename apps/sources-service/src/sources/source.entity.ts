@@ -6,6 +6,7 @@ import {
 } from "typeorm";
 
 import type {
+  SourceFileExtension,
   SourceProcessingStatus,
   SourceStatus,
   SourceType,
@@ -18,6 +19,10 @@ import type {
   "updatedAt",
 ])
 @Index("IX_Sources_ProjectId_SourceType", ["projectId", "sourceType"])
+@Index("IX_Sources_ProjectId_ProcessingStatus", [
+  "projectId",
+  "processingStatus",
+])
 @Index("IX_Sources_Sha256", ["sha256"])
 export class SourceEntity {
   @PrimaryGeneratedColumn("uuid", { name: "Id" })
@@ -54,6 +59,20 @@ export class SourceEntity {
   processingStatus!: SourceProcessingStatus;
 
   @Column("nvarchar", {
+    name: "ProcessingMessage",
+    length: 2000,
+    nullable: true,
+  })
+  processingMessage!: string | null;
+
+  @Column("datetime2", {
+    name: "ProcessedAt",
+    precision: 7,
+    nullable: true,
+  })
+  processedAt!: Date | null;
+
+  @Column("nvarchar", {
     name: "Status",
     length: 32,
     default: "ACTIVE",
@@ -66,6 +85,13 @@ export class SourceEntity {
     nullable: true,
   })
   originalFileName!: string | null;
+
+  @Column("nvarchar", {
+    name: "FileExtension",
+    length: 24,
+    nullable: true,
+  })
+  fileExtension!: SourceFileExtension | null;
 
   @Column("nvarchar", {
     name: "MediaType",
@@ -100,6 +126,18 @@ export class SourceEntity {
     nullable: true,
   })
   storagePath!: string | null;
+
+  @Column("int", {
+    name: "PageCount",
+    nullable: true,
+  })
+  pageCount!: number | null;
+
+  @Column("int", {
+    name: "SheetCount",
+    nullable: true,
+  })
+  sheetCount!: number | null;
 
   @Column("uniqueidentifier", { name: "CreatedByUserId" })
   createdByUserId!: string;

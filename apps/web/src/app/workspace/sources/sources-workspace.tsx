@@ -1,17 +1,25 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DragEvent, FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type {
   CreateTextSourceRequest,
   ProjectListResponse,
+  ProjectStatus,
   SourceDetail,
   SourceListResponse,
   SourceMetrics,
+  SourceProcessingStatus,
   SourceStatus,
   SourceSummary,
   SourceType,
+  SourceUploadBatchResponse,
   TextSourceType,
   UpdateSourceRequest,
 } from "@levantamiento-rq/shared-contracts";
@@ -20,13 +28,15 @@ import {
   RqEmptyState,
   RqKpiCard,
   RqKpiGrid,
-  RqPageHero,
   RqStatusBadge,
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+
+const FILE_ACCEPT =
+  ".pdf,.docx,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.webp";
 
 const EMPTY_PROJECTS: ProjectListResponse = {
   items: [],
@@ -82,6 +92,8 @@ interface AlertState {
   message: string;
 }
 
+type CreationMode = "TEXT" | "FILES";
+
 const EMPTY_FORM: SourceFormState = {
   sourceType: "NOTE",
   title: "",
@@ -101,16 +113,34 @@ function sourceStatusLabel(status: SourceStatus): string {
   return status === "ACTIVE" ? "Activa" : "Archivada";
 }
 
-function processingLabel(status: SourceSummary["processingStatus"]): string {
+function projectStatusLabel(status: ProjectStatus): string {
+  if (status === "IN_PROGRESS") return "En elaboración";
+  if (status === "VALIDATION") return "En validación";
+  if (status === "APPROVED") return "Aprobado";
+  if (status === "ARCHIVED") return "Archivado";
+  return "Borrador";
+}
+
+function projectStageLabel(status: ProjectStatus): string {
+  if (status === "IN_PROGRESS") return "Carga de datos y fuentes";
+  if (status === "VALIDATION") return "Revisión del borrador";
+  if (status === "APPROVED") return "Documento aprobado";
+  if (status === "ARCHIVED") return "Proyecto archivado";
+  return "Título y encabezado";
+}
+
+function processingLabel(status: SourceProcessingStatus): string {
   if (status === "READY") return "Lista";
+  if (status === "PROCESSING") return "Procesando";
   if (status === "FAILED") return "Con error";
   return "Pendiente";
 }
 
 function processingTone(
-  status: SourceSummary["processingStatus"],
-): "success" | "danger" | "pending" {
+  status: SourceProcessingStatus,
+): "success" | "danger" | "pending" | "process" {
   if (status === "READY") return "success";
+  if (status === "PROCESSING") return "process";
   if (status === "FAILED") return "danger";
   return "pending";
 }
@@ -120,6 +150,33 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatBytes(value: string | null): string {
+  const bytes = Number(value ?? 0);
+
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "—";
+  }
+
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+
+function fileDescription(source: SourceSummary): string {
+  if (source.sourceType !== "FILE") {
+    return source.contentPreview || "Sin vista previa";
+  }
+
+  const details = [
+    source.originalFileName,
+    source.fileExtension?.toUpperCase(),
+    formatBytes(source.fileSizeBytes),
+  ].filter(Boolean);
+
+  return details.join(" · ") || "Archivo almacenado";
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -133,8 +190,20 @@ async function parseError(response: Response): Promise<string> {
     const payload = JSON.parse(text) as Readonly<Record<string, unknown>>;
 
     for (const field of ["detail", "message", "title"]) {
-      if (typeof payload[field] === "string" && payload[field].trim()) {
-        return payload[field].trim();
+      const value = payload[field];
+
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+
+      if (Array.isArray(value)) {
+        const joined = value
+          .filter((item): item is string => typeof item === "string")
+          .join(" ");
+
+        if (joined.trim()) {
+          return joined.trim();
+        }
       }
     }
   } catch {
@@ -144,13 +213,22 @@ async function parseError(response: Response): Promise<string> {
   return `La solicitud no pudo completarse (${response.status}).`;
 }
 
-async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  const isFormData =
+    typeof FormData !== "undefined" && options?.body instanceof FormData;
+
   const response = await fetch(`${GATEWAY_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
       accept: "application/json",
-      ...(options?.body ? { "content-type": "application/json" } : {}),
+      ...(!isFormData && options?.body
+        ? { "content-type": "application/json" }
+        : {}),
+      ...options?.headers,
     },
   });
 
@@ -183,12 +261,18 @@ export function SourcesWorkspace({
   const [metrics, setMetrics] = useState<SourceMetrics>(EMPTY_METRICS);
   const [search, setSearch] = useState("");
   const [sourceType, setSourceType] = useState<"" | SourceType>("");
+  const [processingStatus, setProcessingStatus] =
+    useState<"" | SourceProcessingStatus>("");
   const [status, setStatus] = useState<SourceStatus>("ACTIVE");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SourceDetail | null>(null);
+  const [creationMode, setCreationMode] =
+    useState<CreationMode>("TEXT");
   const [form, setForm] = useState<SourceFormState>(EMPTY_FORM);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(
     initialError
       ? {
@@ -208,6 +292,7 @@ export function SourcesWorkspace({
       nextProjectId: string,
       nextSearch: string,
       nextType: "" | SourceType,
+      nextProcessingStatus: "" | SourceProcessingStatus,
       nextStatus: SourceStatus,
     ): Promise<void> => {
       if (!nextProjectId) {
@@ -231,6 +316,10 @@ export function SourcesWorkspace({
 
         if (nextType) {
           query.set("sourceType", nextType);
+        }
+
+        if (nextProcessingStatus) {
+          query.set("processingStatus", nextProcessingStatus);
         }
 
         const [list, summary] = await Promise.all([
@@ -260,13 +349,13 @@ export function SourcesWorkspace({
   );
 
   useEffect(() => {
-    void loadSources(projectId, "", "", "ACTIVE");
+    void loadSources(projectId, "", "", "", "ACTIVE");
   }, [loadSources, projectId]);
 
   useEffect(() => {
     if (!alert) return;
 
-    const timeout = window.setTimeout(() => setAlert(null), 6000);
+    const timeout = window.setTimeout(() => setAlert(null), 8000);
     return () => window.clearTimeout(timeout);
   }, [alert]);
 
@@ -274,6 +363,7 @@ export function SourcesWorkspace({
     setProjectId(nextProjectId);
     setSearch("");
     setSourceType("");
+    setProcessingStatus("");
     setStatus("ACTIVE");
 
     const url = new URL(window.location.href);
@@ -297,11 +387,13 @@ export function SourcesWorkspace({
     }
 
     setEditing(null);
+    setCreationMode("TEXT");
     setForm(EMPTY_FORM);
+    setSelectedFiles([]);
     setModalOpen(true);
   }
 
-  async function openEdit(source: SourceSummary): Promise<void> {
+  async function openDetail(source: SourceSummary): Promise<void> {
     setLoading(true);
 
     try {
@@ -309,21 +401,19 @@ export function SourcesWorkspace({
         `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(source.id)}`,
       );
 
-      if (detail.sourceType === "FILE") {
-        setAlert({
-          tone: "information",
-          message:
-            "La edición de archivos se habilitará con el almacenamiento de documentos.",
-        });
-        return;
-      }
-
       setEditing(detail);
+      setCreationMode(
+        detail.sourceType === "FILE" ? "FILES" : "TEXT",
+      );
       setForm({
-        sourceType: detail.sourceType,
+        sourceType:
+          detail.sourceType === "FILE"
+            ? "NOTE"
+            : detail.sourceType,
         title: detail.title,
         content: detail.content ?? "",
       });
+      setSelectedFiles([]);
       setModalOpen(true);
     } catch (error) {
       setAlert({
@@ -343,7 +433,21 @@ export function SourcesWorkspace({
 
     setModalOpen(false);
     setEditing(null);
+    setCreationMode("TEXT");
     setForm(EMPTY_FORM);
+    setSelectedFiles([]);
+    setDragActive(false);
+  }
+
+  function selectFiles(files: FileList | readonly File[]): void {
+    const next = Array.from(files).slice(0, 20);
+    setSelectedFiles(next);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>): void {
+    event.preventDefault();
+    setDragActive(false);
+    selectFiles(event.dataTransfer.files);
   }
 
   async function saveSource(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -354,10 +458,14 @@ export function SourcesWorkspace({
     setSaving(true);
 
     try {
+      let message = "La fuente fue creada.";
+
       if (editing) {
         const body: UpdateSourceRequest = {
           title: form.title,
-          content: form.content,
+          ...(editing.sourceType === "FILE"
+            ? {}
+            : { content: form.content }),
         };
 
         await requestJson<SourceDetail>(
@@ -367,6 +475,41 @@ export function SourcesWorkspace({
             body: JSON.stringify(body),
           },
         );
+
+        message = "La fuente fue actualizada.";
+      } else if (creationMode === "FILES") {
+        const data = new FormData();
+
+        for (const file of selectedFiles) {
+          data.append("files", file, file.name);
+        }
+
+        const result = await requestJson<SourceUploadBatchResponse>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/sources/files`,
+          {
+            method: "POST",
+            body: data,
+          },
+        );
+
+        if (result.acceptedFiles === 0) {
+          throw new Error(
+            result.rejected
+              .map((item) => `${item.fileName}: ${item.reason}`)
+              .join(" "),
+          );
+        }
+
+        const rejectionSummary = result.rejected
+          .slice(0, 3)
+          .map((item) => `${item.fileName}: ${item.reason}`)
+          .join(" ");
+
+        message =
+          `${result.acceptedFiles} archivo(s) cargado(s) y procesado(s).` +
+          (result.rejectedFiles > 0
+            ? ` ${result.rejectedFiles} rechazado(s). ${rejectionSummary}`
+            : "");
       } else {
         const body: CreateTextSourceRequest = {
           sourceType: form.sourceType,
@@ -383,19 +526,19 @@ export function SourcesWorkspace({
         );
       }
 
-      const wasEditing = Boolean(editing);
-
-      setModalOpen(false);
-      setEditing(null);
-      setForm(EMPTY_FORM);
+      closeModal();
       setAlert({
         tone: "success",
-        message: wasEditing
-          ? "La fuente fue actualizada."
-          : "La fuente fue creada.",
+        message,
       });
 
-      await loadSources(projectId, search, sourceType, status);
+      await loadSources(
+        projectId,
+        search,
+        sourceType,
+        processingStatus,
+        status,
+      );
     } catch (error) {
       setAlert({
         tone: "danger",
@@ -406,6 +549,80 @@ export function SourcesWorkspace({
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function downloadSource(source: SourceSummary): Promise<void> {
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(source.id)}/download`,
+        {
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(await parseError(response));
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = source.originalFileName ?? source.title;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setAlert({
+        tone: "danger",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No fue posible descargar el archivo.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function reprocessSource(source: SourceSummary): Promise<void> {
+    setLoading(true);
+
+    try {
+      await requestJson<SourceDetail>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(source.id)}/reprocess`,
+        {
+          method: "POST",
+        },
+      );
+
+      setAlert({
+        tone: "success",
+        message: "El archivo fue reprocesado.",
+      });
+
+      await loadSources(
+        projectId,
+        search,
+        sourceType,
+        processingStatus,
+        status,
+      );
+    } catch (error) {
+      setAlert({
+        tone: "danger",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No fue posible reprocesar el archivo.",
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -431,7 +648,13 @@ export function SourcesWorkspace({
         message: "La fuente fue archivada.",
       });
 
-      await loadSources(projectId, search, sourceType, status);
+      await loadSources(
+        projectId,
+        search,
+        sourceType,
+        processingStatus,
+        status,
+      );
     } catch (error) {
       setAlert({
         tone: "danger",
@@ -444,6 +667,18 @@ export function SourcesWorkspace({
       setLoading(false);
     }
   }
+
+  const fileDetail = editing?.sourceType === "FILE" ? editing : null;
+  const canSubmit =
+    !saving &&
+    (editing
+      ? form.title.trim().length >= 3 &&
+        (editing.sourceType === "FILE" ||
+          form.content.trim().length >= 1)
+      : creationMode === "FILES"
+        ? selectedFiles.length > 0
+        : form.title.trim().length >= 3 &&
+          form.content.trim().length >= 1);
 
   return (
     <>
@@ -460,11 +695,39 @@ export function SourcesWorkspace({
         </div>
       ) : null}
 
-      <RqPageHero
-        eyebrow="Sources Service activo"
-        title="Fuentes del levantamiento"
-        description="Registra notas, conversaciones y transcripciones asociadas a cada proyecto, con trazabilidad y control de acceso."
-        actions={
+      <section className="rq-module-commandbar">
+        <RqKpiGrid label="Resumen de fuentes">
+          <RqKpiCard
+            description="Registradas"
+            icon="F"
+            title="Fuentes"
+            value={String(metrics.total)}
+          />
+          <RqKpiCard
+            description="Archivos almacenados"
+            icon="A"
+            title="Archivos"
+            value={String(metrics.files)}
+          />
+          <RqKpiCard
+            description="Notas, conversaciones y transcripciones"
+            icon="T"
+            title="Textuales"
+            value={String(
+              metrics.notes +
+                metrics.conversations +
+                metrics.transcripts,
+            )}
+          />
+          <RqKpiCard
+            description="Disponibles para análisis"
+            icon="L"
+            title="Listas"
+            value={String(metrics.ready)}
+          />
+        </RqKpiGrid>
+
+        <div className="rq-module-commandbar__actions">
           <RqActionButton
             disabled={loading || !projectId}
             onClick={openCreate}
@@ -472,12 +735,12 @@ export function SourcesWorkspace({
           >
             Nueva fuente
           </RqActionButton>
-        }
-      />
+        </div>
+      </section>
 
       <section className="rq-source-project-card">
         <div className="rq-field">
-          <label htmlFor="source-project">Proyecto</label>
+          <label htmlFor="source-project">Proyecto de trabajo</label>
           <select
             id="source-project"
             onChange={(event) => changeProject(event.target.value)}
@@ -505,40 +768,33 @@ export function SourcesWorkspace({
             {selectedProject?.requestingArea ?? "Selecciona un proyecto"}
           </small>
         </div>
-      </section>
 
-      <RqKpiGrid label="Resumen de fuentes">
-        <RqKpiCard
-          description="Registradas"
-          icon="F"
-          title="Fuentes"
-          value={String(metrics.total)}
-        />
-        <RqKpiCard
-          description="Contenido directo"
-          icon="N"
-          title="Notas"
-          value={String(metrics.notes)}
-        />
-        <RqKpiCard
-          description="Conversaciones y transcripciones"
-          icon="T"
-          title="Registros textuales"
-          value={String(metrics.conversations + metrics.transcripts)}
-        />
-        <RqKpiCard
-          description="Disponibles para análisis"
-          icon="L"
-          title="Listas"
-          value={String(metrics.ready)}
-        />
-      </RqKpiGrid>
+        <div className="rq-source-project-card__stage">
+          <span>Etapa del proyecto</span>
+          <strong>
+            {selectedProject
+              ? projectStageLabel(selectedProject.status)
+              : "Sin etapa disponible"}
+          </strong>
+          <small>
+            {selectedProject
+              ? `Estado: ${projectStatusLabel(selectedProject.status)}`
+              : "Selecciona un proyecto para consultar su avance"}
+          </small>
+        </div>
+      </section>
 
       <form
         className="rq-filter-bar rq-source-filter-bar"
         onSubmit={(event) => {
           event.preventDefault();
-          void loadSources(projectId, search, sourceType, status);
+          void loadSources(
+            projectId,
+            search,
+            sourceType,
+            processingStatus,
+            status,
+          );
         }}
       >
         <div className="rq-field">
@@ -546,7 +802,7 @@ export function SourcesWorkspace({
           <input
             id="source-search"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Título o contenido"
+            placeholder="Título, contenido o archivo"
             type="search"
             value={search}
           />
@@ -572,6 +828,25 @@ export function SourcesWorkspace({
         </div>
 
         <div className="rq-field">
+          <label htmlFor="source-processing">Procesamiento</label>
+          <select
+            id="source-processing"
+            onChange={(event) =>
+              setProcessingStatus(
+                event.target.value as "" | SourceProcessingStatus,
+              )
+            }
+            value={processingStatus}
+          >
+            <option value="">Todos</option>
+            <option value="PENDING">Pendiente</option>
+            <option value="PROCESSING">Procesando</option>
+            <option value="READY">Lista</option>
+            <option value="FAILED">Con error</option>
+          </select>
+        </div>
+
+        <div className="rq-field">
           <label htmlFor="source-status">Estado</label>
           <select
             id="source-status"
@@ -586,7 +861,11 @@ export function SourcesWorkspace({
         </div>
 
         <div className="rq-filter-bar__actions">
-          <RqActionButton disabled={loading || !projectId} tone="consult" type="submit">
+          <RqActionButton
+            disabled={loading || !projectId}
+            tone="consult"
+            type="submit"
+          >
             {loading ? "Consultando…" : "Buscar"}
           </RqActionButton>
           <RqActionButton
@@ -594,8 +873,15 @@ export function SourcesWorkspace({
             onClick={() => {
               setSearch("");
               setSourceType("");
+              setProcessingStatus("");
               setStatus("ACTIVE");
-              void loadSources(projectId, "", "", "ACTIVE");
+              void loadSources(
+                projectId,
+                "",
+                "",
+                "",
+                "ACTIVE",
+              );
             }}
             tone="secondary"
           >
@@ -606,7 +892,7 @@ export function SourcesWorkspace({
 
       <RqTableShell
         count={sources.totalItems}
-        description="Fuentes almacenadas en RqSourcesDb y vinculadas al proyecto por su identificador externo."
+        description="Fuentes textuales y archivos almacenados en Azurite, con contenido extraído y trazabilidad por proyecto."
         title="Fuentes"
       >
         <table className="rq-table rq-source-table">
@@ -614,6 +900,7 @@ export function SourcesWorkspace({
             <tr>
               <th scope="col">Fuente</th>
               <th scope="col">Tipo</th>
+              <th scope="col">Archivo</th>
               <th scope="col">Procesamiento</th>
               <th scope="col">Estado</th>
               <th scope="col">Actualización</th>
@@ -623,7 +910,7 @@ export function SourcesWorkspace({
           <tbody>
             {sources.items.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <RqEmptyState
                     title={
                       projectId
@@ -632,7 +919,7 @@ export function SourcesWorkspace({
                     }
                     description={
                       projectId
-                        ? "Registra la primera nota, conversación o transcripción."
+                        ? "Registra una fuente textual o carga varios archivos."
                         : "Las fuentes siempre pertenecen a un proyecto accesible."
                     }
                   />
@@ -644,18 +931,28 @@ export function SourcesWorkspace({
                   <td>
                     <div className="rq-source-table__title">
                       <strong>{source.title}</strong>
-                      <span>{source.contentPreview || "Sin vista previa"}</span>
+                      <span>
+                        {source.contentPreview || source.processingMessage ||
+                          "Sin vista previa"}
+                      </span>
                     </div>
                   </td>
                   <td>{sourceTypeLabel(source.sourceType)}</td>
+                  <td>{fileDescription(source)}</td>
                   <td>
-                    <RqStatusBadge tone={processingTone(source.processingStatus)}>
+                    <RqStatusBadge
+                      tone={processingTone(source.processingStatus)}
+                    >
                       {processingLabel(source.processingStatus)}
                     </RqStatusBadge>
                   </td>
                   <td>
                     <RqStatusBadge
-                      tone={source.status === "ACTIVE" ? "success" : "inactive"}
+                      tone={
+                        source.status === "ACTIVE"
+                          ? "success"
+                          : "inactive"
+                      }
                     >
                       {sourceStatusLabel(source.status)}
                     </RqStatusBadge>
@@ -666,11 +963,31 @@ export function SourcesWorkspace({
                       <RqActionButton
                         compact
                         disabled={loading}
-                        onClick={() => void openEdit(source)}
+                        onClick={() => void openDetail(source)}
                         tone="operation"
                       >
-                        Ver / editar
+                        Ver
                       </RqActionButton>
+                      {source.sourceType === "FILE" ? (
+                        <>
+                          <RqActionButton
+                            compact
+                            disabled={loading}
+                            onClick={() => void downloadSource(source)}
+                            tone="consult"
+                          >
+                            Descargar
+                          </RqActionButton>
+                          <RqActionButton
+                            compact
+                            disabled={loading}
+                            onClick={() => void reprocessSource(source)}
+                            tone="secondary"
+                          >
+                            Reprocesar
+                          </RqActionButton>
+                        </>
+                      ) : null}
                       {source.status === "ACTIVE" ? (
                         <RqActionButton
                           compact
@@ -691,12 +1008,12 @@ export function SourcesWorkspace({
       </RqTableShell>
 
       <aside className="rq-foundation-note" role="status">
-        <strong>Estado del Paso 13.1</strong>
+        <strong>Paso 13 completo</strong>
         <span>
-          Sources Service, RqSourcesDb, notas, conversaciones, transcripciones,
-          permisos por proyecto, Gateway y vista responsive están integrados.
-          La carga binaria de archivos en Azurite se implementará en el Paso
-          13.2.
+          Puedes registrar fuentes textuales o cargar varios archivos PDF,
+          Word, Excel, CSV, TXT e imágenes. Los archivos quedan en Azurite,
+          se validan por firma, se protegen contra duplicados y se procesan
+          para preparar su contenido para el análisis posterior.
         </span>
       </aside>
 
@@ -714,7 +1031,11 @@ export function SourcesWorkspace({
                   {selectedProject?.code ?? "Fuente del proyecto"}
                 </span>
                 <h2 id="source-modal-title">
-                  {editing ? "Editar fuente" : "Nueva fuente textual"}
+                  {editing
+                    ? editing.sourceType === "FILE"
+                      ? "Detalle del archivo"
+                      : "Editar fuente"
+                    : "Nueva fuente"}
                 </h2>
               </div>
               <button
@@ -727,65 +1048,212 @@ export function SourcesWorkspace({
               </button>
             </header>
 
-            <form className="rq-project-form" onSubmit={saveSource}>
-              <div className="rq-field">
-                <label htmlFor="source-form-type">Tipo de fuente</label>
-                <select
-                  disabled={Boolean(editing)}
-                  id="source-form-type"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      sourceType: event.target.value as TextSourceType,
-                    }))
-                  }
-                  value={form.sourceType}
+            {!editing ? (
+              <div className="rq-source-mode-tabs" role="tablist">
+                <button
+                  aria-selected={creationMode === "TEXT"}
+                  data-active={creationMode === "TEXT"}
+                  onClick={() => setCreationMode("TEXT")}
+                  role="tab"
+                  type="button"
                 >
-                  {TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  Fuente textual
+                </button>
+                <button
+                  aria-selected={creationMode === "FILES"}
+                  data-active={creationMode === "FILES"}
+                  onClick={() => setCreationMode("FILES")}
+                  role="tab"
+                  type="button"
+                >
+                  Subir archivos
+                </button>
               </div>
+            ) : null}
 
-              <div className="rq-field">
-                <label htmlFor="source-form-title">Título</label>
-                <input
-                  autoFocus
-                  id="source-form-title"
-                  maxLength={240}
-                  minLength={3}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      title: event.target.value,
-                    }))
-                  }
-                  required
-                  value={form.title}
-                />
-              </div>
+            <form className="rq-project-form" onSubmit={saveSource}>
+              {creationMode === "FILES" && !editing ? (
+                <>
+                  <div
+                    className="rq-source-dropzone"
+                    data-active={dragActive}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={handleDrop}
+                  >
+                    <strong>Arrastra los archivos aquí</strong>
+                    <span>
+                      o selecciónalos desde tu equipo. Máximo 20 archivos
+                      por operación.
+                    </span>
+                    <label htmlFor="source-files">
+                      Seleccionar archivos
+                    </label>
+                    <input
+                      accept={FILE_ACCEPT}
+                      id="source-files"
+                      multiple
+                      onChange={(event) =>
+                        selectFiles(event.target.files ?? [])
+                      }
+                      type="file"
+                    />
+                    <small>
+                      PDF, DOCX, XLSX, TXT, CSV, PNG, JPG, JPEG y WEBP.
+                    </small>
+                  </div>
 
-              <div className="rq-field rq-source-form__content">
-                <label htmlFor="source-form-content">Contenido</label>
-                <textarea
-                  id="source-form-content"
-                  maxLength={200000}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      content: event.target.value,
-                    }))
-                  }
-                  required
-                  rows={14}
-                  value={form.content}
-                />
-                <small>{form.content.length}/200000</small>
-              </div>
+                  <div className="rq-source-selected-files">
+                    <strong>
+                      Archivos seleccionados ({selectedFiles.length})
+                    </strong>
+                    {selectedFiles.length === 0 ? (
+                      <span>No has seleccionado archivos.</span>
+                    ) : (
+                      <ul>
+                        {selectedFiles.map((file) => (
+                          <li key={`${file.name}-${file.lastModified}`}>
+                            <span>{file.name}</span>
+                            <small>{formatBytes(String(file.size))}</small>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {fileDetail ? (
+                    <div className="rq-source-file-summary">
+                      <div>
+                        <span>Archivo</span>
+                        <strong>{fileDetail.originalFileName}</strong>
+                      </div>
+                      <div>
+                        <span>Formato y tamaño</span>
+                        <strong>
+                          {fileDetail.fileExtension?.toUpperCase() ?? "—"} ·{" "}
+                          {formatBytes(fileDetail.fileSizeBytes)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Procesamiento</span>
+                        <strong>
+                          {processingLabel(fileDetail.processingStatus)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Páginas / hojas</span>
+                        <strong>
+                          {fileDetail.pageCount ??
+                            fileDetail.sheetCount ??
+                            "—"}
+                        </strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rq-field">
+                      <label htmlFor="source-form-type">
+                        Tipo de fuente
+                      </label>
+                      <select
+                        disabled={Boolean(editing)}
+                        id="source-form-type"
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            sourceType:
+                              event.target.value as TextSourceType,
+                          }))
+                        }
+                        value={form.sourceType}
+                      >
+                        {TYPE_OPTIONS.map((option) => (
+                          <option
+                            key={option.value}
+                            value={option.value}
+                          >
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="rq-field">
+                    <label htmlFor="source-form-title">Título</label>
+                    <input
+                      autoFocus
+                      id="source-form-title"
+                      maxLength={240}
+                      minLength={3}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          title: event.target.value,
+                        }))
+                      }
+                      required
+                      value={form.title}
+                    />
+                  </div>
+
+                  {fileDetail ? (
+                    <div className="rq-source-extracted-preview">
+                      <span>Contenido extraído</span>
+                      <pre>
+                        {fileDetail.extractedText ||
+                          fileDetail.processingMessage ||
+                          "Este archivo no contiene texto extraíble."}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="rq-field rq-source-form__content">
+                      <label htmlFor="source-form-content">
+                        Contenido
+                      </label>
+                      <textarea
+                        id="source-form-content"
+                        maxLength={200000}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            content: event.target.value,
+                          }))
+                        }
+                        required
+                        rows={14}
+                        value={form.content}
+                      />
+                      <small>{form.content.length}/200000</small>
+                    </div>
+                  )}
+                </>
+              )}
 
               <footer className="rq-project-modal__actions">
+                {fileDetail ? (
+                  <>
+                    <RqActionButton
+                      disabled={saving}
+                      onClick={() => void downloadSource(fileDetail)}
+                      tone="consult"
+                    >
+                      Descargar
+                    </RqActionButton>
+                    <RqActionButton
+                      disabled={saving}
+                      onClick={() => void reprocessSource(fileDetail)}
+                      tone="secondary"
+                    >
+                      Reprocesar
+                    </RqActionButton>
+                  </>
+                ) : null}
                 <RqActionButton
                   disabled={saving}
                   onClick={closeModal}
@@ -794,19 +1262,19 @@ export function SourcesWorkspace({
                   Cancelar
                 </RqActionButton>
                 <RqActionButton
-                  disabled={
-                    saving ||
-                    form.title.trim().length < 3 ||
-                    form.content.trim().length < 1
-                  }
+                  disabled={!canSubmit}
                   tone="affirmative"
                   type="submit"
                 >
                   {saving
-                    ? "Guardando…"
+                    ? creationMode === "FILES" && !editing
+                      ? "Cargando y procesando…"
+                      : "Guardando…"
                     : editing
                       ? "Actualizar"
-                      : "Crear fuente"}
+                      : creationMode === "FILES"
+                        ? "Cargar archivos"
+                        : "Crear fuente"}
                 </RqActionButton>
               </footer>
             </form>

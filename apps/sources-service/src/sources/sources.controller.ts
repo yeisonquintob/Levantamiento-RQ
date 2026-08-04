@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,16 +10,19 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
+import type { FastifyReply } from "fastify";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 
@@ -31,7 +35,10 @@ import {
   parseUpdateSource,
 } from "./sources-input";
 import type { SourcesRequest } from "./sources-request";
-import { SourcesService } from "./sources.service";
+import {
+  type IncomingSourceFile,
+  SourcesService,
+} from "./sources.service";
 
 function requireContext(request: SourcesRequest): {
   actor: AuthenticatedUser;
@@ -47,6 +54,10 @@ function requireContext(request: SourcesRequest): {
   };
 }
 
+function attachmentDisposition(fileName: string): string {
+  return `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
 @ApiTags("sources")
 @ApiBearerAuth()
 @UseGuards(SourcesAccessTokenGuard)
@@ -54,7 +65,9 @@ function requireContext(request: SourcesRequest): {
 export class SourcesController {
   constructor(private readonly sources: SourcesService) {}
 
-  @ApiOperation({ summary: "Consultar indicadores de fuentes del proyecto" })
+  @ApiOperation({
+    summary: "Consultar indicadores de fuentes del proyecto",
+  })
   @ApiParam({ name: "projectId", format: "uuid" })
   @Get("summary")
   summary(
@@ -88,7 +101,9 @@ export class SourcesController {
     );
   }
 
-  @ApiOperation({ summary: "Crear nota, conversación o transcripción" })
+  @ApiOperation({
+    summary: "Crear nota, conversación o transcripción",
+  })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiBody({
     schema: {
@@ -100,11 +115,18 @@ export class SourcesController {
           enum: ["NOTE", "CONVERSATION", "TRANSCRIPT"],
         },
         title: { type: "string", minLength: 3, maxLength: 240 },
-        content: { type: "string", minLength: 1, maxLength: 200000 },
+        content: {
+          type: "string",
+          minLength: 1,
+          maxLength: 200000,
+        },
       },
     },
   })
-  @ApiResponse({ status: 201, description: "Fuente textual creada." })
+  @ApiResponse({
+    status: 201,
+    description: "Fuente textual creada.",
+  })
   @Post()
   create(
     @Req() request: SourcesRequest,
@@ -118,6 +140,103 @@ export class SourcesController {
       context.accessToken,
       parseProjectId(projectId),
       parseCreateTextSource(body),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Cargar y procesar varios archivos",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["files"],
+      properties: {
+        files: {
+          type: "array",
+          items: {
+            type: "string",
+            format: "binary",
+          },
+        },
+      },
+    },
+  })
+  @Post("files")
+  async uploadFiles(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    if (!request.isMultipart()) {
+      throw new BadRequestException(
+        "La carga debe usar multipart/form-data.",
+      );
+    }
+
+    const context = requireContext(request);
+    const files: IncomingSourceFile[] = [];
+
+    for await (const part of request.files()) {
+      files.push({
+        fileName: part.filename,
+        mediaType: part.mimetype,
+        buffer: await part.toBuffer(),
+      });
+    }
+
+    return this.sources.uploadFiles(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+      files,
+    );
+  }
+
+  @ApiOperation({ summary: "Descargar un archivo de fuente" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "sourceId", format: "uuid" })
+  @Get(":sourceId/download")
+  async download(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+    @Param("sourceId") sourceId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const context = requireContext(request);
+    const file = await this.sources.download(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+      parseSourceId(sourceId),
+    );
+
+    return reply
+      .header("content-type", file.mediaType)
+      .header(
+        "content-disposition",
+        attachmentDisposition(file.fileName),
+      )
+      .header("content-length", String(file.buffer.length))
+      .send(file.buffer);
+  }
+
+  @ApiOperation({ summary: "Reprocesar un archivo" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "sourceId", format: "uuid" })
+  @Post(":sourceId/reprocess")
+  reprocess(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+    @Param("sourceId") sourceId: string,
+  ) {
+    const context = requireContext(request);
+
+    return this.sources.reprocess(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+      parseSourceId(sourceId),
     );
   }
 
@@ -140,7 +259,7 @@ export class SourcesController {
     );
   }
 
-  @ApiOperation({ summary: "Actualizar una fuente textual" })
+  @ApiOperation({ summary: "Actualizar una fuente" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "sourceId", format: "uuid" })
   @Patch(":sourceId")

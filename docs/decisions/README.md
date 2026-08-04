@@ -27,3 +27,4 @@
 - [ADR-0020: OpenAPI y Swagger en todos los servicios backend](0020-openapi-swagger-all-backend-services.md)
 - [ADR-0021: Dominio de proyectos y Workspace integrado](0021-projects-domain-and-workspace.md)
 - [ADR-0022: Sources Service y fuentes textuales](0022-sources-text-foundation.md)
+- [ADR-0023: Archivos de fuentes y extracción controlada](0023-source-files-and-extraction.md)

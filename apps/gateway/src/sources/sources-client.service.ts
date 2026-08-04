@@ -10,12 +10,50 @@ import type {
   SourceDetail,
   SourceListResponse,
   SourceMetrics,
+  SourceUploadBatchResponse,
   UpdateSourceRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
+import {
+  GATEWAY_CONFIG,
+  type GatewayConfig,
+} from "../config/gateway-config";
 
 type SourcesMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+export interface GatewayUploadFile {
+  fileName: string;
+  mediaType: string;
+  buffer: Buffer;
+}
+
+export interface GatewayDownloadFile {
+  fileName: string;
+  mediaType: string;
+  buffer: Buffer;
+}
+
+function fileNameFromDisposition(
+  value: string | null,
+  fallback: string,
+): string {
+  if (!value) {
+    return fallback;
+  }
+
+  const utf8 = value.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1]);
+    } catch {
+      return fallback;
+    }
+  }
+
+  const regular = value.match(/filename="?([^";]+)"?/i);
+  return regular?.[1]?.trim() || fallback;
+}
 
 @Injectable()
 export class SourcesClientService {
@@ -50,7 +88,10 @@ export class SourcesClientService {
     );
   }
 
-  summary(accessToken: string, projectId: string): Promise<SourceMetrics> {
+  summary(
+    accessToken: string,
+    projectId: string,
+  ): Promise<SourceMetrics> {
     return this.request<SourceMetrics>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/sources/summary`,
       "GET",
@@ -83,6 +124,30 @@ export class SourcesClientService {
     );
   }
 
+  async uploadFiles(
+    accessToken: string,
+    projectId: string,
+    files: readonly GatewayUploadFile[],
+  ): Promise<SourceUploadBatchResponse> {
+    const form = new FormData();
+
+    for (const file of files) {
+      form.append(
+        "files",
+        new Blob([new Uint8Array(file.buffer)], {
+          type: file.mediaType || "application/octet-stream",
+        }),
+        file.fileName,
+      );
+    }
+
+    return this.requestMultipart<SourceUploadBatchResponse>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources/files`,
+      accessToken,
+      form,
+    );
+  }
+
   update(
     accessToken: string,
     projectId: string,
@@ -97,6 +162,64 @@ export class SourcesClientService {
     );
   }
 
+  reprocess(
+    accessToken: string,
+    projectId: string,
+    sourceId: string,
+  ): Promise<SourceDetail> {
+    return this.request<SourceDetail>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/reprocess`,
+      "POST",
+      accessToken,
+    );
+  }
+
+  async download(
+    accessToken: string,
+    projectId: string,
+    sourceId: string,
+  ): Promise<GatewayDownloadFile> {
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `${this.config.sourcesServiceUrl}/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}/download`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/octet-stream",
+            authorization: `Bearer ${accessToken}`,
+          },
+          signal: AbortSignal.timeout(
+            this.config.sourcesUploadTimeoutMs,
+          ),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        "Sources Service no está disponible.",
+      );
+    }
+
+    if (!response.ok) {
+      throw new HttpException(
+        await this.readPayload(response),
+        response.status,
+      );
+    }
+
+    return {
+      fileName: fileNameFromDisposition(
+        response.headers.get("content-disposition"),
+        "fuente",
+      ),
+      mediaType:
+        response.headers.get("content-type") ??
+        "application/octet-stream",
+      buffer: Buffer.from(await response.arrayBuffer()),
+    };
+  }
+
   archive(
     accessToken: string,
     projectId: string,
@@ -107,6 +230,48 @@ export class SourcesClientService {
       "DELETE",
       accessToken,
     );
+  }
+
+  private async requestMultipart<T>(
+    path: string,
+    accessToken: string,
+    form: FormData,
+  ): Promise<T> {
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `${this.config.sourcesServiceUrl}${path}`,
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            authorization: `Bearer ${accessToken}`,
+          },
+          body: form,
+          signal: AbortSignal.timeout(
+            this.config.sourcesUploadTimeoutMs,
+          ),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        "Sources Service no está disponible.",
+      );
+    }
+
+    const payload = await this.readPayload(response);
+
+    if (!response.ok) {
+      throw new HttpException(
+        payload ?? {
+          message: "Sources Service rechazó la carga.",
+        },
+        response.status,
+      );
+    }
+
+    return payload as T;
   }
 
   private async request<T>(
@@ -127,36 +292,51 @@ export class SourcesClientService {
     let response: Response;
 
     try {
-      response = await fetch(`${this.config.sourcesServiceUrl}${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.config.sourcesTimeoutMs),
-      });
+      response = await fetch(
+        `${this.config.sourcesServiceUrl}${path}`,
+        {
+          method,
+          headers,
+          body:
+            body === undefined
+              ? undefined
+              : JSON.stringify(body),
+          signal: AbortSignal.timeout(
+            this.config.sourcesTimeoutMs,
+          ),
+        },
+      );
     } catch {
       throw new ServiceUnavailableException(
         "Sources Service no está disponible.",
       );
     }
 
-    const text = await response.text();
-    let payload: unknown = null;
-
-    if (text) {
-      try {
-        payload = JSON.parse(text) as unknown;
-      } catch {
-        payload = { message: text };
-      }
-    }
+    const payload = await this.readPayload(response);
 
     if (!response.ok) {
       throw new HttpException(
-        payload ?? { message: "Sources Service rechazó la solicitud." },
+        payload ?? {
+          message: "Sources Service rechazó la solicitud.",
+        },
         response.status,
       );
     }
 
     return payload as T;
+  }
+
+  private async readPayload(response: Response): Promise<unknown> {
+    const text = await response.text();
+
+    if (!text) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      return { message: text };
+    }
   }
 }

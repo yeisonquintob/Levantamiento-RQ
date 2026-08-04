@@ -25,3 +25,10 @@
 ## Implementación técnica
 
 - [Base de persistencia TypeORM y SQL Server](persistence-foundation.md)
+
+## Sources Service
+
+`RqSourcesDb` conserva metadatos, estado y texto extraído. Los binarios
+pertenecen al contenedor privado `rq-sources` de Azure Blob Storage/Azurite.
+No se guardan archivos completos en SQL Server y no existen claves foráneas
+hacia `RqProjectsDb`.

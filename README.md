@@ -128,15 +128,18 @@ pnpm swagger:validate
 Projects Service valida access tokens, el Gateway publica la API de proyectos
 y el Workspace permite crear, consultar, filtrar y actualizar registros reales.
 
-## Paso 13.1: Sources Service y fuentes textuales
+## Paso 13: Sources Service completo
 
-`RqSourcesDb` almacena notas, conversaciones, transcripciones y metadatos de
-fuentes sin relaciones entre bases. Sources Service valida el access token y
-consulta Projects Service para confirmar el acceso al proyecto.
+`RqSourcesDb` almacena notas, conversaciones, transcripciones y archivos sin
+relaciones entre bases. Sources Service valida el access token y consulta
+Projects Service para confirmar el acceso al proyecto.
 
-El Gateway publica la API de fuentes y el Workspace permite seleccionar un
-proyecto, consultar indicadores, buscar, registrar, editar y archivar fuentes
-textuales.
+El botón `Nueva fuente` permite registrar contenido textual o seleccionar
+varios archivos PDF, DOCX, XLSX, TXT, CSV, PNG, JPG, JPEG y WEBP. Los archivos
+se validan por extensión, tamaño y firma, se identifican mediante SHA-256 y se
+guardan en el contenedor privado `rq-sources` de Azurite/Azure Blob Storage.
 
-La carga binaria de archivos y el almacenamiento en Azurite se implementarán
-en el Paso 13.2.
+PDF, Word, Excel, CSV y TXT se procesan para obtener texto utilizable por el
+análisis posterior. Las imágenes se conservan como evidencia visual sin OCR.
+El Workspace permite consultar el procesamiento, ver el texto extraído,
+descargar, reprocesar y archivar cada fuente.

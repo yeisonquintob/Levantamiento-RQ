@@ -28,28 +28,63 @@ async function main(): Promise<void> {
       FROM sys.indexes
       WHERE name = 'IX_Sources_ProjectId_SourceType'
     `);
-    const migration = await count(`
+    const processingIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE name = 'IX_Sources_ProjectId_ProcessingStatus'
+    `);
+    const duplicateIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE name = 'UX_Sources_ProjectId_Sha256_ActiveFile'
+    `);
+    const newColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.columns
+      WHERE object_id = OBJECT_ID('dbo.Sources')
+        AND name IN (
+          'ProcessingMessage',
+          'ProcessedAt',
+          'FileExtension',
+          'PageCount',
+          'SheetCount'
+        )
+    `);
+    const foundationMigration = await count(`
       SELECT COUNT(1) AS countValue
       FROM dbo.migrations
       WHERE name = 'CreateSourcesFoundation1785801600000'
+    `);
+    const filesMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddSourceFilesAndExtraction1785888000000'
     `);
 
     if (
       sourcesTable !== 1 ||
       projectIndex !== 1 ||
       typeIndex !== 1 ||
-      migration !== 1
+      processingIndex !== 1 ||
+      duplicateIndex !== 1 ||
+      newColumns !== 5 ||
+      foundationMigration !== 1 ||
+      filesMigration !== 1
     ) {
       throw new Error(
-        "RqSourcesDb no contiene la estructura completa del Paso 13.1.",
+        "RqSourcesDb no contiene la estructura completa del Paso 13.",
       );
     }
 
     console.log("RqSourcesDb verificada correctamente.");
     console.log("Tabla confirmada: dbo.Sources");
+    console.log("Columnas de archivo y extracción confirmadas: 5");
     console.log("Índice confirmado: IX_Sources_ProjectId_Status_UpdatedAt");
     console.log("Índice confirmado: IX_Sources_ProjectId_SourceType");
+    console.log("Índice confirmado: IX_Sources_ProjectId_ProcessingStatus");
+    console.log("Índice único confirmado: UX_Sources_ProjectId_Sha256_ActiveFile");
     console.log("Migración confirmada: CreateSourcesFoundation1785801600000");
+    console.log("Migración confirmada: AddSourceFilesAndExtraction1785888000000");
   } finally {
     await dataSource.destroy();
   }

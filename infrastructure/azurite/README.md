@@ -15,4 +15,7 @@ local. Azure Blob Storage será el servicio previsto para producción.
 La cuenta `devstoreaccount1` y su clave conocida pertenecen únicamente
 al emulador. No sirven para una cuenta productiva de Azure Storage.
 
-En esta etapa no se crean contenedores Blob ni se cargan archivos.
+Sources Service crea bajo demanda el contenedor privado `rq-sources`.
+Los archivos se organizan por `projectId/sourceId/hash.ext` y solamente se
+descargan después de validar la sesión y el acceso al proyecto. La cadena de
+conexión permanece en archivos `.env` ignorados por Git.

@@ -67,6 +67,7 @@ services:
       - --debug
       - /data/debug.log
       - --disableTelemetry
+      - --skipApiVersionCheck
     ports:
       - "127.0.0.1:${RQ_AZURITE_BLOB_PORT:-10000}:10000"
       - "127.0.0.1:${RQ_AZURITE_QUEUE_PORT:-10001}:10001"

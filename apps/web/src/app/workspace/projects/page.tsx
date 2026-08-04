@@ -6,12 +6,12 @@ import type {
   ProjectMetrics,
 } from "@levantamiento-rq/shared-contracts";
 
-import { HomeWorkspace } from "./home-workspace";
+import { ProjectsWorkspace } from "../projects-workspace";
 
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
-async function loadHomeData(): Promise<{
+async function loadInitialData(): Promise<{
   list?: ProjectListResponse;
   metrics?: ProjectMetrics;
   error?: string;
@@ -30,7 +30,7 @@ async function loadHomeData(): Promise<{
 
   try {
     const [listResponse, metricsResponse] = await Promise.all([
-      fetch(`${GATEWAY_URL}/api/v1/projects?page=1&pageSize=5`, {
+      fetch(`${GATEWAY_URL}/api/v1/projects?page=1&pageSize=50`, {
         cache: "no-store",
         headers,
       }),
@@ -47,7 +47,7 @@ async function loadHomeData(): Promise<{
     if (!listResponse.ok || !metricsResponse.ok) {
       return {
         error:
-          "No fue posible cargar el resumen general. Valida Projects Service y recarga la vista.",
+          "Projects Service no respondió correctamente. Recarga la vista después de validar los servicios.",
       };
     }
 
@@ -63,15 +63,15 @@ async function loadHomeData(): Promise<{
   }
 }
 
-export default async function WorkspaceHomePage() {
-  const initial = await loadHomeData();
+export default async function WorkspacePage() {
+  const initial = await loadInitialData();
 
   if (initial.unauthorized) {
     redirect("/sign-in");
   }
 
   return (
-    <HomeWorkspace
+    <ProjectsWorkspace
       initialError={initial.error}
       initialList={initial.list}
       initialMetrics={initial.metrics}

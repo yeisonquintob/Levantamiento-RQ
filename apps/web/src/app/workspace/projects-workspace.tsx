@@ -18,7 +18,6 @@ import {
   RqEmptyState,
   RqKpiCard,
   RqKpiGrid,
-  RqPageHero,
   RqStatusBadge,
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
@@ -342,11 +341,35 @@ export function ProjectsWorkspace({
         </div>
       ) : null}
 
-      <RqPageHero
-        eyebrow="Projects Service activo"
-        title="Gestión de proyectos"
-        description="Crea y administra los proyectos que agrupan las fuentes, el análisis y el documento de levantamiento."
-        actions={
+      <section className="rq-module-commandbar">
+        <RqKpiGrid label="Resumen de proyectos">
+          <RqKpiCard
+            description="Accesibles"
+            icon="P"
+            title="Proyectos"
+            value={String(metrics.total)}
+          />
+          <RqKpiCard
+            description="Sin iniciar"
+            icon="B"
+            title="Borradores"
+            value={String(metrics.draft)}
+          />
+          <RqKpiCard
+            description="Elaboración y validación"
+            icon="E"
+            title="En curso"
+            value={String(metrics.inProgress + metrics.validation)}
+          />
+          <RqKpiCard
+            description="Finalizados"
+            icon="A"
+            title="Aprobados"
+            value={String(metrics.approved)}
+          />
+        </RqKpiGrid>
+
+        <div className="rq-module-commandbar__actions">
           <RqActionButton
             disabled={loading}
             onClick={openCreate}
@@ -354,35 +377,8 @@ export function ProjectsWorkspace({
           >
             Nuevo proyecto
           </RqActionButton>
-        }
-      />
-
-      <RqKpiGrid label="Resumen de proyectos">
-        <RqKpiCard
-          description="Accesibles"
-          icon="P"
-          title="Proyectos"
-          value={String(metrics.total)}
-        />
-        <RqKpiCard
-          description="Sin iniciar"
-          icon="B"
-          title="Borradores"
-          value={String(metrics.draft)}
-        />
-        <RqKpiCard
-          description="Elaboración y validación"
-          icon="E"
-          title="En curso"
-          value={String(metrics.inProgress + metrics.validation)}
-        />
-        <RqKpiCard
-          description="Finalizados"
-          icon="A"
-          title="Aprobados"
-          value={String(metrics.approved)}
-        />
-      </RqKpiGrid>
+        </div>
+      </section>
 
       <form
         className="rq-filter-bar"

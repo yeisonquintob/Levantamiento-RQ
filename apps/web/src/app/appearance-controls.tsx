@@ -1,12 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Theme = "normal" | "cold" | "warm" | "dark";
 type FontScale = "compact" | "normal" | "large" | "extra-large";
 
 const THEME_KEY = "rq-theme";
 const FONT_KEY = "rq-font";
+
+const THEME_OPTIONS: readonly {
+  value: Theme;
+  label: string;
+  symbol: string;
+}[] = [
+  { value: "normal", label: "Claro", symbol: "○" },
+  { value: "cold", label: "Frío", symbol: "◐" },
+  { value: "warm", label: "Cálido", symbol: "◒" },
+  { value: "dark", label: "Oscuro", symbol: "●" },
+];
+
+const FONT_OPTIONS: readonly {
+  value: FontScale;
+  label: string;
+  symbol: string;
+}[] = [
+  { value: "compact", label: "Compacto", symbol: "A−" },
+  { value: "normal", label: "Normal", symbol: "A" },
+  { value: "large", label: "Grande", symbol: "A+" },
+  { value: "extra-large", label: "Muy grande", symbol: "A++" },
+];
 
 function applyPreferences(theme: Theme, font: FontScale): void {
   document.documentElement.dataset.rqTheme = theme;
@@ -16,6 +38,8 @@ function applyPreferences(theme: Theme, font: FontScale): void {
 export function AppearanceControls() {
   const [theme, setTheme] = useState<Theme>("normal");
   const [font, setFont] = useState<FontScale>("normal");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
@@ -26,6 +50,31 @@ export function AppearanceControls() {
     setTheme(resolvedTheme);
     setFont(resolvedFont);
     applyPreferences(resolvedTheme, resolvedFont);
+  }, []);
+
+  useEffect(() => {
+    function closeFromOutside(event: MouseEvent): void {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function closeFromEscape(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeFromOutside);
+    document.addEventListener("keydown", closeFromEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
   }, []);
 
   function changeTheme(value: Theme): void {
@@ -41,34 +90,76 @@ export function AppearanceControls() {
   }
 
   return (
-    <div className="rq-appearance" aria-label="Apariencia y accesibilidad">
-      <label>
-        Tema
-        <select
-          aria-label="Tema visual"
-          value={theme}
-          onChange={(event) => changeTheme(event.target.value as Theme)}
-        >
-          <option value="normal">Normal</option>
-          <option value="cold">Frío</option>
-          <option value="warm">Cálido</option>
-          <option value="dark">Oscuro</option>
-        </select>
-      </label>
+    <div
+      className="rq-appearance"
+      aria-label="Apariencia y accesibilidad"
+      ref={containerRef}
+    >
+      <button
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="rq-appearance__trigger"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span aria-hidden="true">◐</span>
+        <strong>Apariencia</strong>
+      </button>
 
-      <label>
-        Texto
-        <select
-          aria-label="Escala del texto"
-          value={font}
-          onChange={(event) => changeFont(event.target.value as FontScale)}
+      {open ? (
+        <section
+          aria-label="Preferencias visuales"
+          className="rq-appearance__panel"
+          role="dialog"
         >
-          <option value="compact">Compacto</option>
-          <option value="normal">Normal</option>
-          <option value="large">Grande</option>
-          <option value="extra-large">Muy grande</option>
-        </select>
-      </label>
+          <header>
+            <strong>Apariencia y texto</strong>
+            <button
+              aria-label="Cerrar preferencias"
+              onClick={() => setOpen(false)}
+              type="button"
+            >
+              ×
+            </button>
+          </header>
+
+          <fieldset>
+            <legend>Tema visual</legend>
+            <div className="rq-appearance__options">
+              {THEME_OPTIONS.map((option) => (
+                <button
+                  aria-pressed={theme === option.value}
+                  data-active={theme === option.value}
+                  key={option.value}
+                  onClick={() => changeTheme(option.value)}
+                  type="button"
+                >
+                  <span aria-hidden="true">{option.symbol}</span>
+                  <small>{option.label}</small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tamaño del texto</legend>
+            <div className="rq-appearance__options rq-appearance__options--text">
+              {FONT_OPTIONS.map((option) => (
+                <button
+                  aria-pressed={font === option.value}
+                  data-active={font === option.value}
+                  key={option.value}
+                  onClick={() => changeFont(option.value)}
+                  type="button"
+                >
+                  <span aria-hidden="true">{option.symbol}</span>
+                  <small>{option.label}</small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </section>
+      ) : null}
     </div>
   );
 }

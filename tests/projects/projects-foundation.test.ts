@@ -89,15 +89,41 @@ test("la migración no crea relaciones con RqIdentityDb", async () => {
   assert.doesNotMatch(migration, /IdentityUsers/i);
 });
 
-test("el Workspace consume proyectos por medio del Gateway", async () => {
-  const page = await readFile("apps/web/src/app/workspace/page.tsx", "utf8");
-  const client = await readFile(
+test("Inicio y Proyectos son vistas independientes", async () => {
+  const home = await readFile("apps/web/src/app/workspace/page.tsx", "utf8");
+  const homeWorkspace = await readFile(
+    "apps/web/src/app/workspace/home-workspace.tsx",
+    "utf8",
+  );
+  const projectsPage = await readFile(
+    "apps/web/src/app/workspace/projects/page.tsx",
+    "utf8",
+  );
+  const projectsWorkspace = await readFile(
     "apps/web/src/app/workspace/projects-workspace.tsx",
     "utf8",
   );
+  const shell = await readFile("apps/web/src/app/app-shell.tsx", "utf8");
+  const nextConfig = await readFile("apps/web/next.config.js", "utf8");
 
-  assert.match(page, /\/api\/v1\/projects/);
-  assert.match(client, /Nuevo proyecto/);
-  assert.match(client, /credentials: "include"/);
-  assert.doesNotMatch(client, /127\.0\.0\.1:3002/);
+  assert.match(home, /HomeWorkspace/);
+  assert.match(homeWorkspace, /Etapas del levantamiento/);
+  assert.match(homeWorkspace, /Cargar datos y fuentes/);
+  assert.match(homeWorkspace, /Estado del proyecto/);
+  assert.match(homeWorkspace, /projectStageLabel/);
+  assert.doesNotMatch(homeWorkspace, /Acceso rápido/);
+  assert.match(projectsPage, /\/api\/v1\/projects/);
+  assert.match(projectsPage, /ProjectsWorkspace/);
+  assert.match(projectsWorkspace, /Nuevo proyecto/);
+  assert.match(projectsWorkspace, /rq-module-commandbar/);
+  assert.doesNotMatch(projectsWorkspace, /RqPageHero/);
+  assert.match(projectsWorkspace, /credentials: "include"/);
+  assert.match(shell, /href="\/workspace"/);
+  assert.match(shell, /href="\/workspace\/projects"/);
+  assert.match(shell, /resolvePageContext/);
+  assert.match(shell, /rq-topbar__page/);
+  assert.doesNotMatch(shell, /rq-sidebar__brand/);
+  assert.doesNotMatch(shell, /workspace#proyectos/);
+  assert.match(nextConfig, /devIndicators:\s*false/);
+  assert.doesNotMatch(projectsWorkspace, /127\.0\.0\.1:3002/);
 });

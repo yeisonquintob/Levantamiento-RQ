@@ -36,6 +36,7 @@
     "sources:migration:revert": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-revert-migration.ts",
     "sources:migration:run": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-run-migrations.ts",
     "sources:smoke": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-smoke-test.ts",
+    "sources:storage:verify": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-verify-storage.ts",
     "swagger:validate": "bash scripts/swagger-validate-all.sh",
     "test:auth": "TSX_TSCONFIG_PATH=apps/identity-service/tsconfig.app.json node --import tsx --test tests/identity/auth-foundation.test.ts",
     "test:projects": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx --test tests/projects/projects-foundation.test.ts",
@@ -49,6 +50,7 @@
   },
   "private": true,
   "devDependencies": {
+    "@azure/storage-blob": "12.33.0",
     "@babel/core": "^7.14.5",
     "@babel/preset-react": "^7.14.5",
     "@eslint/js": "^9.8.0",
