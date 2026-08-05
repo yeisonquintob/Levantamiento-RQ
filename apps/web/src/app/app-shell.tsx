@@ -18,10 +18,7 @@ interface AppShellProps {
   };
 }
 
-const futureNavigation = [
-  ["Documentos", "D"],
-  ["Validación", "V"],
-] as const;
+const futureNavigation = [["Validación", "V"]] as const;
 
 interface WorkspacePageContext {
   eyebrow: string;
@@ -301,6 +298,21 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Plantillas</span>
           </a>
 
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/documents")
+                ? "page"
+                : undefined
+            }
+            href="/workspace/documents"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              D
+            </span>
+            <span>Documentos</span>
+          </a>
+
           {futureNavigation.map(([label, icon]) => (
             <span
               aria-disabled="true"
@@ -350,7 +362,9 @@ export function AppShell({ children, user }: AppShellProps) {
       </main>
 
       <footer className="rq-footer">
-        {pathname.startsWith("/workspace/templates")
+        {pathname.startsWith("/workspace/documents")
+          ? "Editor documental, versiones e historial · Paso 17"
+          : pathname.startsWith("/workspace/templates")
           ? "Catálogo de plantillas configurables y versionadas · Paso 14"
           : pathname.startsWith("/workspace/sources")
             ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"

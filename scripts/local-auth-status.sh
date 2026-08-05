@@ -7,7 +7,7 @@ check() {
   local url="$3"
 
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
-    if curl -fsS "$url" >/dev/null 2>&1; then
+    if curl --max-time 3 -fsS "$url" >/dev/null 2>&1; then
       echo "✓ $name: activo en $port"
     else
       echo "! $name: puerto $port ocupado, pero no responde correctamente"

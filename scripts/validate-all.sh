@@ -10,6 +10,10 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# La validación es autocontenida: no hereda servidores locales de una sesión
+# anterior y garantiza que el control final de puertos mida solo este proceso.
+cleanup
+
 CI=1 pnpm install --frozen-lockfile
 pnpm lint:all
 pnpm typecheck:all

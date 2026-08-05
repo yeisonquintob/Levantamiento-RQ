@@ -1,0 +1,860 @@
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+
+import type {
+  DocumentHistoryEntry,
+  DocumentJsonValue,
+  DocumentSection,
+  DocumentSectionKey,
+  DocumentStatus,
+  DocumentVersionDetail,
+  ProjectDetail,
+  RequirementDocumentDetail,
+} from "@levantamiento-rq/shared-contracts";
+import {
+  RqActionButton,
+  RqStatusBadge,
+} from "@levantamiento-rq/shared-ui";
+
+const GATEWAY_URL =
+  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+const PENDING = "[PENDIENTE POR DEFINIR]";
+
+const FIELD_LABELS: Readonly<Record<string, string>> = {
+  title: "Título",
+  projectCode: "Código del proyecto",
+  documentVersion: "Versión del documento",
+  createdDate: "Fecha de creación",
+  requestingArea: "Área solicitante",
+  preparedBy: "Elaborado por",
+  reviewedBy: "Revisado por",
+  approvedBy: "Aprobado por",
+  status: "Estado",
+  name: "Nombre",
+  position: "Cargo",
+  general: "Objetivo general",
+  specific: "Objetivos específicos",
+  currentState: "Estado actual",
+  operationalImpact: "Impacto operacional",
+  included: "Incluye",
+  excluded: "No incluye",
+  involvedSystems: "Sistemas involucrados",
+  notation: "Notación",
+  content: "Contenido",
+  actors: "Actores",
+  inputs: "Entradas",
+  outputs: "Salidas",
+  systems: "Sistemas",
+  number: "Número",
+  description: "Descripción",
+  keyActivities: "Actividades clave",
+  userStory: "Historia de usuario",
+  code: "Código",
+  asA: "Como",
+  iWant: "Quiero",
+  soThat: "Para",
+  acceptanceCriteria: "Criterios de aceptación",
+  businessRules: "Reglas de negocio",
+  requiredFields: "Campos requeridos",
+  type: "Tipo",
+  required: "Obligatorio",
+  validationOrObservation: "Validación u observación",
+  security: "Seguridad",
+  traceability: "Trazabilidad",
+  performance: "Rendimiento",
+  compatibility: "Compatibilidad",
+  availability: "Disponibilidad",
+  usability: "Usabilidad",
+  objective: "Objetivo de pruebas",
+  minimumScenarios: "Escenarios mínimos",
+  assumptions: "Supuestos",
+  dependencies: "Dependencias",
+  pendingItems: "Pendientes",
+  changeControl: "Control de cambios",
+  approvals: "Aprobaciones",
+  templateControlled: "Controlado por plantilla",
+};
+
+export interface ContentStats {
+  total: number;
+  completed: number;
+  pending: number;
+  errors: readonly string[];
+}
+
+function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+function statusLabel(status: DocumentStatus): string {
+  if (status === "IN_REVIEW") return "En validación";
+  if (status === "APPROVED") return "Aprobado";
+  if (status === "REJECTED") return "Rechazado";
+  if (status === "ARCHIVED") return "Archivado";
+  return "Borrador";
+}
+
+function statusTone(
+  status: DocumentStatus,
+): "success" | "process" | "pending" | "danger" | "inactive" {
+  if (status === "APPROVED") return "success";
+  if (status === "IN_REVIEW") return "process";
+  if (status === "REJECTED") return "danger";
+  if (status === "ARCHIVED") return "inactive";
+  return "pending";
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+export function analyzeContent(
+  value: DocumentJsonValue,
+  path: readonly string[] = [],
+): ContentStats {
+  if (typeof value === "string") {
+    const empty = value.trim().length === 0;
+    const pending = value.includes(PENDING);
+    return {
+      total: 1,
+      completed: empty || pending ? 0 : 1,
+      pending: pending ? 1 : 0,
+      errors: empty
+        ? [`${path.map(fieldLabel).join(" · ") || "Campo"} es obligatorio.`]
+        : [],
+    };
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return { total: 1, completed: 1, pending: 0, errors: [] };
+  }
+  if (value === null) {
+    return {
+      total: 1,
+      completed: 0,
+      pending: 0,
+      errors: [`${path.map(fieldLabel).join(" · ") || "Campo"} es obligatorio.`],
+    };
+  }
+  if (Array.isArray(value)) {
+    const key = path.at(-1);
+    const emptyAllowed = key === "changeControl" || key === "approvals";
+    if (value.length === 0) {
+      return {
+        total: 1,
+        completed: emptyAllowed ? 1 : 0,
+        pending: 0,
+        errors: emptyAllowed
+          ? []
+          : [`${path.map(fieldLabel).join(" · ")} requiere al menos un elemento.`],
+      };
+    }
+    return value.reduce<ContentStats>(
+      (result, item, index) => {
+        const next = analyzeContent(item, [...path, String(index + 1)]);
+        return {
+          total: result.total + next.total,
+          completed: result.completed + next.completed,
+          pending: result.pending + next.pending,
+          errors: [...result.errors, ...next.errors],
+        };
+      },
+      { total: 0, completed: 0, pending: 0, errors: [] },
+    );
+  }
+  return Object.entries(value).reduce<ContentStats>(
+    (result, [key, item]) => {
+      const next = analyzeContent(item, [...path, key]);
+      return {
+        total: result.total + next.total,
+        completed: result.completed + next.completed,
+        pending: result.pending + next.pending,
+        errors: [...result.errors, ...next.errors],
+      };
+    },
+    { total: 0, completed: 0, pending: 0, errors: [] },
+  );
+}
+
+function versionStats(version: DocumentVersionDetail): ContentStats {
+  return version.sections.reduce<ContentStats>(
+    (result, section) => {
+      const next = analyzeContent(section.content, [section.title]);
+      return {
+        total: result.total + next.total,
+        completed: result.completed + next.completed,
+        pending: result.pending + next.pending,
+        errors: [...result.errors, ...next.errors],
+      };
+    },
+    { total: 0, completed: 0, pending: 0, errors: [] },
+  );
+}
+
+function cloneForNewItem(value: DocumentJsonValue | undefined): DocumentJsonValue {
+  if (value === undefined) return PENDING;
+  if (typeof value === "string") return PENDING;
+  if (typeof value === "number") return value + 1;
+  if (typeof value === "boolean") return false;
+  if (value === null) return PENDING;
+  if (Array.isArray(value)) return value.map((item) => cloneForNewItem(item));
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, cloneForNewItem(item)]),
+  );
+}
+
+async function responseError(response: Response): Promise<string> {
+  if (response.status === 401) {
+    window.location.assign("/sign-in");
+    return "La sesión terminó.";
+  }
+  const text = await response.text();
+  try {
+    const payload = JSON.parse(text) as {
+      detail?: string;
+      message?: string | readonly string[];
+      correlationId?: string;
+    };
+    const message =
+      typeof payload.detail === "string"
+        ? payload.detail
+        : typeof payload.message === "string"
+          ? payload.message
+          : payload.message
+            ? [...payload.message].join(" ")
+            : "La operación no pudo completarse.";
+    return payload.correlationId
+      ? `${message} Código de seguimiento: ${payload.correlationId}.`
+      : message;
+  } catch {
+    return text || "La operación no pudo completarse.";
+  }
+}
+
+interface JsonValueEditorProps {
+  value: DocumentJsonValue;
+  label: string;
+  path: string;
+  readOnly: boolean;
+  onChange: (value: DocumentJsonValue) => void;
+}
+
+function JsonValueEditor({
+  value,
+  label,
+  path,
+  readOnly,
+  onChange,
+}: JsonValueEditorProps) {
+  if (typeof value === "string") {
+    const multiline = value.length > 80 || !["code", "status", "notation"].includes(path.split(".").at(-1) ?? "");
+    return (
+      <label className="rq-document-json-field">
+        <span>{label}</span>
+        {multiline ? (
+          <textarea
+            aria-invalid={!value.trim()}
+            disabled={readOnly}
+            onChange={(event) => onChange(event.target.value)}
+            rows={Math.min(8, Math.max(2, Math.ceil(value.length / 90)))}
+            value={value}
+          />
+        ) : (
+          <input
+            aria-invalid={!value.trim()}
+            disabled={readOnly}
+            onChange={(event) => onChange(event.target.value)}
+            value={value}
+          />
+        )}
+        {value.includes(PENDING) ? <small data-pending="true">Pendiente de definición</small> : null}
+      </label>
+    );
+  }
+  if (typeof value === "number") {
+    return (
+      <label className="rq-document-json-field">
+        <span>{label}</span>
+        <input disabled={readOnly} min={1} onChange={(event) => onChange(Number(event.target.value))} type="number" value={value} />
+      </label>
+    );
+  }
+  if (typeof value === "boolean") {
+    return (
+      <label className="rq-document-json-check">
+        <input checked={value} disabled={readOnly} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+        <span>{label}</span>
+      </label>
+    );
+  }
+  if (value === null) {
+    return (
+      <label className="rq-document-json-field">
+        <span>{label}</span>
+        <input disabled={readOnly} onChange={(event) => onChange(event.target.value)} value="" />
+      </label>
+    );
+  }
+  if (Array.isArray(value)) {
+    return (
+      <fieldset className="rq-document-json-group rq-document-json-array">
+        <legend>{label}</legend>
+        {value.length === 0 ? <p>Sin registros en esta versión.</p> : null}
+        {value.map((item, index) => (
+          <section className="rq-document-json-array__item" key={`${path}-${index}`}>
+            <header>
+              <strong>{label} {index + 1}</strong>
+              {!readOnly && value.length > 1 ? (
+                <button
+                  aria-label={`Eliminar ${label} ${index + 1}`}
+                  onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
+                  type="button"
+                >
+                  Eliminar
+                </button>
+              ) : null}
+            </header>
+            <JsonValueEditor
+              label={`${label} ${index + 1}`}
+              onChange={(next) => onChange(value.map((current, itemIndex) => itemIndex === index ? next : current))}
+              path={`${path}.${index}`}
+              readOnly={readOnly}
+              value={item}
+            />
+          </section>
+        ))}
+        {!readOnly ? (
+          <button className="rq-document-add-item" onClick={() => onChange([...value, cloneForNewItem(value[0])])} type="button">
+            Agregar elemento
+          </button>
+        ) : null}
+      </fieldset>
+    );
+  }
+  return (
+    <fieldset className="rq-document-json-group">
+      <legend>{label}</legend>
+      <div className="rq-document-json-grid">
+        {Object.entries(value).map(([key, item]) => (
+          <JsonValueEditor
+            key={`${path}.${key}`}
+            label={fieldLabel(key)}
+            onChange={(next) => onChange({ ...value, [key]: next })}
+            path={`${path}.${key}`}
+            readOnly={readOnly}
+            value={item}
+          />
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+interface RequirementDocumentEditorProps {
+  initialDocument: RequirementDocumentDetail;
+  project: ProjectDetail;
+}
+
+export function RequirementDocumentEditor({
+  initialDocument,
+  project,
+}: RequirementDocumentEditorProps) {
+  const [documentState, setDocumentState] = useState(initialDocument);
+  const [version, setVersion] = useState(initialDocument.currentVersionDetail);
+  const [activeKey, setActiveKey] = useState<DocumentSectionKey>(
+    initialDocument.currentVersionDetail.sections[0]?.key ?? "header",
+  );
+  const [draftContent, setDraftContent] = useState<DocumentJsonValue>(
+    initialDocument.currentVersionDetail.sections[0]?.content ?? {},
+  );
+  const [busy, setBusy] = useState(false);
+  const [alert, setAlert] = useState<string | null>(null);
+  const [alertTone, setAlertTone] = useState<"success" | "danger" | "warning">("success");
+  const [conflict, setConflict] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<readonly DocumentHistoryEntry[]>([]);
+  const [versionOpen, setVersionOpen] = useState(false);
+  const [versionSummary, setVersionSummary] = useState(
+    "Ajustes posteriores a la revisión",
+  );
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareLeft, setCompareLeft] = useState(1);
+  const [compareRight, setCompareRight] = useState(documentState.currentVersionNumber);
+  const [leftVersion, setLeftVersion] = useState<DocumentVersionDetail | null>(null);
+  const [rightVersion, setRightVersion] = useState<DocumentVersionDetail | null>(null);
+
+  const activeSection = version.sections.find((section) => section.key === activeKey) ?? version.sections[0];
+  const unsaved = Boolean(activeSection) && JSON.stringify(draftContent) !== JSON.stringify(activeSection.content);
+  const currentVersion = version.versionNumber === documentState.currentVersionNumber;
+  const readOnly =
+    !currentVersion ||
+    version.status !== "DRAFT" ||
+    documentState.status === "ARCHIVED" ||
+    Boolean(activeSection?.templateControlled);
+  const activeStats = useMemo(() => analyzeContent(draftContent), [draftContent]);
+  const overallStats = useMemo(() => versionStats(version), [version]);
+  const progress = overallStats.total
+    ? Math.round((overallStats.completed / overallStats.total) * 100)
+    : 0;
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!unsaved) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [unsaved]);
+
+  function showAlert(message: string, tone: "success" | "danger" | "warning") {
+    setAlert(message);
+    setAlertTone(tone);
+  }
+
+  function chooseSection(section: DocumentSection): void {
+    if (unsaved && !window.confirm("Hay cambios sin guardar. ¿Deseas descartarlos y cambiar de sección?")) return;
+    setActiveKey(section.key);
+    setDraftContent(section.content);
+    setAlert(null);
+    setConflict(false);
+  }
+
+  async function reloadDocument(message?: string): Promise<void> {
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}`,
+        { credentials: "include", cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const next = (await response.json()) as RequirementDocumentDetail;
+      setDocumentState(next);
+      setVersion(next.currentVersionDetail);
+      const section = next.currentVersionDetail.sections.find((item) => item.key === activeKey) ?? next.currentVersionDetail.sections[0];
+      if (section) {
+        setActiveKey(section.key);
+        setDraftContent(section.content);
+      }
+      setConflict(false);
+      if (message) showAlert(message, "success");
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSection(): Promise<void> {
+    if (!activeSection || readOnly) return;
+    if (activeStats.errors.length > 0) {
+      showAlert("Corrige los campos obligatorios antes de guardar.", "danger");
+      return;
+    }
+    setBusy(true);
+    setConflict(false);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/sections/${encodeURIComponent(activeSection.key)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expectedRevision: version.revision,
+            content: draftContent,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const message = await responseError(response);
+        if (response.status === 409) setConflict(true);
+        throw new Error(message);
+      }
+      const saved = (await response.json()) as DocumentVersionDetail;
+      setVersion(saved);
+      setDocumentState((current) => ({
+        ...current,
+        revision: current.revision + 1,
+        updatedAt: new Date().toISOString(),
+        currentVersionDetail: saved,
+      }));
+      const savedSection = saved.sections.find((item) => item.key === activeSection.key);
+      if (savedSection) setDraftContent(savedSection.content);
+      showAlert("La sección se guardó correctamente.", "success");
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadVersion(versionNumber: number): Promise<void> {
+    if (unsaved && !window.confirm("Hay cambios sin guardar. ¿Deseas descartarlos y abrir otra versión?")) return;
+    if (versionNumber === documentState.currentVersionNumber) {
+      const current = documentState.currentVersionDetail;
+      setVersion(current);
+      const section = current.sections.find((item) => item.key === activeKey) ?? current.sections[0];
+      if (section) {
+        setActiveKey(section.key);
+        setDraftContent(section.content);
+      }
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions/${versionNumber}`,
+        { credentials: "include", cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const loaded = (await response.json()) as DocumentVersionDetail;
+      setVersion(loaded);
+      const section = loaded.sections.find((item) => item.key === activeKey) ?? loaded.sections[0];
+      if (section) {
+        setActiveKey(section.key);
+        setDraftContent(section.content);
+      }
+      setAlert(null);
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openVersionDialog(): void {
+    if (unsaved) {
+      showAlert("Guarda o descarta los cambios antes de crear una versión.", "warning");
+      return;
+    }
+    setVersionSummary("Ajustes posteriores a la revisión");
+    setVersionOpen(true);
+  }
+
+  async function createVersion(): Promise<void> {
+    const summary = versionSummary.trim();
+    if (summary.length < 3) {
+      showAlert("Describe el motivo de la nueva versión.", "danger");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expectedRevision: documentState.revision,
+            changeSummary: summary,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const message = await responseError(response);
+        if (response.status === 409) setConflict(true);
+        throw new Error(message);
+      }
+      const next = (await response.json()) as RequirementDocumentDetail;
+      setDocumentState(next);
+      setVersion(next.currentVersionDetail);
+      const first = next.currentVersionDetail.sections[0];
+      if (first) {
+        setActiveKey(first.key);
+        setDraftContent(first.content);
+      }
+      setVersionOpen(false);
+      showAlert(`Se creó la versión ${next.currentVersion}.`, "success");
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function transition(action: "submit-review" | "approve" | "reject") {
+    if (unsaved) {
+      showAlert("Guarda o descarta los cambios antes de cambiar el estado.", "warning");
+      return;
+    }
+    const labels = {
+      "submit-review": "enviar la versión a validación",
+      approve: "aprobar y bloquear esta versión",
+      reject: "rechazar esta versión",
+    } as const;
+    if (!window.confirm(`¿Deseas ${labels[action]}?`)) return;
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/${action}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expectedRevision: version.revision }),
+        },
+      );
+      if (!response.ok) {
+        const message = await responseError(response);
+        if (response.status === 409) setConflict(true);
+        throw new Error(message);
+      }
+      const updated = (await response.json()) as DocumentVersionDetail;
+      setVersion(updated);
+      setDocumentState((current) => ({
+        ...current,
+        status: updated.status,
+        revision: current.revision + 1,
+        updatedAt: new Date().toISOString(),
+        currentVersionDetail: updated,
+      }));
+      const section = updated.sections.find((item) => item.key === activeKey);
+      if (section) setDraftContent(section.content);
+      showAlert(`La versión quedó en estado ${statusLabel(updated.status)}.`, "success");
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openHistory(): Promise<void> {
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/history`,
+        { credentials: "include", cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      setHistory((await response.json()) as readonly DocumentHistoryEntry[]);
+      setHistoryOpen(true);
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadComparison(): Promise<void> {
+    setBusy(true);
+    try {
+      const get = async (value: number) => {
+        const response = await fetch(
+          `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions/${value}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(await responseError(response));
+        return (await response.json()) as DocumentVersionDetail;
+      };
+      const [left, right] = await Promise.all([get(compareLeft), get(compareRight)]);
+      setLeftVersion(left);
+      setRightVersion(right);
+      setCompareOpen(true);
+    } catch (error) {
+      showAlert(error instanceof Error ? error.message : String(error), "danger");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rq-document-editor">
+      <header className="rq-document-editor__header">
+        <div>
+          <span>Editor documental versionado</span>
+          <h1>{documentState.title}</h1>
+          <p>{project.code} · {project.title}</p>
+        </div>
+        <div className="rq-document-editor__header-actions">
+          <a
+            href={`/workspace/documents?projectId=${encodeURIComponent(project.id)}`}
+            onClick={(event) => {
+              if (unsaved && !window.confirm("Hay cambios sin guardar. ¿Deseas salir del editor?")) event.preventDefault();
+            }}
+          >
+            Volver
+          </a>
+          <RqActionButton disabled={busy} onClick={() => void openHistory()} tone="consult">Historial</RqActionButton>
+          <RqActionButton disabled={busy || documentState.currentVersionNumber < 2} onClick={() => void loadComparison()} tone="operation">Comparar versiones</RqActionButton>
+          <RqActionButton disabled={busy || documentState.status === "ARCHIVED"} onClick={openVersionDialog} tone="affirmative">Nueva versión</RqActionButton>
+        </div>
+      </header>
+
+      <section className="rq-document-editor__metadata" aria-label="Datos del documento">
+        <article><span>Proyecto</span><strong>{project.code}</strong><small>{project.requestingArea}</small></article>
+        <article><span>Plantilla</span><strong>{documentState.template.name}</strong><small>v{documentState.template.version}</small></article>
+        <article>
+          <span>Versión consultada</span>
+          <select aria-label="Versión consultada" disabled={busy || unsaved} onChange={(event) => void loadVersion(Number(event.target.value))} value={version.versionNumber}>
+            {Array.from({ length: documentState.currentVersionNumber }, (_, index) => index + 1).map((item) => (
+              <option key={item} value={item}>Versión {item}{item === documentState.currentVersionNumber ? " · actual" : ""}</option>
+            ))}
+          </select>
+          <small>SemVer {version.version}</small>
+        </article>
+        <article><span>Estado</span><RqStatusBadge tone={statusTone(version.status)}>{statusLabel(version.status)}</RqStatusBadge><small>{version.status === "APPROVED" ? "Versión inmutable" : "Control de cambios activo"}</small></article>
+        <article><span>Última modificación</span><strong>{formatDate(version.updatedAt)}</strong><small>Revisión {version.revision}</small></article>
+        <article className="rq-document-progress-card">
+          <span>Avance</span><strong>{progress}%</strong>
+          <progress aria-label={`Avance ${progress}%`} max={100} value={progress} />
+          <small>{overallStats.pending} pendientes</small>
+        </article>
+      </section>
+
+      {alert ? (
+        <div className="rq-document-alert" data-tone={alertTone} role="alert">
+          <span>{alert}</span>
+          {conflict ? <button disabled={busy} onClick={() => void reloadDocument("Se cargó la revisión más reciente.")} type="button">Recargar versión</button> : null}
+          <button aria-label="Cerrar mensaje" onClick={() => setAlert(null)} type="button">×</button>
+        </div>
+      ) : null}
+
+      {!currentVersion ? (
+        <div className="rq-document-version-banner" role="status">
+          Estás consultando una versión histórica. La edición está bloqueada.
+          {version.status === "APPROVED" ? " Esta versión fue aprobada y es inmutable." : ""}
+        </div>
+      ) : version.status === "APPROVED" ? (
+        <div className="rq-document-version-banner" data-approved="true" role="status">
+          Esta versión está aprobada y bloqueada. Usa “Nueva versión” para realizar cambios posteriores.
+        </div>
+      ) : null}
+
+      <div className="rq-document-editor__layout">
+        <nav aria-label="Secciones del documento" className="rq-document-sections">
+          <header><strong>13 secciones</strong><span>{overallStats.pending} pendientes</span></header>
+          <ol>
+            {version.sections.map((section) => {
+              const stats = analyzeContent(section.content);
+              return (
+                <li key={section.key}>
+                  <button aria-current={activeKey === section.key ? "step" : undefined} onClick={() => chooseSection(section)} type="button">
+                    <span>{section.order}</span>
+                    <span><strong>{section.title}</strong><small>{stats.pending > 0 ? `${stats.pending} pendientes` : stats.errors.length > 0 ? `${stats.errors.length} errores` : "Completa"}</small></span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+
+        <main className="rq-document-section-editor">
+          {activeSection ? (
+            <>
+              <header>
+                <div><span>Sección {activeSection.order} de 13</span><h2>{activeSection.title}</h2><p>{activeSection.templateControlled ? "Contenido institucional controlado por la plantilla." : "Edita los campos obligatorios y guarda esta sección."}</p></div>
+                <div className="rq-document-section-editor__status">
+                  {unsaved ? <span data-unsaved="true">Cambios sin guardar</span> : <span>Sin cambios pendientes</span>}
+                  {activeStats.pending > 0 ? <small>{activeStats.pending} datos pendientes</small> : null}
+                </div>
+              </header>
+
+              {activeStats.errors.length > 0 ? (
+                <section className="rq-document-validation" aria-labelledby="document-validation-title">
+                  <strong id="document-validation-title">Campos obligatorios por corregir</strong>
+                  <ul>{activeStats.errors.slice(0, 12).map((error) => <li key={error}>{error}</li>)}</ul>
+                </section>
+              ) : null}
+
+              <form onSubmit={(event) => { event.preventDefault(); void saveSection(); }}>
+                <JsonValueEditor label={activeSection.title} onChange={setDraftContent} path={activeSection.key} readOnly={readOnly || busy} value={draftContent} />
+                <footer>
+                  <span>{readOnly ? "Edición bloqueada para esta versión o sección." : "Los marcadores pendientes se conservan hasta que exista información real."}</span>
+                  <RqActionButton disabled={readOnly || busy || !unsaved || activeStats.errors.length > 0} tone="affirmative" type="submit">{busy ? "Guardando…" : "Guardar sección"}</RqActionButton>
+                </footer>
+              </form>
+
+              {(version.fields.some((field) => field.sectionKey === activeSection.key) || version.requirements.some((item) => item.sectionKey === activeSection.key) || version.evidence.some((item) => item.sectionKey === activeSection.key)) ? (
+                <section className="rq-document-structured-summary">
+                  <h3>Trazabilidad estructurada de la sección</h3>
+                  <p>{version.fields.filter((item) => item.sectionKey === activeSection.key).length} campos · {version.requirements.filter((item) => item.sectionKey === activeSection.key).length} requisitos · {version.evidence.filter((item) => item.sectionKey === activeSection.key).length} evidencias</p>
+                </section>
+              ) : null}
+            </>
+          ) : null}
+
+          <aside className="rq-document-ai-future" aria-labelledby="ai-future-title">
+            <span aria-hidden="true">IA</span>
+            <div><h3 id="ai-future-title">Propuestas de inteligencia artificial</h3><p>Las propuestas de inteligencia artificial se habilitarán en el Paso 18.</p></div>
+          </aside>
+        </main>
+      </div>
+
+      {currentVersion ? (
+        <section className="rq-document-workflow-actions" aria-label="Acciones de estado">
+          <div><strong>Estado de la versión actual</strong><span>Solo usuarios autorizados pueden revisar, aprobar o rechazar.</span></div>
+          {version.status === "DRAFT" ? <RqActionButton disabled={busy || unsaved} onClick={() => void transition("submit-review")} tone="operation">Enviar a validación</RqActionButton> : null}
+          {version.status === "IN_REVIEW" ? (
+            <><RqActionButton disabled={busy} onClick={() => void transition("reject")} tone="danger">Rechazar</RqActionButton><RqActionButton disabled={busy} onClick={() => void transition("approve")} tone="affirmative">Aprobar y bloquear</RqActionButton></>
+          ) : null}
+        </section>
+      ) : null}
+
+      {versionOpen ? (
+        <div className="rq-project-modal-backdrop" role="presentation">
+          <section aria-labelledby="new-version-title" aria-modal="true" className="rq-project-modal rq-document-version-modal" role="dialog">
+            <header className="rq-project-modal__header">
+              <div><span>Control de versiones</span><h2 id="new-version-title">Nueva versión</h2></div>
+              <button aria-label="Cerrar nueva versión" disabled={busy} onClick={() => setVersionOpen(false)} type="button">×</button>
+            </header>
+            <form className="rq-project-form" onSubmit={(event) => { event.preventDefault(); void createVersion(); }}>
+              <label className="rq-field">
+                <span>Motivo de la nueva versión</span>
+                <textarea disabled={busy} minLength={3} onChange={(event) => setVersionSummary(event.target.value)} required rows={4} value={versionSummary} />
+              </label>
+              <p className="rq-document-version-modal__confirmation">Se clonará la versión actual como un nuevo borrador. La versión anterior conservará su contenido e historial.</p>
+              <div className="rq-project-modal__actions">
+                <RqActionButton disabled={busy} onClick={() => setVersionOpen(false)}>Cancelar</RqActionButton>
+                <RqActionButton disabled={busy || versionSummary.trim().length < 3} tone="affirmative" type="submit">{busy ? "Creando…" : "Confirmar nueva versión"}</RqActionButton>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {historyOpen ? (
+        <div className="rq-project-modal-backdrop" role="presentation">
+          <section aria-labelledby="history-title" aria-modal="true" className="rq-project-modal rq-document-history-modal" role="dialog">
+            <header className="rq-project-modal__header"><div><span>Auditoría documental</span><h2 id="history-title">Historial</h2></div><button aria-label="Cerrar historial" onClick={() => setHistoryOpen(false)} type="button">×</button></header>
+            <ol className="rq-document-history-list">
+              {history.map((entry) => (
+                <li key={entry.id}><span aria-hidden="true" /><div><strong>{entry.eventType.replaceAll("_", " ")}</strong><small>{formatDate(entry.createdAt)}</small><pre>{JSON.stringify(entry.details, null, 2)}</pre></div></li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      ) : null}
+
+      {compareOpen && leftVersion && rightVersion ? (
+        <div className="rq-project-modal-backdrop" role="presentation">
+          <section aria-labelledby="compare-title" aria-modal="true" className="rq-project-modal rq-document-compare-modal" role="dialog">
+            <header className="rq-project-modal__header"><div><span>Control de cambios</span><h2 id="compare-title">Comparar versiones</h2></div><button aria-label="Cerrar comparación" onClick={() => setCompareOpen(false)} type="button">×</button></header>
+            <div className="rq-document-compare-selectors">
+              <label><span>Versión izquierda</span><select onChange={(event) => setCompareLeft(Number(event.target.value))} value={compareLeft}>{Array.from({ length: documentState.currentVersionNumber }, (_, index) => index + 1).map((item) => <option key={item} value={item}>Versión {item}</option>)}</select></label>
+              <label><span>Versión derecha</span><select onChange={(event) => setCompareRight(Number(event.target.value))} value={compareRight}>{Array.from({ length: documentState.currentVersionNumber }, (_, index) => index + 1).map((item) => <option key={item} value={item}>Versión {item}</option>)}</select></label>
+              <RqActionButton disabled={busy} onClick={() => void loadComparison()} tone="consult">Actualizar comparación</RqActionButton>
+            </div>
+            <div className="rq-document-compare-summary"><span>v{leftVersion.version} · {statusLabel(leftVersion.status)}</span><span>v{rightVersion.version} · {statusLabel(rightVersion.status)}</span></div>
+            <div className="rq-document-compare-list">
+              {leftVersion.sections.map((leftSection) => {
+                const rightSection = rightVersion.sections.find((item) => item.key === leftSection.key);
+                const changed = JSON.stringify(leftSection.content) !== JSON.stringify(rightSection?.content);
+                return (
+                  <article data-changed={changed} key={leftSection.key}>
+                    <header><strong>{leftSection.order}. {leftSection.title}</strong><span>{changed ? "Con cambios" : "Sin cambios"}</span></header>
+                    <div><pre>{JSON.stringify(leftSection.content, null, 2)}</pre><pre>{JSON.stringify(rightSection?.content ?? null, null, 2)}</pre></div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </section>
+  );
+}

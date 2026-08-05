@@ -36,13 +36,25 @@ for port in 3000 3001 3002 3003 3004 4200; do
   fi
 done
 
+env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx run-many \
+    --target=build \
+    --projects=identity-service,projects-service,sources-service,documents-service,gateway \
+    --configuration=development \
+    --skip-nx-cache \
+  > "$LOG_DIR/local-services-build.log" 2>&1
+echo "✓ Servicios locales compilados."
+
 wait_for_url() {
   local name="$1"
   local url="$2"
   local log_file="$3"
 
   for _ in $(seq 1 120); do
-    if curl -fsS "$url" >/dev/null 2>&1; then
+    if curl --max-time 3 -fsS "$url" >/dev/null 2>&1; then
       echo "✓ $name disponible."
       return 0
     fi
@@ -56,78 +68,81 @@ wait_for_url() {
   exit 1
 }
 
-nohup env \
-  NX_DAEMON=false \
-  NX_INTERACTIVE=false \
-  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve identity-service --skip-nx-cache \
-  > "$LOG_DIR/identity-service.log" 2>&1 &
-echo $! > "$PID_DIR/identity-service.pid"
+start_detached() {
+  local pid_file="$1"
+  local log_file="$2"
+  shift 2
+
+  node "$ROOT/scripts/start-detached-process.mjs" "$log_file" "$@" \
+    > "$pid_file"
+}
+
+NODE_ENV=development start_detached \
+  "$PID_DIR/identity-service.pid" \
+  "$LOG_DIR/identity-service.log" \
+  node "$ROOT/apps/identity-service/dist/main.js"
 
 wait_for_url \
   "Identity Service" \
   "http://127.0.0.1:3001/api/v1/health" \
   "$LOG_DIR/identity-service.log"
 
-nohup env \
-  NX_DAEMON=false \
-  NX_INTERACTIVE=false \
-  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve projects-service --skip-nx-cache \
-  > "$LOG_DIR/projects-service.log" 2>&1 &
-echo $! > "$PID_DIR/projects-service.pid"
+NODE_ENV=development start_detached \
+  "$PID_DIR/projects-service.pid" \
+  "$LOG_DIR/projects-service.log" \
+  node "$ROOT/apps/projects-service/dist/main.js"
 
 wait_for_url \
   "Projects Service" \
   "http://127.0.0.1:3002/api/v1/health" \
   "$LOG_DIR/projects-service.log"
 
-nohup env \
-  NX_DAEMON=false \
-  NX_INTERACTIVE=false \
-  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve sources-service --skip-nx-cache \
-  > "$LOG_DIR/sources-service.log" 2>&1 &
-echo $! > "$PID_DIR/sources-service.pid"
+NODE_ENV=development start_detached \
+  "$PID_DIR/sources-service.pid" \
+  "$LOG_DIR/sources-service.log" \
+  node "$ROOT/apps/sources-service/dist/main.js"
 
 wait_for_url \
   "Sources Service" \
   "http://127.0.0.1:3003/api/v1/health" \
   "$LOG_DIR/sources-service.log"
 
-nohup env \
-  NX_DAEMON=false \
-  NX_INTERACTIVE=false \
-  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve documents-service --skip-nx-cache \
-  > "$LOG_DIR/documents-service.log" 2>&1 &
-echo $! > "$PID_DIR/documents-service.pid"
+NODE_ENV=development start_detached \
+  "$PID_DIR/documents-service.pid" \
+  "$LOG_DIR/documents-service.log" \
+  node "$ROOT/apps/documents-service/dist/main.js"
 
 wait_for_url \
   "Documents Service" \
   "http://127.0.0.1:3004/api/v1/health" \
   "$LOG_DIR/documents-service.log"
 
-nohup env \
-  NX_DAEMON=false \
-  NX_INTERACTIVE=false \
-  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve gateway --skip-nx-cache \
-  > "$LOG_DIR/gateway.log" 2>&1 &
-echo $! > "$PID_DIR/gateway.pid"
+NODE_ENV=development start_detached \
+  "$PID_DIR/gateway.pid" \
+  "$LOG_DIR/gateway.log" \
+  node "$ROOT/apps/gateway/dist/main.js"
 
 wait_for_url \
   "Gateway" \
   "http://127.0.0.1:3000/api/v1/health" \
   "$LOG_DIR/gateway.log"
 
-nohup env \
+env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx dev web --port=4200 --skip-nx-cache \
-  > "$LOG_DIR/web.log" 2>&1 &
-echo $! > "$PID_DIR/web.pid"
+  pnpm exec nx build shared-ui --skip-nx-cache \
+  > "$LOG_DIR/shared-ui-build.log" 2>&1
+echo "✓ Shared UI preparada."
+
+env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  node "$ROOT/scripts/start-detached-process.mjs" \
+    "$LOG_DIR/web.log" \
+    pnpm exec nx dev web --port=4200 --skip-nx-cache \
+  > "$PID_DIR/web.pid"
 
 wait_for_url \
   "Frontend" \

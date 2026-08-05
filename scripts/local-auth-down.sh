@@ -39,6 +39,11 @@ pkill -TERM -f "projects-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "sources-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "documents-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "gateway:serve:development" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/identity-service/dist/main.js" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/projects-service/dist/main.js" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/sources-service/dist/main.js" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/documents-service/dist/main.js" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/gateway/dist/main.js" >/dev/null 2>&1 || true
 
 for port in 4200 3000 3001 3002 3003 3004; do
   pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
