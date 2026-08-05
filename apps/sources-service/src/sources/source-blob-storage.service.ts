@@ -14,6 +14,13 @@ function metadataValue(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
 }
 
+export class SourceBlobNotFoundError extends Error {
+  constructor() {
+    super("El archivo almacenado no existe.");
+    this.name = "SourceBlobNotFoundError";
+  }
+}
+
 @Injectable()
 export class SourceBlobStorage {
   private readonly container: ContainerClient;
@@ -71,7 +78,7 @@ export class SourceBlobStorage {
     const client = this.container.getBlobClient(blobPath);
 
     if (!(await client.exists())) {
-      throw new Error("El archivo almacenado no existe.");
+      throw new SourceBlobNotFoundError();
     }
 
     return client.downloadToBuffer();

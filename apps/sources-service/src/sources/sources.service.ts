@@ -24,7 +24,10 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 
 import { ProjectsAccessClient } from "./projects-access.client";
-import { SourceBlobStorage } from "./source-blob-storage.service";
+import {
+  SourceBlobNotFoundError,
+  SourceBlobStorage,
+} from "./source-blob-storage.service";
 import { SourceEntity } from "./source.entity";
 import { SourceProcessingQueue } from "./source-processing.queue";
 import {
@@ -462,11 +465,21 @@ export class SourcesService {
       );
     }
 
-    return {
-      buffer: await this.storage.download(source.storagePath),
-      mediaType: source.mediaType ?? "application/octet-stream",
-      fileName: source.originalFileName,
-    };
+    try {
+      return {
+        buffer: await this.storage.download(source.storagePath),
+        mediaType: source.mediaType ?? "application/octet-stream",
+        fileName: source.originalFileName,
+      };
+    } catch (error) {
+      if (error instanceof SourceBlobNotFoundError) {
+        throw new NotFoundException(
+          "El archivo original ya no está disponible en el almacenamiento. Elimina esta fuente y carga el archivo nuevamente.",
+        );
+      }
+
+      throw error;
+    }
   }
 
   async archive(

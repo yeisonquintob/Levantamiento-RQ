@@ -8,12 +8,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   DOCUMENT_SECTION_DEFINITIONS,
   type RequirementDocumentDetail,
+  type RequirementDocumentSummary,
 } from "../../libs/shared/contracts/src/lib/documents.js";
 import type {
   ProjectDetail,
   ProjectListResponse,
 } from "../../libs/shared/contracts/src/lib/projects.js";
 import { DocumentsWorkspace } from "../../apps/web/src/app/workspace/documents/documents-workspace.js";
+import { ValidationWorkspace } from "../../apps/web/src/app/workspace/validation/validation-workspace.js";
 import {
   analyzeContent,
   RequirementDocumentEditor,
@@ -132,6 +134,36 @@ test("el editor renderiza las trece secciones, avance y área futura de IA", () 
     /Las propuestas de inteligencia artificial se habilitarán en el Paso 18/,
   );
   assert.doesNotMatch(html, /Generar con IA|Analizar con IA/);
+});
+
+test("la bandeja de validación está habilitada y abre el flujo documental", async () => {
+  const summary: RequirementDocumentSummary = document;
+  const projects: ProjectListResponse = {
+    items: [project],
+    page: 1,
+    pageSize: 50,
+    totalItems: 1,
+    totalPages: 1,
+  };
+  const html = renderToStaticMarkup(
+    <ValidationWorkspace
+      initialDocuments={[
+        {
+          ...summary,
+          projectCode: project.code,
+          projectTitle: project.title,
+        },
+      ]}
+      initialProjects={projects}
+    />,
+  );
+  const shell = await readFile("apps/web/src/app/app-shell.tsx", "utf8");
+
+  assert.match(html, /Bandeja de validación/);
+  assert.match(html, /Preparar/);
+  assert.match(html, /Proyecto de prueba/);
+  assert.match(shell, /href="\/workspace\/validation"/);
+  assert.doesNotMatch(shell, /futureNavigation/);
 });
 
 test("la validación distingue obligatorios, pendientes y avance", () => {

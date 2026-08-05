@@ -18,8 +18,6 @@ interface AppShellProps {
   };
 }
 
-const futureNavigation = [["Validación", "V"]] as const;
-
 interface WorkspacePageContext {
   eyebrow: string;
   title: string;
@@ -313,19 +311,20 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Documentos</span>
           </a>
 
-          {futureNavigation.map(([label, icon]) => (
-            <span
-              aria-disabled="true"
-              className="rq-nav__disabled"
-              key={label}
-              title="Se habilitará en un paso posterior"
-            >
-              <span aria-hidden="true" className="rq-nav__icon">
-                {icon}
-              </span>
-              <span>{label}</span>
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/validation")
+                ? "page"
+                : undefined
+            }
+            href="/workspace/validation"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              V
             </span>
-          ))}
+            <span>Validación</span>
+          </a>
 
           {canManageUsers ? (
             <>
@@ -364,6 +363,8 @@ export function AppShell({ children, user }: AppShellProps) {
       <footer className="rq-footer">
         {pathname.startsWith("/workspace/documents")
           ? "Editor documental, versiones e historial · Paso 17"
+          : pathname.startsWith("/workspace/validation")
+            ? "Revisión, observaciones y aprobación documental · Paso 17"
           : pathname.startsWith("/workspace/templates")
           ? "Catálogo de plantillas configurables y versionadas · Paso 14"
           : pathname.startsWith("/workspace/sources")

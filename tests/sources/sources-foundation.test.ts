@@ -315,6 +315,7 @@ test("el almacenamiento, la extracción y la descarga son privados", async () =>
   assert.match(storage, /BlobServiceClient\.fromConnectionString/);
   assert.match(storage, /client\.upload\(buffer, buffer\.length/);
   assert.match(storage, /downloadToBuffer/);
+  assert.match(storage, /SourceBlobNotFoundError/);
   assert.doesNotMatch(storage, /generateBlobSASQueryParameters/);
   assert.match(extraction, /mammoth\.extractRawText/);
   assert.match(extraction, /new ExcelJS\.Workbook/);
@@ -323,6 +324,8 @@ test("el almacenamiento, la extracción y la descarga son privados", async () =>
   assert.match(service, /requireManage/);
   assert.match(service, /duplicateSourceId/);
   assert.match(service, /processingQueue\.enqueue/);
+  assert.match(service, /error instanceof SourceBlobNotFoundError/);
+  assert.match(service, /new NotFoundException/);
 });
 
 test("BullMQ separa la cola, el worker y el procesamiento", async () => {
