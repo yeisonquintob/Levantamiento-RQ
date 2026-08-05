@@ -1,25 +1,25 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 import type { DataSource as DataSourceType } from "typeorm";
 
+import type { AuthenticatedUser } from "../libs/shared/contracts/src/index.js";
 import { loadEnvironmentFiles } from "../libs/shared/config/src/index.js";
 import { SourceBlobStorage } from "../apps/sources-service/src/sources/source-blob-storage.service.js";
 import { SourceEntity } from "../apps/sources-service/src/sources/source.entity.js";
 import { SourceProcessingQueue } from "../apps/sources-service/src/sources/source-processing.queue.js";
+import { SourcesService } from "../apps/sources-service/src/sources/sources.service.js";
+import {
+  SOURCES_STORAGE_CONFIG,
+  type SourcesStorageConfig,
+} from "../apps/sources-service/src/sources/sources-storage.config.js";
 
 loadEnvironmentFiles({
-  paths: [
-    ".env",
-    "infrastructure/docker/.env",
-    "apps/sources-service/.env",
-  ],
+  paths: [".env", "infrastructure/docker/.env", "apps/sources-service/.env"],
 });
 
-function sha256(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex");
-}
+process.env.SOURCES_PROCESSING_QUEUE = "source-processing-controlled-smoke";
 
 async function waitForReady(
   dataSource: DataSourceType,
@@ -38,173 +38,243 @@ async function waitForReady(
       throw new Error(source.processingMessage ?? "El worker reportó FAILED.");
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((done) => setTimeout(done, 250));
   }
 
   throw new Error("El procesamiento no finalizó dentro del tiempo esperado.");
+}
+
+async function queueCounts(queue: SourceProcessingQueue["bullQueue"]) {
+  return queue.getJobCounts(
+    "active",
+    "completed",
+    "delayed",
+    "failed",
+    "paused",
+    "prioritized",
+    "waiting",
+  );
+}
+
+async function removeSmokeJobs(
+  queue: SourceProcessingQueue["bullQueue"],
+  sourceIds: readonly string[],
+): Promise<void> {
+  const jobs = await queue.getJobs([
+    "completed",
+    "failed",
+    "waiting",
+    "delayed",
+    "paused",
+  ]);
+
+  for (const job of jobs) {
+    if (sourceIds.includes(job.data.sourceId)) {
+      await job.remove();
+    }
+  }
 }
 
 async function main(): Promise<void> {
   const appRequire = createRequire(
     resolve(process.cwd(), "apps/sources-service/package.json"),
   );
-  const { NestFactory } = appRequire("@nestjs/core") as typeof import("@nestjs/core");
+  const { NestFactory } = appRequire(
+    "@nestjs/core",
+  ) as typeof import("@nestjs/core");
   const { DataSource } = appRequire("typeorm") as typeof import("typeorm");
-  const { AppModule } = await import(
-    "../apps/sources-service/src/app/app.module.js"
-  );
+  const { AppModule } =
+    await import("../apps/sources-service/src/app/app.module.js");
   const app = await NestFactory.createApplicationContext(AppModule, {
     abortOnError: false,
     logger: ["error"],
   });
   const storage = app.get(SourceBlobStorage);
   const processingQueue = app.get(SourceProcessingQueue);
+  const storageConfig = app.get<SourcesStorageConfig>(SOURCES_STORAGE_CONFIG);
   const queue = processingQueue.bullQueue;
   const dataSource = app.get(DataSource);
   const sources = dataSource.getRepository(SourceEntity);
-  const sourceId = randomUUID();
   const projectId = randomUUID();
-  const actorId = randomUUID();
-  const content = Buffer.from(
-    `Smoke asíncrono de Sources ${sourceId}\nContenido TXT no vacío.`,
-    "utf8",
+  const actor: AuthenticatedUser = {
+    id: randomUUID(),
+    email: "sources-controlled-smoke@local.invalid",
+    displayName: "Sources Controlled Smoke",
+    roles: ["ADMIN"],
+    permissions: ["system.admin"],
+    mustChangePassword: false,
+  };
+  const service = new SourcesService(
+    sources,
+    { requireManage: async () => undefined } as never,
+    storage,
+    processingQueue,
+    storageConfig,
   );
-  const digest = sha256(content);
-  const blobPath = `${projectId}/${sourceId}/${digest.slice(0, 16)}.txt`;
-  let jobId: string | undefined;
+  const sourceIds: string[] = [];
+  const blobPaths: string[] = [];
 
   try {
-    const initialCounts = await queue.getJobCounts(
-      "active",
-      "completed",
-      "delayed",
-      "failed",
-      "paused",
-      "prioritized",
-      "waiting",
-    );
+    const initialCounts = await queueCounts(queue);
 
     if (Object.values(initialCounts).some((count) => count !== 0)) {
-      throw new Error(`La cola no está limpia: ${JSON.stringify(initialCounts)}`);
-    }
-
-    await storage.upload(
-      blobPath,
-      content,
-      "text/plain; charset=utf-8",
-      "smoke-async.txt",
-      digest,
-    );
-
-    if (!(await storage.exists(blobPath))) {
-      throw new Error("El blob no existe después de la carga.");
-    }
-
-    const properties = await storage.getProperties(blobPath);
-
-    if (properties.contentLength !== content.length) {
       throw new Error(
-        `Content-Length no coincide: esperado ${content.length}, recibido ${String(properties.contentLength)}.`,
+        `La cola no está limpia: ${JSON.stringify(initialCounts)}`,
       );
     }
 
-    const downloaded = await storage.download(blobPath);
-
-    if (!downloaded.equals(content) || sha256(downloaded) !== digest) {
-      throw new Error("La descarga o su SHA-256 no coincide con la carga.");
-    }
-
-    const now = new Date();
-    await sources.save(
-      sources.create({
-        id: sourceId,
-        projectId,
-        sourceType: "FILE",
-        title: "Smoke asíncrono temporal",
-        description: "Registro temporal del Paso 15",
-        classification: "EVIDENCE",
-        content: null,
-        extractedText: null,
-        processingStatus: "PENDING",
-        processingMessage: "Pendiente de worker.",
-        processedAt: null,
-        status: "ACTIVE",
-        originalFileName: "smoke-async.txt",
-        fileExtension: "txt",
-        mediaType: "text/plain; charset=utf-8",
-        fileSizeBytes: String(content.length),
-        sha256: digest,
-        storageContainer: storage.containerName,
-        storagePath: blobPath,
-        pageCount: null,
-        sheetCount: null,
-        createdByUserId: actorId,
-        updatedByUserId: actorId,
-        createdAt: now,
-        updatedAt: now,
-      }),
+    const uploaded = await service.uploadFiles(
+      actor,
+      "smoke-token",
+      projectId,
+      [
+        {
+          fileName: "smoke-controlado-uno.txt",
+          mediaType: "text/plain",
+          buffer: Buffer.from(
+            `Primera fuente del smoke controlado ${randomUUID()}.`,
+            "utf8",
+          ),
+          description: null,
+        },
+        {
+          fileName: "smoke-controlado-dos.txt",
+          mediaType: "text/plain",
+          buffer: Buffer.from(
+            `Segunda fuente del smoke controlado ${randomUUID()}.`,
+            "utf8",
+          ),
+          classification: "",
+          description: null,
+        },
+      ],
     );
 
-    const job = await processingQueue.enqueue(sourceId, actorId);
-    jobId = job.id;
-    const ready = await waitForReady(dataSource, sourceId);
-    const completedJob = jobId ? await queue.getJob(jobId) : null;
-
-    if (!completedJob || (await completedJob.getState()) !== "completed") {
-      throw new Error("BullMQ no marcó el trabajo como completed.");
-    }
-
-    if (completedJob.attemptsMade !== 1 || completedJob.failedReason) {
+    if (uploaded.acceptedFiles !== 2 || uploaded.rejectedFiles !== 0) {
       throw new Error(
-        `Intentos o error inesperado: attempts=${completedJob.attemptsMade}, error=${completedJob.failedReason}`,
+        `La carga no aceptó los dos archivos: ${JSON.stringify(uploaded)}`,
       );
     }
 
-    if (ready.extractedText !== content.toString("utf8")) {
-      throw new Error("El texto extraído no coincide con el TXT original.");
+    for (const source of uploaded.accepted) {
+      sourceIds.push(source.id);
+      if (source.storagePath) blobPaths.push(source.storagePath);
+
+      if (
+        source.classification !== "OTHER" ||
+        source.processingStatus !== "PENDING" ||
+        source.processingMessage !==
+          "Archivo almacenado. Procesamiento pendiente."
+      ) {
+        throw new Error(
+          `Estado inicial inesperado para ${source.id}: ${JSON.stringify(source)}`,
+        );
+      }
     }
 
-    await completedJob.remove();
-    jobId = undefined;
-    await sources.delete({ id: sourceId });
-    await storage.deleteIfExists(blobPath);
+    await new Promise((done) => setTimeout(done, 750));
+    const pendingRows = await sources.findBy({
+      projectId,
+      processingStatus: "PENDING",
+    });
+    const afterUploadCounts = await queueCounts(queue);
 
-    const finalCounts = await queue.getJobCounts(
-      "active",
-      "completed",
-      "delayed",
-      "failed",
-      "paused",
-      "prioritized",
-      "waiting",
+    if (
+      pendingRows.length !== 2 ||
+      Object.values(afterUploadCounts).some((count) => count !== 0)
+    ) {
+      throw new Error("La carga encoló o procesó archivos automáticamente.");
+    }
+
+    const selectedResult = await service.processSelected(
+      actor,
+      "smoke-token",
+      projectId,
+      { sourceIds: [sourceIds[0]!] },
     );
-    const remainingRows = await sources.count({ where: { id: sourceId } });
+
+    if (selectedResult.enqueued !== 1 || selectedResult.failed !== 0) {
+      throw new Error(
+        `Procesar seleccionadas devolvió: ${JSON.stringify(selectedResult)}`,
+      );
+    }
+
+    const firstReady = await waitForReady(dataSource, sourceIds[0]!);
+    const secondPending = await sources.findOneByOrFail({ id: sourceIds[1]! });
+
+    if (secondPending.processingStatus !== "PENDING") {
+      throw new Error("La fuente no seleccionada dejó de estar PENDING.");
+    }
+
+    const firstProcessedAt = firstReady.processedAt?.getTime();
+    const allResult = await service.processAll(actor, "smoke-token", projectId);
+
+    if (allResult.enqueued !== 1 || allResult.failed !== 0) {
+      throw new Error(`Procesar todos devolvió: ${JSON.stringify(allResult)}`);
+    }
+
+    await waitForReady(dataSource, sourceIds[1]!);
+    const firstAfterProcessAll = await sources.findOneByOrFail({
+      id: sourceIds[0]!,
+    });
+
+    if (firstAfterProcessAll.processedAt?.getTime() !== firstProcessedAt) {
+      throw new Error("Procesar todos volvió a procesar la fuente READY.");
+    }
+
+    const idempotentResult = await service.processAll(
+      actor,
+      "smoke-token",
+      projectId,
+    );
+
+    if (idempotentResult.requested !== 0 || idempotentResult.enqueued !== 0) {
+      throw new Error(
+        `La repetición no fue idempotente: ${JSON.stringify(idempotentResult)}`,
+      );
+    }
+
+    await removeSmokeJobs(queue, sourceIds);
+    await sources.delete({ projectId });
+
+    for (const blobPath of blobPaths) {
+      await storage.deleteIfExists(blobPath);
+    }
+
+    const finalCounts = await queueCounts(queue);
+    const remainingRows = await sources.count({ where: { projectId } });
+    const blobsRemain = (
+      await Promise.all(blobPaths.map((blobPath) => storage.exists(blobPath)))
+    ).some(Boolean);
 
     if (
       Object.values(finalCounts).some((count) => count !== 0) ||
       remainingRows !== 0 ||
-      (await storage.exists(blobPath))
+      blobsRemain
     ) {
       throw new Error("La limpieza temporal del smoke no quedó completa.");
     }
 
-    console.log("✓ Blob cargado, verificado y descargado con tamaño y SHA-256.");
-    console.log("✓ Job recibido por Worker y completado en el primer intento.");
-    console.log("✓ Fuente READY con texto extraído idéntico al TXT original.");
-    console.log("✓ Job, fuente y blob temporales eliminados; cola limpia.");
+    console.log("✓ Dos archivos sin clasificación quedaron OTHER y PENDING.");
+    console.log("✓ La carga no creó trabajos BullMQ automáticamente.");
+    console.log("✓ Procesar seleccionadas dejó una READY y otra PENDING.");
+    console.log("✓ Procesar todos completó solo la pendiente y omitió READY.");
+    console.log("✓ Repetición idempotente, filas, blobs y jobs eliminados.");
   } finally {
-    if (jobId) {
-      const job = await queue.getJob(jobId);
-      if (job && (await job.getState()) !== "active") await job.remove();
+    await removeSmokeJobs(queue, sourceIds);
+    await sources.delete({ projectId });
+
+    for (const blobPath of blobPaths) {
+      await storage.deleteIfExists(blobPath);
     }
-    await sources.delete({ id: sourceId });
-    await storage.deleteIfExists(blobPath);
+
+    await queue.obliterate({ force: true });
     await app.close();
   }
 }
 
 void main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  console.error(`Smoke asíncrono de Sources fallido: ${message}`);
+  console.error(`Smoke controlado de Sources fallido: ${message}`);
   process.exitCode = 1;
 });

@@ -7,6 +7,7 @@ import {
   SOURCE_TYPES,
   TEXT_SOURCE_TYPES,
   type CreateTextSourceRequest,
+  type ProcessSourcesRequest,
   type SourceClassification,
   type SourceProcessingStatus,
   type SourceStatus,
@@ -129,6 +130,21 @@ function requiredClassification(
   return value as SourceClassification;
 }
 
+function uploadClassification(
+  value: unknown,
+  field: string,
+): SourceClassification {
+  if (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    return "OTHER";
+  }
+
+  return requiredClassification(value, field);
+}
+
 function optionalSourceType(value: unknown): SourceType | null {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -153,13 +169,9 @@ function optionalProcessingStatus(
 
   if (
     typeof value !== "string" ||
-    !SOURCE_PROCESSING_STATUSES.includes(
-      value as SourceProcessingStatus,
-    )
+    !SOURCE_PROCESSING_STATUSES.includes(value as SourceProcessingStatus)
   ) {
-    throw new BadRequestException(
-      "El estado de procesamiento no es válido.",
-    );
+    throw new BadRequestException("El estado de procesamiento no es válido.");
   }
 
   return value as SourceProcessingStatus;
@@ -188,9 +200,7 @@ export function parseSourceId(value: string): string {
   return requiredUuid(value, "sourceId");
 }
 
-export function parseCreateTextSource(
-  value: unknown,
-): CreateTextSourceRequest {
+export function parseCreateTextSource(value: unknown): CreateTextSourceRequest {
   const record = asRecord(value);
   const sourceType = record.sourceType;
 
@@ -244,7 +254,7 @@ export function parseUploadMetadata(
 ): readonly SourceUploadFileMetadata[] {
   if (typeof value !== "string" || !value.trim()) {
     throw new BadRequestException(
-      "Debes clasificar y describir los archivos antes de cargarlos.",
+      "Debes enviar la configuración de los archivos antes de cargarlos.",
     );
   }
 
@@ -269,13 +279,39 @@ export function parseUploadMetadata(
 
     return {
       fileName: requiredText(record, "fileName", 1, 260),
-      classification: requiredClassification(
+      classification: uploadClassification(
         record.classification,
         `metadata[${index}].classification`,
       ),
       description: optionalText(record, "description", 2000) ?? null,
     };
   });
+}
+
+export function parseProcessSourcesRequest(
+  value: unknown,
+): ProcessSourcesRequest {
+  const record = asRecord(value);
+
+  if (
+    !Array.isArray(record.sourceIds) ||
+    record.sourceIds.length === 0 ||
+    record.sourceIds.length > 100
+  ) {
+    throw new BadRequestException(
+      "sourceIds debe contener entre 1 y 100 identificadores.",
+    );
+  }
+
+  return {
+    sourceIds: [
+      ...new Set(
+        record.sourceIds.map((sourceId, index) =>
+          requiredUuid(sourceId, `sourceIds[${index}]`),
+        ),
+      ),
+    ],
+  };
 }
 
 export function parseSourceListQuery(value: unknown): SourceListQuery {

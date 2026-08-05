@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   SOURCE_CLASSIFICATIONS,
+  SOURCE_BATCH_PROCESSING_RESULT_STATUSES,
   SOURCE_FILE_EXTENSIONS,
   SOURCE_PROCESSING_STATUSES,
   SOURCE_STATUSES,
@@ -12,6 +13,7 @@ import {
 } from "../../libs/shared/contracts/src/lib/sources.js";
 import {
   parseCreateTextSource,
+  parseProcessSourcesRequest,
   parseSourceListQuery,
   parseUpdateSource,
   parseUploadMetadata,
@@ -20,12 +22,9 @@ import {
   titleFromFileName,
   validateSourceFile,
 } from "../../apps/sources-service/src/sources/source-file-validation.js";
-import {
-  loadSourcesStorageConfig,
-} from "../../apps/sources-service/src/sources/sources-storage.config.js";
-import {
-  SourceExtractionService,
-} from "../../apps/sources-service/src/sources/source-extraction.service.js";
+import { loadSourcesStorageConfig } from "../../apps/sources-service/src/sources/sources-storage.config.js";
+import { SourceExtractionService } from "../../apps/sources-service/src/sources/source-extraction.service.js";
+import { SourcesService } from "../../apps/sources-service/src/sources/sources.service.js";
 
 test("el contrato publica tipos, formatos y estados controlados", () => {
   assert.deepEqual(SOURCE_TYPES, [
@@ -34,11 +33,7 @@ test("el contrato publica tipos, formatos y estados controlados", () => {
     "CONVERSATION",
     "TRANSCRIPT",
   ]);
-  assert.deepEqual(TEXT_SOURCE_TYPES, [
-    "NOTE",
-    "CONVERSATION",
-    "TRANSCRIPT",
-  ]);
+  assert.deepEqual(TEXT_SOURCE_TYPES, ["NOTE", "CONVERSATION", "TRANSCRIPT"]);
   assert.deepEqual(SOURCE_STATUSES, ["ACTIVE", "ARCHIVED"]);
   assert.deepEqual(SOURCE_PROCESSING_STATUSES, [
     "PENDING",
@@ -67,6 +62,11 @@ test("el contrato publica tipos, formatos y estados controlados", () => {
     "jpg",
     "jpeg",
     "webp",
+  ]);
+  assert.deepEqual(SOURCE_BATCH_PROCESSING_RESULT_STATUSES, [
+    "ENQUEUED",
+    "SKIPPED",
+    "FAILED",
   ]);
 });
 
@@ -101,7 +101,7 @@ test("la actualización exige al menos un campo", () => {
   assert.throws(() => parseUpdateSource({}), /al menos un campo/i);
 });
 
-test("cada archivo exige clasificación y admite descripción", () => {
+test("cada archivo usa OTHER por defecto y admite clasificación manual", () => {
   assert.deepEqual(
     parseUploadMetadata(
       JSON.stringify([
@@ -131,17 +131,264 @@ test("cada archivo exige clasificación y admite descripción", () => {
     ],
   );
 
+  assert.deepEqual(
+    parseUploadMetadata(
+      JSON.stringify([
+        { fileName: "sin-clasificar.pdf" },
+        { fileName: "clasificacion-vacia.txt", classification: "  " },
+      ]),
+    ),
+    [
+      {
+        fileName: "sin-clasificar.pdf",
+        classification: "OTHER",
+        description: null,
+      },
+      {
+        fileName: "clasificacion-vacia.txt",
+        classification: "OTHER",
+        description: null,
+      },
+    ],
+  );
+});
+
+test("la solicitud batch valida, normaliza y deduplica SourceId", () => {
+  const first = "e65d4816-36fa-4d43-88fb-6b6732b00f62";
+  const second = "a616457a-4ca5-45a8-b1db-1ad4f40f94fd";
+
+  assert.deepEqual(
+    parseProcessSourcesRequest({ sourceIds: [first, first, second] }),
+    { sourceIds: [first, second] },
+  );
   assert.throws(
+    () => parseProcessSourcesRequest({ sourceIds: [] }),
+    /entre 1 y 100/i,
+  );
+});
+
+test("la carga persiste archivos OTHER y PENDING sin encolarlos", async () => {
+  const saved: Array<Record<string, unknown>> = [];
+  let enqueueCalls = 0;
+  const repository = {
+    create: (source: Record<string, unknown>) => source,
+    findOne: async () => null,
+    save: async (source: Record<string, unknown>) => {
+      saved.push(source);
+      return source;
+    },
+  };
+  const service = new SourcesService(
+    repository as never,
+    { requireManage: async () => undefined } as never,
+    {
+      containerName: "rq-sources",
+      upload: async () => undefined,
+      deleteIfExists: async () => undefined,
+    } as never,
+    {
+      enqueue: async () => {
+        enqueueCalls += 1;
+      },
+    } as never,
+    {
+      maxFileBytes: 1024,
+      maxFilesPerUpload: 20,
+      maxBatchBytes: 2048,
+    } as never,
+  );
+  const actor = {
+    id: "31ecea61-03bf-4201-b0db-1b4794ed391c",
+    email: "sources-test@local.invalid",
+    displayName: "Sources Test",
+    roles: ["ADMIN"],
+    permissions: ["system.admin"],
+    mustChangePassword: false,
+  };
+  const result = await service.uploadFiles(
+    actor,
+    "token",
+    "15b9f080-0c27-4e5a-aa30-e2b53f63f834",
+    [
+      {
+        fileName: "primero.txt",
+        mediaType: "text/plain",
+        buffer: Buffer.from("Contenido temporal uno", "utf8"),
+        description: null,
+      },
+      {
+        fileName: "segundo.txt",
+        mediaType: "text/plain",
+        buffer: Buffer.from("Contenido temporal dos", "utf8"),
+        classification: "",
+        description: null,
+      },
+    ],
+  );
+
+  assert.equal(result.acceptedFiles, 2);
+  assert.equal(enqueueCalls, 0);
+  assert.equal(saved.length, 2);
+  assert.ok(
+    saved.every(
+      (source) =>
+        source.classification === "OTHER" &&
+        source.processingStatus === "PENDING" &&
+        source.processingMessage ===
+          "Archivo almacenado. Procesamiento pendiente.",
+    ),
+  );
+});
+
+test("el batch encola solo archivos activos PENDING o FAILED y es idempotente", async () => {
+  const projectId = "15b9f080-0c27-4e5a-aa30-e2b53f63f834";
+  const rows = [
+    {
+      id: "00000000-0000-4000-8000-000000000001",
+      projectId,
+      sourceType: "FILE",
+      status: "ACTIVE",
+      processingStatus: "PENDING",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000002",
+      projectId,
+      sourceType: "FILE",
+      status: "ACTIVE",
+      processingStatus: "FAILED",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000003",
+      projectId,
+      sourceType: "FILE",
+      status: "ACTIVE",
+      processingStatus: "PROCESSING",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000004",
+      projectId,
+      sourceType: "FILE",
+      status: "ACTIVE",
+      processingStatus: "READY",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000005",
+      projectId,
+      sourceType: "FILE",
+      status: "ARCHIVED",
+      processingStatus: "PENDING",
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000006",
+      projectId,
+      sourceType: "NOTE",
+      status: "ACTIVE",
+      processingStatus: "READY",
+    },
+  ];
+  const enqueued: string[] = [];
+  let accessChecks = 0;
+  const repository = {
+    find: async () => rows,
+    update: async (
+      criteria: { id: string },
+      changes: Record<string, unknown>,
+    ) => {
+      const row = rows.find((item) => item.id === criteria.id);
+
+      if (
+        !row ||
+        row.sourceType !== "FILE" ||
+        row.status !== "ACTIVE" ||
+        !["PENDING", "FAILED"].includes(row.processingStatus)
+      ) {
+        return { affected: 0 };
+      }
+
+      Object.assign(row, changes);
+      return { affected: 1 };
+    },
+  };
+  const service = new SourcesService(
+    repository as never,
+    {
+      requireManage: async () => {
+        accessChecks += 1;
+      },
+    } as never,
+    {} as never,
+    {
+      enqueue: async (sourceId: string) => {
+        enqueued.push(sourceId);
+      },
+    } as never,
+    {} as never,
+  );
+  const actor = {
+    id: "31ecea61-03bf-4201-b0db-1b4794ed391c",
+    email: "sources-test@local.invalid",
+    displayName: "Sources Test",
+    roles: ["ADMIN"],
+    permissions: ["system.admin"],
+    mustChangePassword: false,
+  };
+  const request = { sourceIds: rows.map((row) => row.id) };
+  const first = await service.processSelected(
+    actor,
+    "token",
+    projectId,
+    request,
+  );
+  const second = await service.processSelected(
+    actor,
+    "token",
+    projectId,
+    request,
+  );
+
+  assert.deepEqual(enqueued, request.sourceIds.slice(0, 2));
+  assert.deepEqual(
+    {
+      requested: first.requested,
+      enqueued: first.enqueued,
+      skipped: first.skipped,
+      failed: first.failed,
+    },
+    { requested: 6, enqueued: 2, skipped: 4, failed: 0 },
+  );
+  assert.equal(second.enqueued, 0);
+  assert.equal(second.skipped, 6);
+  assert.equal(accessChecks, 2);
+});
+
+test("el procesamiento batch exige permiso de gestión", async () => {
+  const service = new SourcesService(
+    { find: async () => [] } as never,
+    {
+      requireManage: async () => {
+        throw new Error("Acceso denegado");
+      },
+    } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+
+  await assert.rejects(
     () =>
-      parseUploadMetadata(
-        JSON.stringify([
-          {
-            fileName: "sin-clasificar.pdf",
-            classification: "",
-          },
-        ]),
+      service.processAll(
+        {
+          id: "31ecea61-03bf-4201-b0db-1b4794ed391c",
+          email: "viewer@local.invalid",
+          displayName: "Viewer",
+          roles: ["VIEWER"],
+          permissions: [],
+          mustChangePassword: false,
+        },
+        "token",
+        "15b9f080-0c27-4e5a-aa30-e2b53f63f834",
       ),
-    /clasificación válida/i,
+    /Acceso denegado/,
   );
 });
 
@@ -179,21 +426,12 @@ test("la validación de archivos controla extensión, tamaño y firma", () => {
 
   assert.throws(
     () =>
-      validateSourceFile(
-        "falso.pdf",
-        Buffer.from("no es pdf", "utf8"),
-        1024,
-      ),
+      validateSourceFile("falso.pdf", Buffer.from("no es pdf", "utf8"), 1024),
     /firma del formato/i,
   );
 
   assert.throws(
-    () =>
-      validateSourceFile(
-        "grande.txt",
-        Buffer.alloc(20),
-        10,
-      ),
+    () => validateSourceFile("grande.txt", Buffer.alloc(20), 10),
     /tamaño máximo/i,
   );
 });
@@ -324,6 +562,12 @@ test("el almacenamiento, la extracción y la descarga son privados", async () =>
   assert.match(service, /requireManage/);
   assert.match(service, /duplicateSourceId/);
   assert.match(service, /processingQueue\.enqueue/);
+  assert.doesNotMatch(
+    service.match(
+      /private async persistFile[\s\S]*?private async processFiles/,
+    )?.[0] ?? "",
+    /processingQueue\.enqueue/,
+  );
   assert.match(service, /error instanceof SourceBlobNotFoundError/);
   assert.match(service, /new NotFoundException/);
 });
@@ -380,6 +624,14 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
   assert.match(client, /data\.append\(\s*"metadata"/);
   assert.match(client, /Reprocesar/);
   assert.match(client, /Descargar/);
+  assert.match(client, /"Procesar"/);
+  assert.match(client, /"Procesar todos"/);
+  assert.match(client, /classification: "OTHER" as const/);
+  assert.match(client, /Otro — clasificación predeterminada/);
+  assert.match(client, /selectedSourceIds/);
+  assert.match(gateway, /sources\/process-all/);
+  assert.match(controller, /@Post\("process"\)/);
+  assert.match(controller, /@Post\("process-all"\)/);
   assert.doesNotMatch(client, /127\.0\.0\.1:3003/);
 });
 

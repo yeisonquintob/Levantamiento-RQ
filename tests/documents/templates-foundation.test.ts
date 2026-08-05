@@ -74,10 +74,7 @@ test("pequeño, mediano y grande exigen Scrum", () => {
 });
 
 test("la actualización exige al menos un campo", () => {
-  assert.throws(
-    () => parseUpdateDocumentTemplate({}),
-    /al menos un campo/i,
-  );
+  assert.throws(() => parseUpdateDocumentTemplate({}), /al menos un campo/i);
 });
 
 test("los puntos se pueden editar, agregar, eliminar y reordenar", () => {
@@ -214,8 +211,7 @@ test("las plantillas iniciales parten de trece puntos y los borradores son flexi
   assert.match(service, /getManyAndCount/);
   assert.match(service, /requiredIso/);
   assert.equal(
-    (migration.match(/"standard":"ISO_IEC_IEEE_29148_2018"/g) ?? [])
-      .length,
+    (migration.match(/"standard":"ISO_IEC_IEEE_29148_2018"/g) ?? []).length,
     4,
   );
   assert.equal((migration.match(/"key":/g) ?? []).length, 52);
@@ -263,7 +259,7 @@ test("publicadas y retiradas son inmutables y se clonan a borrador", async () =>
   assert.match(service, /sourceTemplateId: source\.id/);
 });
 
-test("Gateway y Workspace exponen Plantillas como vista independiente", async () => {
+test("Gateway y Workspace exponen Plantillas dentro de Administración", async () => {
   const gatewayModule = await readFile(
     "apps/gateway/src/app/app.module.ts",
     "utf8",
@@ -280,10 +276,7 @@ test("Gateway y Workspace exponen Plantillas como vista independiente", async ()
     "apps/web/src/app/workspace/templates/templates-workspace.tsx",
     "utf8",
   );
-  const shell = await readFile(
-    "apps/web/src/app/app-shell.tsx",
-    "utf8",
-  );
+  const shell = await readFile("apps/web/src/app/app-shell.tsx", "utf8");
 
   assert.match(gatewayModule, /DocumentTemplatesGatewayController/);
   assert.match(gatewayController, /@Controller\("templates"\)/);
@@ -301,4 +294,19 @@ test("Gateway y Workspace exponen Plantillas como vista independiente", async ()
   assert.match(workspace, /credentials: "include"/);
   assert.match(shell, /href="\/workspace\/templates"/);
   assert.match(shell, /Catálogo de plantillas/);
+  assert.match(shell, /documents\.templates\.manage/);
+  assert.match(shell, /role\.toUpperCase\(\) === "ADMIN"/);
+  assert.match(shell, /\{canManageTemplates \? \(/);
+  assert.ok(
+    shell.indexOf('<span className="rq-nav__label">Administración</span>') <
+      shell.indexOf('href="/workspace/templates"'),
+  );
+  assert.ok(
+    shell.indexOf('href="/workspace/templates"') <
+      shell.indexOf('href="/workspace/settings/users"'),
+  );
+  assert.ok(
+    shell.indexOf('href="/workspace/validation"') <
+      shell.indexOf('<span className="rq-nav__label">Administración</span>'),
+  );
 });

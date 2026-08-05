@@ -1,17 +1,13 @@
 "use client";
 
 import type { DragEvent, FormEvent } from "react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   CreateTextSourceRequest,
   ProjectListResponse,
   ProjectStatus,
+  SourceBatchProcessingResponse,
   SourceClassification,
   SourceDetail,
   SourceListResponse,
@@ -36,8 +32,7 @@ import {
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
-const FILE_ACCEPT =
-  ".pdf,.docx,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.webp";
+const FILE_ACCEPT = ".pdf,.docx,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.webp";
 
 const EMPTY_PROJECTS: ProjectListResponse = {
   items: [],
@@ -108,7 +103,7 @@ interface SourceFormState {
 interface SelectedSourceFile {
   key: string;
   file: File;
-  classification: "" | SourceClassification;
+  classification: SourceClassification;
   description: string;
 }
 
@@ -118,6 +113,7 @@ interface AlertState {
 }
 
 type CreationMode = "TEXT" | "FILES";
+type BatchProcessingMode = "SELECTED" | "ALL";
 
 const EMPTY_FORM: SourceFormState = {
   sourceType: "NOTE",
@@ -142,9 +138,8 @@ function classificationLabel(
   if (!classification) return "Sin clasificar";
 
   return (
-    CLASSIFICATION_OPTIONS.find(
-      (option) => option.value === classification,
-    )?.label ?? classification
+    CLASSIFICATION_OPTIONS.find((option) => option.value === classification)
+      ?.label ?? classification
   );
 }
 
@@ -252,10 +247,7 @@ async function parseError(response: Response): Promise<string> {
   return `La solicitud no pudo completarse (${response.status}).`;
 }
 
-async function requestJson<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
+async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   const isFormData =
     typeof FormData !== "undefined" && options?.body instanceof FormData;
 
@@ -300,17 +292,22 @@ export function SourcesWorkspace({
   const [metrics, setMetrics] = useState<SourceMetrics>(EMPTY_METRICS);
   const [search, setSearch] = useState("");
   const [sourceType, setSourceType] = useState<"" | SourceType>("");
-  const [processingStatus, setProcessingStatus] =
-    useState<"" | SourceProcessingStatus>("");
+  const [processingStatus, setProcessingStatus] = useState<
+    "" | SourceProcessingStatus
+  >("");
   const [status, setStatus] = useState<SourceStatus>("ACTIVE");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SourceDetail | null>(null);
-  const [creationMode, setCreationMode] =
-    useState<CreationMode>("TEXT");
+  const [creationMode, setCreationMode] = useState<CreationMode>("TEXT");
   const [form, setForm] = useState<SourceFormState>(EMPTY_FORM);
   const [selectedFiles, setSelectedFiles] = useState<SelectedSourceFile[]>([]);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [batchProcessing, setBatchProcessing] =
+    useState<BatchProcessingMode | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(
     initialError
@@ -325,6 +322,21 @@ export function SourcesWorkspace({
     () => initialProjects.items.find((project) => project.id === projectId),
     [initialProjects.items, projectId],
   );
+  const eligibleVisibleSourceIds = useMemo(
+    () =>
+      sources.items
+        .filter(
+          (source) =>
+            source.sourceType === "FILE" && source.status === "ACTIVE",
+        )
+        .map((source) => source.id),
+    [sources.items],
+  );
+  const allEligibleVisibleSelected =
+    eligibleVisibleSourceIds.length > 0 &&
+    eligibleVisibleSourceIds.every((sourceId) =>
+      selectedSourceIds.has(sourceId),
+    );
 
   const loadSources = useCallback(
     async (
@@ -392,6 +404,18 @@ export function SourcesWorkspace({
   }, [loadSources, projectId]);
 
   useEffect(() => {
+    const visibleIds = new Set(sources.items.map((source) => source.id));
+
+    setSelectedSourceIds((current) => {
+      const next = new Set(
+        [...current].filter((sourceId) => visibleIds.has(sourceId)),
+      );
+
+      return next.size === current.size ? current : next;
+    });
+  }, [sources.items]);
+
+  useEffect(() => {
     if (!alert) return;
 
     const timeout = window.setTimeout(() => setAlert(null), 8000);
@@ -404,6 +428,7 @@ export function SourcesWorkspace({
     setSourceType("");
     setProcessingStatus("");
     setStatus("ACTIVE");
+    setSelectedSourceIds(new Set());
 
     const url = new URL(window.location.href);
 
@@ -441,14 +466,9 @@ export function SourcesWorkspace({
       );
 
       setEditing(detail);
-      setCreationMode(
-        detail.sourceType === "FILE" ? "FILES" : "TEXT",
-      );
+      setCreationMode(detail.sourceType === "FILE" ? "FILES" : "TEXT");
       setForm({
-        sourceType:
-          detail.sourceType === "FILE"
-            ? "NOTE"
-            : detail.sourceType,
+        sourceType: detail.sourceType === "FILE" ? "NOTE" : detail.sourceType,
         title: detail.title,
         content: detail.content ?? "",
         description: detail.description ?? "",
@@ -486,7 +506,7 @@ export function SourcesWorkspace({
       .map((file) => ({
         key: `${file.name}-${file.size}-${file.lastModified}`,
         file,
-        classification: "" as const,
+        classification: "OTHER" as const,
         description: "",
       }));
 
@@ -507,9 +527,7 @@ export function SourcesWorkspace({
   }
 
   function removeSelectedFile(key: string): void {
-    setSelectedFiles((current) =>
-      current.filter((item) => item.key !== key),
-    );
+    setSelectedFiles((current) => current.filter((item) => item.key !== key));
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>): void {
@@ -585,7 +603,7 @@ export function SourcesWorkspace({
           .join(" ");
 
         message =
-          `${result.acceptedFiles} archivo(s) cargado(s) y procesado(s).` +
+          `${result.acceptedFiles} archivo(s) almacenado(s) y pendiente(s) de procesamiento.` +
           (result.rejectedFiles > 0
             ? ` ${result.rejectedFiles} rechazado(s). ${rejectionSummary}`
             : "");
@@ -705,6 +723,101 @@ export function SourcesWorkspace({
     }
   }
 
+  function toggleSourceSelection(sourceId: string): void {
+    setSelectedSourceIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
+      } else {
+        next.add(sourceId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleAllEligibleVisible(): void {
+    setSelectedSourceIds((current) => {
+      const next = new Set(current);
+
+      if (allEligibleVisibleSelected) {
+        eligibleVisibleSourceIds.forEach((sourceId) => next.delete(sourceId));
+      } else {
+        eligibleVisibleSourceIds.forEach((sourceId) => next.add(sourceId));
+      }
+
+      return next;
+    });
+  }
+
+  async function processBatch(mode: BatchProcessingMode): Promise<void> {
+    if (!projectId || batchProcessing) return;
+
+    const selectedIds = [...selectedSourceIds];
+
+    if (mode === "SELECTED" && selectedIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      mode === "ALL"
+        ? "Se procesarán todos los archivos pendientes o con error del proyecto seleccionado."
+        : `Se procesarán las ${selectedIds.length} fuente(s) seleccionada(s) que estén pendientes o con error.`,
+    );
+
+    if (!confirmed) return;
+
+    setBatchProcessing(mode);
+
+    try {
+      const result = await requestJson<SourceBatchProcessingResponse>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${mode === "ALL" ? "process-all" : "process"}`,
+        {
+          method: "POST",
+          ...(mode === "SELECTED"
+            ? { body: JSON.stringify({ sourceIds: selectedIds }) }
+            : {}),
+        },
+      );
+      const summary =
+        `Procesadas: ${result.enqueued}. ` +
+        `Omitidas: ${result.skipped}. Fallidas: ${result.failed}.`;
+
+      setSelectedSourceIds(new Set());
+      setAlert({
+        tone:
+          result.failed > 0
+            ? result.enqueued > 0
+              ? "information"
+              : "danger"
+            : result.enqueued > 0
+              ? "success"
+              : "information",
+        message:
+          result.requested === 0
+            ? `No hay archivos pendientes o con error. ${summary}`
+            : summary,
+      });
+
+      await loadSources(
+        projectId,
+        search,
+        sourceType,
+        processingStatus,
+        status,
+      );
+    } catch (error) {
+      setAlert({
+        tone: "danger",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No fue posible iniciar el procesamiento.",
+      });
+    } finally {
+      setBatchProcessing(null);
+    }
+  }
+
   async function archiveSource(source: SourceSummary): Promise<void> {
     if (
       !window.confirm(
@@ -749,6 +862,7 @@ export function SourcesWorkspace({
 
   const fileDetail = editing?.sourceType === "FILE" ? editing : null;
   const canSubmit =
+    Boolean(projectId) &&
     !saving &&
     (editing
       ? form.title.trim().length >= 3 &&
@@ -756,10 +870,8 @@ export function SourcesWorkspace({
           ? Boolean(form.classification)
           : form.content.trim().length >= 1)
       : creationMode === "FILES"
-        ? selectedFiles.length > 0 &&
-          selectedFiles.every((item) => Boolean(item.classification))
-        : form.title.trim().length >= 3 &&
-          form.content.trim().length >= 1);
+        ? selectedFiles.length > 0
+        : form.title.trim().length >= 3 && form.content.trim().length >= 1);
 
   return (
     <>
@@ -795,9 +907,7 @@ export function SourcesWorkspace({
             icon="T"
             title="Textuales"
             value={String(
-              metrics.notes +
-                metrics.conversations +
-                metrics.transcripts,
+              metrics.notes + metrics.conversations + metrics.transcripts,
             )}
           />
           <RqKpiCard
@@ -810,7 +920,27 @@ export function SourcesWorkspace({
 
         <div className="rq-module-commandbar__actions">
           <RqActionButton
-            disabled={loading || !projectId}
+            disabled={
+              loading ||
+              batchProcessing !== null ||
+              selectedSourceIds.size === 0
+            }
+            onClick={() => void processBatch("SELECTED")}
+            tone="operation"
+          >
+            {batchProcessing === "SELECTED" ? "Procesando..." : "Procesar"}
+          </RqActionButton>
+          <RqActionButton
+            disabled={loading || batchProcessing !== null || !projectId}
+            onClick={() => void processBatch("ALL")}
+            tone="consult"
+          >
+            {batchProcessing === "ALL"
+              ? "Procesando todos..."
+              : "Procesar todos"}
+          </RqActionButton>
+          <RqActionButton
+            disabled={loading || batchProcessing !== null || !projectId}
             onClick={openCreate}
             tone="affirmative"
           >
@@ -931,9 +1061,7 @@ export function SourcesWorkspace({
           <label htmlFor="source-status">Estado</label>
           <select
             id="source-status"
-            onChange={(event) =>
-              setStatus(event.target.value as SourceStatus)
-            }
+            onChange={(event) => setStatus(event.target.value as SourceStatus)}
             value={status}
           >
             <option value="ACTIVE">Activas</option>
@@ -956,13 +1084,7 @@ export function SourcesWorkspace({
               setSourceType("");
               setProcessingStatus("");
               setStatus("ACTIVE");
-              void loadSources(
-                projectId,
-                "",
-                "",
-                "",
-                "ACTIVE",
-              );
+              void loadSources(projectId, "", "", "", "ACTIVE");
             }}
             tone="secondary"
           >
@@ -979,6 +1101,19 @@ export function SourcesWorkspace({
         <table className="rq-table rq-source-table">
           <thead>
             <tr>
+              <th scope="col">
+                <input
+                  aria-label="Seleccionar todas las fuentes elegibles visibles"
+                  checked={allEligibleVisibleSelected}
+                  disabled={
+                    loading ||
+                    batchProcessing !== null ||
+                    eligibleVisibleSourceIds.length === 0
+                  }
+                  onChange={toggleAllEligibleVisible}
+                  type="checkbox"
+                />
+              </th>
               <th scope="col">Fuente</th>
               <th scope="col">Tipo</th>
               <th scope="col">Clasificación</th>
@@ -992,7 +1127,7 @@ export function SourcesWorkspace({
           <tbody>
             {sources.items.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <RqEmptyState
                     title={
                       projectId
@@ -1010,6 +1145,20 @@ export function SourcesWorkspace({
             ) : (
               sources.items.map((source) => (
                 <tr key={source.id}>
+                  <td>
+                    {source.sourceType === "FILE" &&
+                    source.status === "ACTIVE" ? (
+                      <input
+                        aria-label={`Seleccionar ${source.title}`}
+                        checked={selectedSourceIds.has(source.id)}
+                        disabled={loading || batchProcessing !== null}
+                        onChange={() => toggleSourceSelection(source.id)}
+                        type="checkbox"
+                      />
+                    ) : (
+                      <span aria-hidden="true">—</span>
+                    )}
+                  </td>
                   <td>
                     <div className="rq-source-table__title">
                       <strong>{source.title}</strong>
@@ -1033,11 +1182,7 @@ export function SourcesWorkspace({
                   </td>
                   <td>
                     <RqStatusBadge
-                      tone={
-                        source.status === "ACTIVE"
-                          ? "success"
-                          : "inactive"
-                      }
+                      tone={source.status === "ACTIVE" ? "success" : "inactive"}
                     >
                       {sourceStatusLabel(source.status)}
                     </RqStatusBadge>
@@ -1095,9 +1240,9 @@ export function SourcesWorkspace({
       <aside className="rq-foundation-note" role="status">
         <strong>Paso 13 completo</strong>
         <span>
-          Puedes registrar fuentes textuales o cargar varios archivos PDF,
-          Word, Excel, CSV, TXT e imágenes. Los archivos quedan en Azurite,
-          se validan por firma, se protegen contra duplicados y se procesan
+          Puedes registrar fuentes textuales o cargar varios archivos PDF, Word,
+          Excel, CSV, TXT e imágenes. Los archivos quedan en Azurite, se validan
+          por firma, se protegen contra duplicados y se procesan manualmente
           para preparar su contenido para el análisis posterior.
         </span>
       </aside>
@@ -1112,9 +1257,7 @@ export function SourcesWorkspace({
           >
             <header className="rq-project-modal__header">
               <div>
-                <span>
-                  {selectedProject?.code ?? "Fuente del proyecto"}
-                </span>
+                <span>{selectedProject?.code ?? "Fuente del proyecto"}</span>
                 <h2 id="source-modal-title">
                   {editing
                     ? editing.sourceType === "FILE"
@@ -1172,12 +1315,10 @@ export function SourcesWorkspace({
                   >
                     <strong>Arrastra los archivos aquí</strong>
                     <span>
-                      o selecciónalos desde tu equipo. Máximo 20 archivos
-                      por operación.
+                      o selecciónalos desde tu equipo. Máximo 20 archivos por
+                      operación.
                     </span>
-                    <label htmlFor="source-files">
-                      Seleccionar archivos
-                    </label>
+                    <label htmlFor="source-files">Seleccionar archivos</label>
                     <input
                       accept={FILE_ACCEPT}
                       id="source-files"
@@ -1216,9 +1357,7 @@ export function SourcesWorkspace({
                               </div>
                               <RqActionButton
                                 compact
-                                onClick={() =>
-                                  removeSelectedFile(item.key)
-                                }
+                                onClick={() => removeSelectedFile(item.key)}
                                 tone="danger"
                               >
                                 Quitar
@@ -1226,42 +1365,34 @@ export function SourcesWorkspace({
                             </header>
 
                             <div className="rq-field">
-                              <label
-                                htmlFor={`source-classification-${index}`}
-                              >
+                              <label htmlFor={`source-classification-${index}`}>
                                 Clasificación
                               </label>
                               <select
                                 id={`source-classification-${index}`}
                                 onChange={(event) =>
                                   updateSelectedFile(item.key, {
-                                    classification:
-                                      event.target.value as
-                                        | ""
-                                        | SourceClassification,
+                                    classification: event.target
+                                      .value as SourceClassification,
                                   })
                                 }
-                                required
                                 value={item.classification}
                               >
-                                <option value="">
-                                  Selecciona una clasificación
-                                </option>
                                 {CLASSIFICATION_OPTIONS.map((option) => (
                                   <option
                                     key={option.value}
                                     value={option.value}
                                   >
-                                    {option.label}
+                                    {option.value === "OTHER"
+                                      ? "Otro — clasificación predeterminada"
+                                      : option.label}
                                   </option>
                                 ))}
                               </select>
                             </div>
 
                             <div className="rq-field">
-                              <label
-                                htmlFor={`source-description-${index}`}
-                              >
+                              <label htmlFor={`source-description-${index}`}>
                                 Descripción opcional
                               </label>
                               <textarea
@@ -1276,9 +1407,7 @@ export function SourcesWorkspace({
                                 rows={3}
                                 value={item.description}
                               />
-                              <small>
-                                {item.description.length}/2000
-                              </small>
+                              <small>{item.description.length}/2000</small>
                             </div>
                           </article>
                         ))}
@@ -1310,34 +1439,26 @@ export function SourcesWorkspace({
                       <div>
                         <span>Páginas / hojas</span>
                         <strong>
-                          {fileDetail.pageCount ??
-                            fileDetail.sheetCount ??
-                            "—"}
+                          {fileDetail.pageCount ?? fileDetail.sheetCount ?? "—"}
                         </strong>
                       </div>
                     </div>
                   ) : (
                     <div className="rq-field">
-                      <label htmlFor="source-form-type">
-                        Tipo de fuente
-                      </label>
+                      <label htmlFor="source-form-type">Tipo de fuente</label>
                       <select
                         disabled={Boolean(editing)}
                         id="source-form-type"
                         onChange={(event) =>
                           setForm((current) => ({
                             ...current,
-                            sourceType:
-                              event.target.value as TextSourceType,
+                            sourceType: event.target.value as TextSourceType,
                           }))
                         }
                         value={form.sourceType}
                       >
                         {TYPE_OPTIONS.map((option) => (
-                          <option
-                            key={option.value}
-                            value={option.value}
-                          >
+                          <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
                         ))}
@@ -1374,24 +1495,19 @@ export function SourcesWorkspace({
                           onChange={(event) =>
                             setForm((current) => ({
                               ...current,
-                              classification:
-                                event.target.value as
-                                  | ""
-                                  | SourceClassification,
+                              classification: event.target.value as
+                                "" | SourceClassification,
                             }))
                           }
                           required
                           value={form.classification}
                         >
-                          <option value="">
-                            Selecciona una clasificación
-                          </option>
+                          <option value="">Selecciona una clasificación</option>
                           {CLASSIFICATION_OPTIONS.map((option) => (
-                            <option
-                              key={option.value}
-                              value={option.value}
-                            >
-                              {option.label}
+                            <option key={option.value} value={option.value}>
+                              {option.value === "OTHER"
+                                ? "Otro — clasificación predeterminada"
+                                : option.label}
                             </option>
                           ))}
                         </select>
@@ -1418,19 +1534,17 @@ export function SourcesWorkspace({
                       </div>
 
                       <div className="rq-source-extracted-preview">
-                      <span>Contenido extraído</span>
-                      <pre>
-                        {fileDetail.extractedText ||
-                          fileDetail.processingMessage ||
-                          "Este archivo no contiene texto extraíble."}
-                      </pre>
+                        <span>Contenido extraído</span>
+                        <pre>
+                          {fileDetail.extractedText ||
+                            fileDetail.processingMessage ||
+                            "Este archivo no contiene texto extraíble."}
+                        </pre>
                       </div>
                     </>
                   ) : (
                     <div className="rq-field rq-source-form__content">
-                      <label htmlFor="source-form-content">
-                        Contenido
-                      </label>
+                      <label htmlFor="source-form-content">Contenido</label>
                       <textarea
                         id="source-form-content"
                         maxLength={200000}
@@ -1483,7 +1597,7 @@ export function SourcesWorkspace({
                 >
                   {saving
                     ? creationMode === "FILES" && !editing
-                      ? "Cargando y procesando…"
+                      ? "Cargando…"
                       : "Guardando…"
                     : editing
                       ? "Actualizar"

@@ -41,8 +41,7 @@ export const SOURCE_CLASSIFICATIONS = [
   "OTHER",
 ] as const;
 
-export type SourceClassification =
-  (typeof SOURCE_CLASSIFICATIONS)[number];
+export type SourceClassification = (typeof SOURCE_CLASSIFICATIONS)[number];
 
 export const SOURCE_FILE_EXTENSIONS = [
   "pdf",
@@ -125,7 +124,7 @@ export interface UpdateSourceRequest {
 
 export interface SourceUploadFileMetadata {
   fileName: string;
-  classification: SourceClassification;
+  classification?: SourceClassification | null;
   description?: string | null;
 }
 
@@ -141,4 +140,31 @@ export interface SourceUploadBatchResponse {
   totalFiles: number;
   acceptedFiles: number;
   rejectedFiles: number;
+}
+
+export const SOURCE_BATCH_PROCESSING_RESULT_STATUSES = [
+  "ENQUEUED",
+  "SKIPPED",
+  "FAILED",
+] as const;
+
+export type SourceBatchProcessingResultStatus =
+  (typeof SOURCE_BATCH_PROCESSING_RESULT_STATUSES)[number];
+
+export interface ProcessSourcesRequest {
+  sourceIds: readonly string[];
+}
+
+export interface SourceBatchProcessingResult {
+  sourceId: string;
+  status: SourceBatchProcessingResultStatus;
+  message: string;
+}
+
+export interface SourceBatchProcessingResponse {
+  requested: number;
+  enqueued: number;
+  skipped: number;
+  failed: number;
+  results: readonly SourceBatchProcessingResult[];
 }

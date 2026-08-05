@@ -7,6 +7,8 @@ import {
 
 import type {
   CreateTextSourceRequest,
+  ProcessSourcesRequest,
+  SourceBatchProcessingResponse,
   SourceDetail,
   SourceListResponse,
   SourceMetrics,
@@ -14,10 +16,7 @@ import type {
   UpdateSourceRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 type SourcesMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -88,10 +87,7 @@ export class SourcesClientService {
     );
   }
 
-  summary(
-    accessToken: string,
-    projectId: string,
-  ): Promise<SourceMetrics> {
+  summary(accessToken: string, projectId: string): Promise<SourceMetrics> {
     return this.request<SourceMetrics>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/sources/summary`,
       "GET",
@@ -150,6 +146,30 @@ export class SourcesClientService {
     );
   }
 
+  processSelected(
+    accessToken: string,
+    projectId: string,
+    body: ProcessSourcesRequest | unknown,
+  ): Promise<SourceBatchProcessingResponse> {
+    return this.request<SourceBatchProcessingResponse>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process`,
+      "POST",
+      accessToken,
+      body,
+    );
+  }
+
+  processAll(
+    accessToken: string,
+    projectId: string,
+  ): Promise<SourceBatchProcessingResponse> {
+    return this.request<SourceBatchProcessingResponse>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process-all`,
+      "POST",
+      accessToken,
+    );
+  }
+
   update(
     accessToken: string,
     projectId: string,
@@ -192,9 +212,7 @@ export class SourcesClientService {
             accept: "application/octet-stream",
             authorization: `Bearer ${accessToken}`,
           },
-          signal: AbortSignal.timeout(
-            this.config.sourcesUploadTimeoutMs,
-          ),
+          signal: AbortSignal.timeout(this.config.sourcesUploadTimeoutMs),
         },
       );
     } catch {
@@ -220,8 +238,7 @@ export class SourcesClientService {
         "fuente",
       ),
       mediaType:
-        response.headers.get("content-type") ??
-        "application/octet-stream",
+        response.headers.get("content-type") ?? "application/octet-stream",
       buffer: Buffer.from(await response.arrayBuffer()),
     };
   }
@@ -246,20 +263,15 @@ export class SourcesClientService {
     let response: Response;
 
     try {
-      response = await fetch(
-        `${this.config.sourcesServiceUrl}${path}`,
-        {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            authorization: `Bearer ${accessToken}`,
-          },
-          body: form,
-          signal: AbortSignal.timeout(
-            this.config.sourcesUploadTimeoutMs,
-          ),
+      response = await fetch(`${this.config.sourcesServiceUrl}${path}`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          authorization: `Bearer ${accessToken}`,
         },
-      );
+        body: form,
+        signal: AbortSignal.timeout(this.config.sourcesUploadTimeoutMs),
+      });
     } catch {
       throw new ServiceUnavailableException(
         "Sources Service no está disponible.",
@@ -298,20 +310,12 @@ export class SourcesClientService {
     let response: Response;
 
     try {
-      response = await fetch(
-        `${this.config.sourcesServiceUrl}${path}`,
-        {
-          method,
-          headers,
-          body:
-            body === undefined
-              ? undefined
-              : JSON.stringify(body),
-          signal: AbortSignal.timeout(
-            this.config.sourcesTimeoutMs,
-          ),
-        },
-      );
+      response = await fetch(`${this.config.sourcesServiceUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.config.sourcesTimeoutMs),
+      });
     } catch {
       throw new ServiceUnavailableException(
         "Sources Service no está disponible.",

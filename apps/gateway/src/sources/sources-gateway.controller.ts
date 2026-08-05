@@ -28,6 +28,7 @@ import type { FastifyReply } from "fastify";
 
 import type {
   CreateTextSourceRequest,
+  ProcessSourcesRequest,
   UpdateSourceRequest,
 } from "@levantamiento-rq/shared-contracts";
 
@@ -51,9 +52,7 @@ interface RequestLike {
   parts(): AsyncIterableIterator<GatewayMultipartPart>;
 }
 
-function firstHeader(
-  value: string | string[] | undefined,
-): string | undefined {
+function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -67,9 +66,7 @@ function requireAccessToken(request: RequestLike): string {
     return cookieToken;
   }
 
-  const authorization = firstHeader(
-    request.headers.authorization,
-  );
+  const authorization = firstHeader(request.headers.authorization);
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
 
   if (!match?.[1]) {
@@ -93,14 +90,8 @@ export class SourcesGatewayController {
   @ApiOperation({ summary: "Consultar indicadores de fuentes" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @Get("summary")
-  summary(
-    @Req() request: RequestLike,
-    @Param("projectId") projectId: string,
-  ) {
-    return this.sources.summary(
-      requireAccessToken(request),
-      projectId,
-    );
+  summary(@Req() request: RequestLike, @Param("projectId") projectId: string) {
+    return this.sources.summary(requireAccessToken(request), projectId);
   }
 
   @ApiOperation({ summary: "Listar fuentes del proyecto" })
@@ -111,11 +102,7 @@ export class SourcesGatewayController {
     @Param("projectId") projectId: string,
     @Query() query: Readonly<Record<string, unknown>>,
   ) {
-    return this.sources.list(
-      requireAccessToken(request),
-      projectId,
-      query,
-    );
+    return this.sources.list(requireAccessToken(request), projectId, query);
   }
 
   @ApiOperation({ summary: "Crear una fuente textual" })
@@ -149,15 +136,11 @@ export class SourcesGatewayController {
     @Param("projectId") projectId: string,
     @Body() body: CreateTextSourceRequest | unknown,
   ) {
-    return this.sources.create(
-      requireAccessToken(request),
-      projectId,
-      body,
-    );
+    return this.sources.create(requireAccessToken(request), projectId, body);
   }
 
   @ApiOperation({
-    summary: "Cargar y procesar varios archivos",
+    summary: "Cargar varios archivos pendientes de procesamiento",
   })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiConsumes("multipart/form-data")
@@ -169,7 +152,7 @@ export class SourcesGatewayController {
         metadata: {
           type: "string",
           description:
-            "JSON ordenado con fileName, classification y description.",
+            "JSON ordenado con fileName, classification opcional y description.",
         },
         files: {
           type: "array",
@@ -187,9 +170,7 @@ export class SourcesGatewayController {
     @Param("projectId") projectId: string,
   ) {
     if (!request.isMultipart()) {
-      throw new BadRequestException(
-        "La carga debe usar multipart/form-data.",
-      );
+      throw new BadRequestException("La carga debe usar multipart/form-data.");
     }
 
     const files: GatewayUploadFile[] = [];
@@ -212,7 +193,7 @@ export class SourcesGatewayController {
 
     if (!metadata) {
       throw new BadRequestException(
-        "Cada archivo debe tener clasificación y descripción configuradas.",
+        "Debes enviar la configuración de los archivos.",
       );
     }
 
@@ -222,6 +203,47 @@ export class SourcesGatewayController {
       files,
       metadata,
     );
+  }
+
+  @ApiOperation({ summary: "Procesar las fuentes seleccionadas" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["sourceIds"],
+      properties: {
+        sourceIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 100,
+          items: { type: "string", format: "uuid" },
+        },
+      },
+    },
+  })
+  @Post("process")
+  processSelected(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Body() body: ProcessSourcesRequest | unknown,
+  ) {
+    return this.sources.processSelected(
+      requireAccessToken(request),
+      projectId,
+      body,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Procesar todas las fuentes pendientes o con error",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("process-all")
+  processAll(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.sources.processAll(requireAccessToken(request), projectId);
   }
 
   @ApiOperation({ summary: "Descargar archivo de fuente" })
@@ -242,10 +264,7 @@ export class SourcesGatewayController {
 
     return reply
       .header("content-type", file.mediaType)
-      .header(
-        "content-disposition",
-        attachmentDisposition(file.fileName),
-      )
+      .header("content-disposition", attachmentDisposition(file.fileName))
       .header("content-length", String(file.buffer.length))
       .send(file.buffer);
   }

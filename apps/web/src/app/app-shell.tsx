@@ -124,6 +124,11 @@ export function AppShell({ children, user }: AppShellProps) {
   const profile = resolveProfile(user.roles);
   const pageContext = resolvePageContext(pathname);
   const canManageUsers = user.permissions.includes("system.admin");
+  const canManageTemplates =
+    user.roles.some((role) => role.toUpperCase() === "ADMIN") ||
+    user.permissions.includes("system.admin") ||
+    user.permissions.includes("documents.templates.manage");
+  const showAdministration = canManageTemplates || canManageUsers;
 
   useEffect(() => {
     function closeFromOutside(event: MouseEvent): void {
@@ -283,24 +288,7 @@ export function AppShell({ children, user }: AppShellProps) {
 
           <a
             aria-current={
-              pathname.startsWith("/workspace/templates")
-                ? "page"
-                : undefined
-            }
-            href="/workspace/templates"
-            onClick={() => setMenuOpen(false)}
-          >
-            <span aria-hidden="true" className="rq-nav__icon">
-              T
-            </span>
-            <span>Plantillas</span>
-          </a>
-
-          <a
-            aria-current={
-              pathname.startsWith("/workspace/documents")
-                ? "page"
-                : undefined
+              pathname.startsWith("/workspace/documents") ? "page" : undefined
             }
             href="/workspace/documents"
             onClick={() => setMenuOpen(false)}
@@ -313,9 +301,7 @@ export function AppShell({ children, user }: AppShellProps) {
 
           <a
             aria-current={
-              pathname.startsWith("/workspace/validation")
-                ? "page"
-                : undefined
+              pathname.startsWith("/workspace/validation") ? "page" : undefined
             }
             href="/workspace/validation"
             onClick={() => setMenuOpen(false)}
@@ -326,23 +312,41 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Validación</span>
           </a>
 
-          {canManageUsers ? (
+          {showAdministration ? (
             <>
               <span className="rq-nav__label">Administración</span>
-              <a
-                aria-current={
-                  pathname.startsWith("/workspace/settings/users")
-                    ? "page"
-                    : undefined
-                }
-                href="/workspace/settings/users"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span aria-hidden="true" className="rq-nav__icon">
-                  C
-                </span>
-                <span>Configuración</span>
-              </a>
+              {canManageTemplates ? (
+                <a
+                  aria-current={
+                    pathname.startsWith("/workspace/templates")
+                      ? "page"
+                      : undefined
+                  }
+                  href="/workspace/templates"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span aria-hidden="true" className="rq-nav__icon">
+                    T
+                  </span>
+                  <span>Plantillas</span>
+                </a>
+              ) : null}
+              {canManageUsers ? (
+                <a
+                  aria-current={
+                    pathname.startsWith("/workspace/settings/users")
+                      ? "page"
+                      : undefined
+                  }
+                  href="/workspace/settings/users"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <span aria-hidden="true" className="rq-nav__icon">
+                    C
+                  </span>
+                  <span>Configuración</span>
+                </a>
+              ) : null}
             </>
           ) : null}
         </nav>
@@ -365,13 +369,13 @@ export function AppShell({ children, user }: AppShellProps) {
           ? "Editor documental, versiones e historial · Paso 17"
           : pathname.startsWith("/workspace/validation")
             ? "Revisión, observaciones y aprobación documental · Paso 17"
-          : pathname.startsWith("/workspace/templates")
-          ? "Catálogo de plantillas configurables y versionadas · Paso 14"
-          : pathname.startsWith("/workspace/sources")
-            ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-            : pathname.startsWith("/workspace/projects")
-              ? "Gestión de proyectos y participantes · Paso 12"
-              : "Flujo documental: datos, análisis, borradores y aprobación"}
+            : pathname.startsWith("/workspace/templates")
+              ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+              : pathname.startsWith("/workspace/sources")
+                ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+                : pathname.startsWith("/workspace/projects")
+                  ? "Gestión de proyectos y participantes · Paso 12"
+                  : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );

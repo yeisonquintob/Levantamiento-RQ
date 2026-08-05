@@ -7,11 +7,14 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 
 import type {
   AuthenticatedUser,
   CreateTextSourceRequest,
+  ProcessSourcesRequest,
+  SourceBatchProcessingResponse,
+  SourceBatchProcessingResult,
   SourceClassification,
   SourceDetail,
   SourceFileExtension,
@@ -44,7 +47,7 @@ export interface IncomingSourceFile {
   fileName: string;
   mediaType: string;
   buffer: Buffer;
-  classification: SourceClassification;
+  classification?: SourceClassification | null | "";
   description: string | null;
 }
 
@@ -154,9 +157,7 @@ export class SourcesService {
     await this.projectAccess.requireManage(projectId, accessToken, actor);
 
     if (files.length === 0) {
-      throw new BadRequestException(
-        "Debes seleccionar al menos un archivo.",
-      );
+      throw new BadRequestException("Debes seleccionar al menos un archivo.");
     }
 
     if (files.length > this.storageConfig.maxFilesPerUpload) {
@@ -207,7 +208,7 @@ export class SourcesService {
         }
 
         accepted.push(
-          await this.persistAndProcessFile(
+          await this.persistFile(
             actor,
             projectId,
             validated.originalFileName,
@@ -215,7 +216,7 @@ export class SourcesService {
             validated.mediaType,
             validated.buffer,
             fileSha256,
-            incoming.classification,
+            incoming.classification || "OTHER",
             incoming.description,
           ),
         );
@@ -292,8 +293,7 @@ export class SourcesService {
       page: query.page,
       pageSize: query.pageSize,
       totalItems,
-      totalPages:
-        totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
+      totalPages: totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
     };
   }
 
@@ -398,9 +398,7 @@ export class SourcesService {
       source.processingMessage = null;
       source.processedAt = new Date();
       source.mediaType = "text/plain; charset=utf-8";
-      source.fileSizeBytes = String(
-        Buffer.byteLength(request.content, "utf8"),
-      );
+      source.fileSizeBytes = String(Buffer.byteLength(request.content, "utf8"));
       source.sha256 = textSha256(request.content);
     }
 
@@ -448,6 +446,42 @@ export class SourcesService {
     await this.processingQueue.enqueue(source.id, actor.id);
 
     return this.toDetail(source);
+  }
+
+  async processSelected(
+    actor: AuthenticatedUser,
+    accessToken: string,
+    projectId: string,
+    request: ProcessSourcesRequest,
+  ): Promise<SourceBatchProcessingResponse> {
+    await this.projectAccess.requireManage(projectId, accessToken, actor);
+
+    return this.processFiles(actor, projectId, request.sourceIds);
+  }
+
+  async processAll(
+    actor: AuthenticatedUser,
+    accessToken: string,
+    projectId: string,
+  ): Promise<SourceBatchProcessingResponse> {
+    await this.projectAccess.requireManage(projectId, accessToken, actor);
+
+    const eligible = await this.sources.find({
+      select: { id: true },
+      where: {
+        projectId,
+        sourceType: "FILE",
+        status: "ACTIVE",
+        processingStatus: In(["PENDING", "FAILED"]),
+      },
+      order: { createdAt: "ASC" },
+    });
+
+    return this.processFiles(
+      actor,
+      projectId,
+      eligible.map((source) => source.id),
+    );
   }
 
   async download(
@@ -498,7 +532,7 @@ export class SourcesService {
     return this.toDetail(await this.sources.save(source));
   }
 
-  private async persistAndProcessFile(
+  private async persistFile(
     actor: AuthenticatedUser,
     projectId: string,
     originalFileName: string,
@@ -510,8 +544,7 @@ export class SourcesService {
     description: string | null,
   ): Promise<SourceDetail> {
     const sourceId = randomUUID();
-    const blobPath =
-      `${projectId}/${sourceId}/${fileSha256.slice(0, 16)}.${extension}`;
+    const blobPath = `${projectId}/${sourceId}/${fileSha256.slice(0, 16)}.${extension}`;
     let blobUploaded = false;
     let sourceSaved = false;
 
@@ -556,21 +589,7 @@ export class SourcesService {
 
       await this.sources.save(source);
       sourceSaved = true;
-
-      try {
-        await this.processingQueue.enqueue(source.id, actor.id);
-        source.processingMessage = "Archivo almacenado y encolado.";
-        return this.toDetail(await this.sources.save(source));
-      } catch (error) {
-        source.processingStatus = "FAILED";
-        source.processingMessage =
-          `No fue posible encolar el procesamiento: ${errorMessage(error)}`;
-        source.processedAt = new Date();
-        source.updatedByUserId = actor.id;
-        source.updatedAt = new Date();
-
-        return this.toDetail(await this.sources.save(source));
-      }
+      return this.toDetail(source);
     } catch (error) {
       if (blobUploaded && !sourceSaved) {
         await this.storage.deleteIfExists(blobPath);
@@ -578,6 +597,140 @@ export class SourcesService {
 
       throw error;
     }
+  }
+
+  private async processFiles(
+    actor: AuthenticatedUser,
+    projectId: string,
+    sourceIds: readonly string[],
+  ): Promise<SourceBatchProcessingResponse> {
+    if (sourceIds.length === 0) {
+      return {
+        requested: 0,
+        enqueued: 0,
+        skipped: 0,
+        failed: 0,
+        results: [],
+      };
+    }
+
+    const uniqueSourceIds = [...new Set(sourceIds)];
+    const available = await this.sources.find({
+      where: {
+        projectId,
+        id: In(uniqueSourceIds),
+      },
+    });
+    const sourceById = new Map(available.map((source) => [source.id, source]));
+    const results: SourceBatchProcessingResult[] = [];
+
+    for (const sourceId of uniqueSourceIds) {
+      const source = sourceById.get(sourceId);
+
+      if (!source) {
+        results.push({
+          sourceId,
+          status: "FAILED",
+          message: "La fuente no existe en este proyecto.",
+        });
+        continue;
+      }
+
+      const skipMessage = this.batchSkipMessage(source);
+
+      if (skipMessage) {
+        results.push({
+          sourceId,
+          status: "SKIPPED",
+          message: skipMessage,
+        });
+        continue;
+      }
+
+      const now = new Date();
+      const claimed = await this.sources.update(
+        {
+          id: sourceId,
+          projectId,
+          sourceType: "FILE",
+          status: "ACTIVE",
+          processingStatus: In(["PENDING", "FAILED"]),
+        },
+        {
+          processingStatus: "PROCESSING",
+          processingMessage: "Procesamiento encolado.",
+          processedAt: null,
+          updatedByUserId: actor.id,
+          updatedAt: now,
+        },
+      );
+
+      if (claimed.affected !== 1) {
+        results.push({
+          sourceId,
+          status: "SKIPPED",
+          message: "La fuente cambió de estado y ya no requiere procesamiento.",
+        });
+        continue;
+      }
+
+      try {
+        await this.processingQueue.enqueue(sourceId, actor.id);
+        results.push({
+          sourceId,
+          status: "ENQUEUED",
+          message: "Archivo encolado para procesamiento.",
+        });
+      } catch (error) {
+        await this.sources.update(
+          {
+            id: sourceId,
+            projectId,
+            processingStatus: "PROCESSING",
+          },
+          {
+            processingStatus: "FAILED",
+            processingMessage: `No fue posible encolar el procesamiento: ${errorMessage(error)}`,
+            processedAt: new Date(),
+            updatedByUserId: actor.id,
+            updatedAt: new Date(),
+          },
+        );
+        results.push({
+          sourceId,
+          status: "FAILED",
+          message: errorMessage(error),
+        });
+      }
+    }
+
+    return {
+      requested: uniqueSourceIds.length,
+      enqueued: results.filter((result) => result.status === "ENQUEUED").length,
+      skipped: results.filter((result) => result.status === "SKIPPED").length,
+      failed: results.filter((result) => result.status === "FAILED").length,
+      results,
+    };
+  }
+
+  private batchSkipMessage(source: SourceEntity): string | null {
+    if (source.sourceType !== "FILE") {
+      return "La fuente no corresponde a un archivo.";
+    }
+
+    if (source.status !== "ACTIVE") {
+      return "La fuente está archivada.";
+    }
+
+    if (source.processingStatus === "PROCESSING") {
+      return "El archivo ya se está procesando.";
+    }
+
+    if (source.processingStatus === "READY") {
+      return "El archivo ya está listo.";
+    }
+
+    return null;
   }
 
   private async requireSource(
@@ -592,9 +745,7 @@ export class SourcesService {
     });
 
     if (!source) {
-      throw new NotFoundException(
-        "La fuente no existe en este proyecto.",
-      );
+      throw new NotFoundException("La fuente no existe en este proyecto.");
     }
 
     return source;
@@ -623,9 +774,7 @@ export class SourcesService {
       title: source.title,
       description: source.description,
       classification: source.classification,
-      contentPreview: contentPreview(
-        source.extractedText ?? source.content,
-      ),
+      contentPreview: contentPreview(source.extractedText ?? source.content),
       processingStatus: source.processingStatus,
       processingMessage: source.processingMessage,
       processedAt: optionalIso(source.processedAt),

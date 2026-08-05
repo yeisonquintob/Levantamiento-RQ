@@ -29,6 +29,7 @@ import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 import { SourcesAccessTokenGuard } from "./sources-access-token.guard";
 import {
   parseCreateTextSource,
+  parseProcessSourcesRequest,
   parseProjectId,
   parseSourceId,
   parseSourceListQuery,
@@ -36,10 +37,7 @@ import {
   parseUploadMetadata,
 } from "./sources-input";
 import type { SourcesRequest } from "./sources-request";
-import {
-  type IncomingSourceFile,
-  SourcesService,
-} from "./sources.service";
+import { type IncomingSourceFile, SourcesService } from "./sources.service";
 
 function requireContext(request: SourcesRequest): {
   actor: AuthenticatedUser;
@@ -145,7 +143,7 @@ export class SourcesController {
   }
 
   @ApiOperation({
-    summary: "Cargar y procesar varios archivos",
+    summary: "Cargar varios archivos pendientes de procesamiento",
   })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiConsumes("multipart/form-data")
@@ -157,7 +155,7 @@ export class SourcesController {
         metadata: {
           type: "string",
           description:
-            "JSON ordenado con fileName, classification y description.",
+            "JSON ordenado con fileName, classification opcional y description.",
         },
         files: {
           type: "array",
@@ -175,9 +173,7 @@ export class SourcesController {
     @Param("projectId") projectId: string,
   ) {
     if (!request.isMultipart()) {
-      throw new BadRequestException(
-        "La carga debe usar multipart/form-data.",
-      );
+      throw new BadRequestException("La carga debe usar multipart/form-data.");
     }
 
     const context = requireContext(request);
@@ -207,7 +203,7 @@ export class SourcesController {
 
     if (metadata.length !== rawFiles.length) {
       throw new BadRequestException(
-        "Cada archivo debe tener una clasificación y descripción asociadas.",
+        "Cada archivo debe tener una configuración asociada.",
       );
     }
 
@@ -235,6 +231,56 @@ export class SourcesController {
     );
   }
 
+  @ApiOperation({ summary: "Procesar las fuentes seleccionadas" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["sourceIds"],
+      properties: {
+        sourceIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 100,
+          items: { type: "string", format: "uuid" },
+        },
+      },
+    },
+  })
+  @Post("process")
+  processSelected(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+    @Body() body: unknown,
+  ) {
+    const context = requireContext(request);
+
+    return this.sources.processSelected(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+      parseProcessSourcesRequest(body),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Procesar todas las fuentes pendientes o con error",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("process-all")
+  processAll(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    const context = requireContext(request);
+
+    return this.sources.processAll(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+    );
+  }
+
   @ApiOperation({ summary: "Descargar un archivo de fuente" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "sourceId", format: "uuid" })
@@ -255,10 +301,7 @@ export class SourcesController {
 
     return reply
       .header("content-type", file.mediaType)
-      .header(
-        "content-disposition",
-        attachmentDisposition(file.fileName),
-      )
+      .header("content-disposition", attachmentDisposition(file.fileName))
       .header("content-length", String(file.buffer.length))
       .send(file.buffer);
   }
