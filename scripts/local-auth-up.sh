@@ -25,7 +25,6 @@ done
 bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
 
 cd "$ROOT"
-NX_DAEMON=false pnpm exec nx reset >/dev/null
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 

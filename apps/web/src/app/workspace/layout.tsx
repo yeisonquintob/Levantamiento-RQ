@@ -11,6 +11,8 @@ interface SessionUser {
   displayName: string;
   email: string;
   roles: readonly string[];
+  permissions: readonly string[];
+  mustChangePassword: boolean;
 }
 
 async function resolveUser(): Promise<SessionUser> {
@@ -39,15 +41,24 @@ async function resolveUser(): Promise<SessionUser> {
       typeof payload.displayName !== "string" ||
       typeof payload.email !== "string" ||
       !Array.isArray(payload.roles) ||
-      !payload.roles.every((role) => typeof role === "string")
+      !payload.roles.every((role) => typeof role === "string") ||
+      !Array.isArray(payload.permissions) ||
+      !payload.permissions.every((permission) => typeof permission === "string") ||
+      typeof payload.mustChangePassword !== "boolean"
     ) {
       redirect("/sign-in");
+    }
+
+    if (payload.mustChangePassword) {
+      redirect("/change-password");
     }
 
     return {
       displayName: payload.displayName,
       email: payload.email,
       roles: payload.roles,
+      permissions: payload.permissions,
+      mustChangePassword: payload.mustChangePassword,
     };
   } catch {
     redirect("/sign-in");

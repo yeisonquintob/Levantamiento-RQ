@@ -6,6 +6,7 @@ export interface IdentityUserRecord extends AuthenticatedUser {
   emailNormalized: string;
   passwordHash: string;
   isActive: boolean;
+  sessionVersion: number;
 }
 
 export interface RefreshSessionRecord {
@@ -40,4 +41,9 @@ export interface IdentityStore {
     instant: Date,
   ): Promise<boolean>;
   revokeRefreshSession(sessionId: string, instant: Date): Promise<void>;
+  changePassword(
+    userId: string,
+    passwordHash: string,
+    instant: Date,
+  ): Promise<boolean>;
 }

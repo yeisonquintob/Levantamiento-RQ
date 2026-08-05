@@ -17,6 +17,8 @@ pnpm build:all
 pnpm test:unit
 pnpm test:structural
 pnpm test:integration
+pnpm identity:migration:run
+pnpm identity:db:verify
 pnpm sources:migration:run
 pnpm sources:db:verify
 pnpm sources:queue:verify

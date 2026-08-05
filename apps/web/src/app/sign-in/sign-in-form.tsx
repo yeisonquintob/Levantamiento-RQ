@@ -61,7 +61,19 @@ export function SignInForm() {
         return;
       }
 
-      window.location.assign("/workspace");
+      const mustChangePassword = Boolean(
+        payload &&
+          typeof payload === "object" &&
+          "user" in payload &&
+          payload.user &&
+          typeof payload.user === "object" &&
+          "mustChangePassword" in payload.user &&
+          payload.user.mustChangePassword === true,
+      );
+
+      window.location.assign(
+        mustChangePassword ? "/change-password" : "/workspace",
+      );
     } catch {
       setMessage(
         "El Gateway no está disponible. Verifica que los servicios estén ejecutándose.",

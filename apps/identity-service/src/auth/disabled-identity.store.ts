@@ -3,7 +3,6 @@ import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import type {
   IdentityStore,
   IdentityUserRecord,
-  NewRefreshSession,
   RefreshSessionRecord,
 } from "./identity-store";
 
@@ -35,15 +34,15 @@ export class DisabledIdentityStore implements IdentityStore {
     return unavailable();
   }
 
-  rotateRefreshSession(
-    _currentSessionId: string,
-    _nextSession: NewRefreshSession,
-    _instant: Date,
-  ): Promise<boolean> {
+  rotateRefreshSession(): Promise<boolean> {
     return unavailable();
   }
 
   revokeRefreshSession(): Promise<void> {
+    return unavailable();
+  }
+
+  changePassword(): Promise<boolean> {
     return unavailable();
   }
 }

@@ -144,6 +144,39 @@ export class AuthController {
     return { signedOut: true };
   }
 
+  @ApiOperation({ summary: "Cambiar la contraseña de la cuenta autenticada" })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: "Contraseña y sesión renovadas." })
+  @Post("change-password")
+  @HttpCode(200)
+  @UseGuards(AccessTokenGuard)
+  changePassword(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+    @Headers("x-client-user-agent") userAgent?: string,
+    @Headers("x-client-ip") ipAddress?: string,
+  ): Promise<AuthSessionResponse> {
+    const record = asRecord(body);
+
+    if (!request.authPrincipal) {
+      throw new BadRequestException("No se resolvió la identidad.");
+    }
+
+    return this.authService.changePassword(
+      request.authPrincipal,
+      {
+        currentPassword: requiredText(
+          record,
+          "currentPassword",
+          8,
+          256,
+        ),
+        newPassword: requiredText(record, "newPassword", 12, 256),
+      },
+      { userAgent, ipAddress },
+    );
+  }
+
   @ApiOperation({ summary: "Consultar identidad desde access token" })
   @ApiBearerAuth()
   @ApiResponse({ status: 200, description: "Identidad autenticada." })

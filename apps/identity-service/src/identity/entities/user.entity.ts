@@ -32,6 +32,12 @@ export class UserEntity {
   @Column("bit", { name: "IsActive", default: true })
   isActive!: boolean;
 
+  @Column("bit", { name: "MustChangePassword", default: false })
+  mustChangePassword!: boolean;
+
+  @Column("int", { name: "SessionVersion", default: 1 })
+  sessionVersion!: number;
+
   @Column("datetime2", {
     name: "LastLoginAt",
     precision: 7,

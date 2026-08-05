@@ -9,10 +9,17 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 
 import { AUTH_CONFIG, type AuthConfig } from "./auth-config";
+import type { IdentityUserRecord } from "./identity-store";
 
 interface RefreshClaims {
   userId: string;
   sessionId: string;
+  sessionVersion: number;
+}
+
+interface AccessPrincipal {
+  user: AuthenticatedUser;
+  sessionVersion: number;
 }
 
 function requireText(value: unknown, name: string): string {
@@ -29,6 +36,33 @@ function requireStringArray(value: unknown): readonly string[] {
   return value;
 }
 
+function requireBoolean(value: unknown): boolean {
+  if (typeof value !== "boolean") {
+    throw new UnauthorizedException("Token inválido.");
+  }
+
+  return value;
+}
+
+function requirePositiveInteger(value: unknown): number {
+  if (!Number.isInteger(value) || Number(value) < 1) {
+    throw new UnauthorizedException("Token inválido.");
+  }
+
+  return Number(value);
+}
+
+function toAuthenticatedUser(user: IdentityUserRecord): AuthenticatedUser {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    roles: user.roles,
+    permissions: user.permissions,
+    mustChangePassword: user.mustChangePassword,
+  };
+}
+
 @Injectable()
 export class TokenService {
   constructor(
@@ -41,13 +75,14 @@ export class TokenService {
   }
 
   async issueSession(
-    user: AuthenticatedUser,
+    identityUser: IdentityUserRecord,
     sessionId: string = randomUUID(),
   ): Promise<AuthSessionResponse> {
     const now = Math.floor(Date.now() / 1000);
     const accessSecret = new TextEncoder().encode(this.config.accessSecret);
     const refreshSecret = new TextEncoder().encode(this.config.refreshSecret);
 
+    const user = toAuthenticatedUser(identityUser);
     const accessToken = await new SignJWT({
       typ: "access",
       sid: sessionId,
@@ -55,6 +90,8 @@ export class TokenService {
       name: user.displayName,
       roles: [...user.roles],
       permissions: [...user.permissions],
+      mustChangePassword: user.mustChangePassword,
+      sv: identityUser.sessionVersion,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(user.id)
@@ -68,6 +105,7 @@ export class TokenService {
     const refreshToken = await new SignJWT({
       typ: "refresh",
       sid: sessionId,
+      sv: identityUser.sessionVersion,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(user.id)
@@ -87,7 +125,7 @@ export class TokenService {
     };
   }
 
-  async verifyAccessToken(token: string): Promise<AuthenticatedUser> {
+  async verifyAccessToken(token: string): Promise<AccessPrincipal> {
     const { payload } = await this.verify(
       token,
       this.config.accessSecret,
@@ -95,11 +133,15 @@ export class TokenService {
     );
 
     return {
-      id: requireText(payload.sub, "sub"),
-      email: requireText(payload.email, "email"),
-      displayName: requireText(payload.name, "name"),
-      roles: requireStringArray(payload.roles),
-      permissions: requireStringArray(payload.permissions),
+      user: {
+        id: requireText(payload.sub, "sub"),
+        email: requireText(payload.email, "email"),
+        displayName: requireText(payload.name, "name"),
+        roles: requireStringArray(payload.roles),
+        permissions: requireStringArray(payload.permissions),
+        mustChangePassword: requireBoolean(payload.mustChangePassword),
+      },
+      sessionVersion: requirePositiveInteger(payload.sv),
     };
   }
 
@@ -113,6 +155,7 @@ export class TokenService {
     return {
       userId: requireText(payload.sub, "sub"),
       sessionId: requireText(payload.sid, "sid"),
+      sessionVersion: requirePositiveInteger(payload.sv),
     };
   }
 

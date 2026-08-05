@@ -31,6 +31,13 @@ export class PermissionsGuard implements CanActivate {
 
     const request =
       context.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    if (request.authPrincipal?.mustChangePassword) {
+      throw new ForbiddenException(
+        "Debes cambiar la contraseña temporal antes de continuar.",
+      );
+    }
+
     const granted = new Set(request.authPrincipal?.permissions ?? []);
     const allowed = required.every((permission) =>
       granted.has(permission),

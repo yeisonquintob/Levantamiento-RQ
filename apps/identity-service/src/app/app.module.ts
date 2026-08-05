@@ -24,11 +24,14 @@ import {
   RefreshSessionEntity,
   RoleEntity,
   RolePermissionEntity,
+  SecurityAuditEntity,
   UserEntity,
   UserRoleEntity,
 } from "../identity/entities";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { UsersController } from "../users/users.controller";
+import { UsersService } from "../users/users.service";
 
 const databaseConfig = loadSqlServerDatabaseConfig({
   serviceName: "identity-service",
@@ -42,6 +45,7 @@ const entities = [
   UserRoleEntity,
   RolePermissionEntity,
   RefreshSessionEntity,
+  SecurityAuditEntity,
 ];
 
 const storeProviders: Provider[] = databaseConfig.enabled
@@ -70,7 +74,11 @@ const storeProviders: Provider[] = databaseConfig.enabled
       ? [TypeOrmModule.forFeature(entities)]
       : []),
   ],
-  controllers: [AppController, AuthController],
+  controllers: [
+    AppController,
+    AuthController,
+    ...(databaseConfig.enabled ? [UsersController] : []),
+  ],
   providers: [
     AppService,
     {
@@ -82,6 +90,7 @@ const storeProviders: Provider[] = databaseConfig.enabled
     AuthService,
     AccessTokenGuard,
     PermissionsGuard,
+    ...(databaseConfig.enabled ? [UsersService] : []),
     ...storeProviders,
   ],
 })

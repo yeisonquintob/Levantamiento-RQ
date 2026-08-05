@@ -44,6 +44,7 @@ async function bootstrap(): Promise<void> {
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
       .addTag("authentication", "Identidad y sesiones")
+      .addTag("users", "Administración de cuentas y credenciales")
       .addBearerAuth()
       .build();
 

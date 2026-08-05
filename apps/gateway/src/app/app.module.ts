@@ -9,6 +9,8 @@ import { ProjectsClientService } from "../projects/projects-client.service";
 import { ProjectsGatewayController } from "../projects/projects-gateway.controller";
 import { SourcesClientService } from "../sources/sources-client.service";
 import { SourcesGatewayController } from "../sources/sources-gateway.controller";
+import { UsersClientService } from "../users/users-client.service";
+import { UsersGatewayController } from "../users/users-gateway.controller";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -19,6 +21,7 @@ import { AppService } from "./app.service";
     ProjectsGatewayController,
     SourcesGatewayController,
     DocumentTemplatesGatewayController,
+    UsersGatewayController,
   ],
   providers: [
     {
@@ -30,6 +33,7 @@ import { AppService } from "./app.service";
     ProjectsClientService,
     SourcesClientService,
     DocumentTemplatesClientService,
+    UsersClientService,
   ],
 })
 export class AppModule {}

@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -70,19 +71,32 @@ export class ProjectsAccessTokenGuard implements CanActivate {
         throw new UnauthorizedException("Tipo de token inválido.");
       }
 
+      const mustChangePassword =
+        result.payload.mustChangePassword === true;
+
+      if (mustChangePassword) {
+        throw new ForbiddenException(
+          "Debes cambiar la contraseña temporal antes de continuar.",
+        );
+      }
+
       const principal: AuthenticatedUser = {
         id: requiredText(result.payload.sub),
         email: requiredText(result.payload.email),
         displayName: requiredText(result.payload.name),
         roles: requiredStringArray(result.payload.roles),
         permissions: requiredStringArray(result.payload.permissions),
+        mustChangePassword,
       };
 
       request.authPrincipal = principal;
       request.accessToken = token;
       return true;
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
 

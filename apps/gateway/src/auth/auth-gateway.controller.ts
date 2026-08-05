@@ -86,7 +86,11 @@ export class AuthGatewayController {
       ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
     });
 
-    this.setSessionCookies(reply, session);
+    this.setSessionCookies(
+      reply,
+      session,
+      session.user.mustChangePassword,
+    );
 
     return {
       user: session.user,
@@ -118,7 +122,11 @@ export class AuthGatewayController {
       ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
     });
 
-    this.setSessionCookies(reply, session);
+    this.setSessionCookies(
+      reply,
+      session,
+      session.user.mustChangePassword,
+    );
 
     return {
       user: session.user,
@@ -159,10 +167,51 @@ export class AuthGatewayController {
           path: "/api/v1/auth",
           secure: this.config.cookieSecure,
         }),
+        serializeCookie(ACCESS_COOKIE, "", {
+          maxAge: 0,
+          path: "/api/v1/auth",
+          secure: this.config.cookieSecure,
+        }),
       ]);
     }
 
     return { signedOut: true };
+  }
+
+  @ApiOperation({ summary: "Cambiar contraseña y renovar la sesión" })
+  @ApiCookieAuth("rq_access")
+  @Post("change-password")
+  @HttpCode(200)
+  async changePassword(
+    @Body() body: unknown,
+    @Req() request: RequestLike,
+    @Res({ passthrough: true }) reply: ReplyLike,
+  ): Promise<GatewayAuthSessionResponse> {
+    const accessToken = readCookie(
+      firstHeader(request.headers.cookie),
+      ACCESS_COOKIE,
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException("Sesión requerida.");
+    }
+
+    const session = await this.identity.changePassword(
+      accessToken,
+      body,
+      {
+        userAgent: firstHeader(request.headers["user-agent"]),
+        ipAddress:
+          firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
+      },
+    );
+
+    this.setSessionCookies(reply, session, false);
+
+    return {
+      user: session.user,
+      accessTokenExpiresInSeconds: session.accessTokenExpiresInSeconds,
+    };
   }
 
   @ApiOperation({ summary: "Consultar el usuario autenticado" })
@@ -191,11 +240,12 @@ export class AuthGatewayController {
       accessTokenExpiresInSeconds: number;
       refreshTokenExpiresInSeconds: number;
     },
+    restrictedToAuthentication: boolean,
   ): void {
     reply.header("set-cookie", [
       serializeCookie(ACCESS_COOKIE, session.accessToken, {
         maxAge: session.accessTokenExpiresInSeconds,
-        path: "/",
+        path: restrictedToAuthentication ? "/api/v1/auth" : "/",
         secure: this.config.cookieSecure,
       }),
       serializeCookie(REFRESH_COOKIE, session.refreshToken, {

@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 
 import {
   RefreshSessionEntity,
+  SecurityAuditEntity,
   UserEntity,
 } from "../identity/entities";
 import type {
@@ -35,6 +38,8 @@ function mapUser(user: UserEntity): IdentityUserRecord {
     displayName: user.displayName,
     passwordHash: user.passwordHash,
     isActive: user.isActive,
+    mustChangePassword: user.mustChangePassword,
+    sessionVersion: user.sessionVersion,
     roles,
     permissions,
   };
@@ -158,6 +163,50 @@ export class TypeOrmIdentityStore implements IdentityStore {
       .where("Id = :sessionId", { sessionId })
       .andWhere("RevokedAt IS NULL")
       .execute();
+  }
+
+  async changePassword(
+    userId: string,
+    passwordHash: string,
+    instant: Date,
+  ): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const users = manager.getRepository(UserEntity);
+      const user = await users.findOne({
+        where: { id: userId },
+        lock: { mode: "pessimistic_write" },
+      });
+
+      if (!user || !user.isActive) {
+        return false;
+      }
+
+      user.passwordHash = passwordHash;
+      user.mustChangePassword = false;
+      user.sessionVersion += 1;
+      user.updatedAt = instant;
+      await users.save(user);
+
+      await manager
+        .getRepository(RefreshSessionEntity)
+        .createQueryBuilder()
+        .update(RefreshSessionEntity)
+        .set({ revokedAt: instant, lastUsedAt: instant })
+        .where("UserId = :userId", { userId })
+        .andWhere("RevokedAt IS NULL")
+        .execute();
+
+      await manager.getRepository(SecurityAuditEntity).insert({
+        id: randomUUID(),
+        eventType: "PASSWORD_CHANGED",
+        actorUserId: userId,
+        targetUserId: userId,
+        detail: null,
+        createdAt: instant,
+      });
+
+      return true;
+    });
   }
 
   private userQuery() {

@@ -48,6 +48,8 @@ async function main(): Promise<void> {
       displayName,
       passwordHash,
       isActive: true,
+      mustChangePassword: true,
+      sessionVersion: 1,
       lastLoginAt: null,
       createdAt: now,
       updatedAt: now,

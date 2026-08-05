@@ -4,6 +4,7 @@ export interface AuthenticatedUser {
   displayName: string;
   roles: readonly string[];
   permissions: readonly string[];
+  mustChangePassword: boolean;
 }
 
 export interface SignInRequest {
@@ -34,4 +35,9 @@ export interface GatewayAuthSessionResponse {
 
 export interface SignOutResponse {
   signedOut: true;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }

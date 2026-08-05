@@ -93,3 +93,112 @@
     padding: var(--rq-space-3);
   }
 }
+
+.rq-users-workspace {
+  display: grid;
+  gap: var(--rq-space-4);
+}
+
+.rq-users-table__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+}
+
+.rq-users-table__identity span,
+.rq-users-table__identity small {
+  color: var(--rq-color-muted);
+}
+
+.rq-users-table__identity small {
+  color: var(--rq-action-operation);
+  font-weight: 700;
+}
+
+.rq-users-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rq-space-2);
+  min-width: 300px;
+}
+
+.rq-users-modal {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.rq-users-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rq-users-roles {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: var(--rq-space-2);
+  margin: 0;
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+}
+
+.rq-users-roles label {
+  display: flex;
+  align-items: center;
+  gap: var(--rq-space-2);
+}
+
+.rq-users-detail,
+.rq-users-confirm,
+.rq-users-password {
+  display: grid;
+  gap: var(--rq-space-4);
+  padding: var(--rq-space-4);
+}
+
+.rq-users-detail dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rq-space-3);
+  margin: 0;
+}
+
+.rq-users-detail dl div {
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-users-detail dt {
+  color: var(--rq-color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rq-users-detail dd {
+  margin: var(--rq-space-1) 0 0;
+  font-weight: 700;
+}
+
+.rq-users-password output {
+  overflow-wrap: anywhere;
+  padding: var(--rq-space-4);
+  border: 2px dashed var(--rq-action-operation);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: calc(18px * var(--rq-font-scale));
+  font-weight: 800;
+  user-select: all;
+}
+
+@media (max-width: 760px) {
+  .rq-users-form,
+  .rq-users-detail dl {
+    grid-template-columns: 1fr;
+  }
+
+  .rq-users-table__actions {
+    min-width: 220px;
+  }
+}

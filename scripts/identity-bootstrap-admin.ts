@@ -62,6 +62,8 @@ async function main(): Promise<void> {
           displayName,
           passwordHash: await hasher.hash(password),
           isActive: true,
+          mustChangePassword: false,
+          sessionVersion: 1,
           lastLoginAt: null,
           createdAt: now,
           updatedAt: now,
@@ -96,6 +98,8 @@ async function main(): Promise<void> {
 
         if (!passwordMatches) {
           user.passwordHash = await hasher.hash(password);
+          user.mustChangePassword = false;
+          user.sessionVersion += 1;
           userResult = "actualizado";
         }
 

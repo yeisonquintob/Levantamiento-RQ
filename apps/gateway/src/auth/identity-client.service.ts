@@ -71,6 +71,20 @@ export class IdentityClientService {
     );
   }
 
+  changePassword(
+    accessToken: string,
+    body: unknown,
+    context: ClientContext,
+  ): Promise<AuthSessionResponse> {
+    return this.request<AuthSessionResponse>(
+      "/api/v1/auth/change-password",
+      "POST",
+      body,
+      context,
+      accessToken,
+    );
+  }
+
   private async request<T>(
     path: string,
     method: "GET" | "POST",

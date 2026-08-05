@@ -10,6 +10,7 @@ import {
 import type {
   AuthSessionResponse,
   AuthenticatedUser,
+  ChangePasswordRequest,
   SignInRequest,
 } from "@levantamiento-rq/shared-contracts";
 
@@ -107,7 +108,11 @@ export class AuthService {
 
     const user = await this.store.findUserById(claims.userId);
 
-    if (!user || !user.isActive) {
+    if (
+      !user ||
+      !user.isActive ||
+      user.sessionVersion !== claims.sessionVersion
+    ) {
       throw new UnauthorizedException("La cuenta no está disponible.");
     }
 
@@ -155,9 +160,13 @@ export class AuthService {
     this.ensureEnabled();
     const principal =
       await this.tokenService.verifyAccessToken(accessToken);
-    const user = await this.store.findUserById(principal.id);
+    const user = await this.store.findUserById(principal.user.id);
 
-    if (!user || !user.isActive) {
+    if (
+      !user ||
+      !user.isActive ||
+      user.sessionVersion !== principal.sessionVersion
+    ) {
       throw new UnauthorizedException("La cuenta no está disponible.");
     }
 
@@ -167,7 +176,62 @@ export class AuthService {
       displayName: user.displayName,
       roles: user.roles,
       permissions: user.permissions,
+      mustChangePassword: user.mustChangePassword,
     };
+  }
+
+  async changePassword(
+    actor: AuthenticatedUser,
+    request: ChangePasswordRequest,
+    context: SessionContext = {},
+  ): Promise<AuthSessionResponse> {
+    this.ensureEnabled();
+    const user = await this.store.findUserById(actor.id);
+
+    if (
+      !user ||
+      !user.isActive ||
+      !(await this.passwordHasher.verify(
+        request.currentPassword,
+        user.passwordHash,
+      ))
+    ) {
+      throw new UnauthorizedException("La contraseña actual no es válida.");
+    }
+
+    if (request.currentPassword === request.newPassword) {
+      throw new UnauthorizedException(
+        "La nueva contraseña debe ser diferente.",
+      );
+    }
+
+    const now = new Date();
+    const changed = await this.store.changePassword(
+      user.id,
+      await this.passwordHasher.hash(request.newPassword),
+      now,
+    );
+    const updated = changed
+      ? await this.store.findUserById(user.id)
+      : null;
+
+    if (!updated) {
+      throw new UnauthorizedException("La cuenta no está disponible.");
+    }
+
+    const sessionId = randomUUID();
+    const session = await this.tokenService.issueSession(updated, sessionId);
+    await this.store.createRefreshSession(
+      this.toNewSession(
+        sessionId,
+        updated.id,
+        session.refreshToken,
+        now,
+        context,
+      ),
+    );
+
+    return session;
   }
 
   private ensureEnabled(): void {

@@ -13,13 +13,14 @@ interface AppShellProps {
     displayName: string;
     email: string;
     roles: readonly string[];
+    permissions: readonly string[];
+    mustChangePassword: boolean;
   };
 }
 
 const futureNavigation = [
   ["Documentos", "D"],
   ["Validación", "V"],
-  ["Configuración", "C"],
 ] as const;
 
 interface WorkspacePageContext {
@@ -127,6 +128,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const initials = resolveInitials(user.displayName);
   const profile = resolveProfile(user.roles);
   const pageContext = resolvePageContext(pathname);
+  const canManageUsers = user.permissions.includes("system.admin");
 
   useEffect(() => {
     function closeFromOutside(event: MouseEvent): void {
@@ -312,6 +314,26 @@ export function AppShell({ children, user }: AppShellProps) {
               <span>{label}</span>
             </span>
           ))}
+
+          {canManageUsers ? (
+            <>
+              <span className="rq-nav__label">Administración</span>
+              <a
+                aria-current={
+                  pathname.startsWith("/workspace/settings/users")
+                    ? "page"
+                    : undefined
+                }
+                href="/workspace/settings/users"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span aria-hidden="true" className="rq-nav__icon">
+                  C
+                </span>
+                <span>Configuración</span>
+              </a>
+            </>
+          ) : null}
         </nav>
       </aside>
 

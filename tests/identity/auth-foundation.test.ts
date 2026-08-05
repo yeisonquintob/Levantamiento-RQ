@@ -88,6 +88,31 @@ class FakeIdentityStore implements IdentityStore {
 
     return Promise.resolve();
   }
+
+  changePassword(
+    userId: string,
+    passwordHash: string,
+    instant: Date,
+  ): Promise<boolean> {
+    const user = this.users.get(userId);
+
+    if (!user || !user.isActive) return Promise.resolve(false);
+
+    this.users.set(userId, {
+      ...user,
+      passwordHash,
+      mustChangePassword: false,
+      sessionVersion: user.sessionVersion + 1,
+    });
+
+    for (const [sessionId, session] of this.sessions) {
+      if (session.userId === userId && !session.revokedAt) {
+        this.sessions.set(sessionId, { ...session, revokedAt: instant });
+      }
+    }
+
+    return Promise.resolve(true);
+  }
 }
 
 const config: AuthConfig = {
@@ -113,6 +138,8 @@ async function createFixture(active = true) {
     displayName: "Analista de Requerimientos",
     passwordHash: await hasher.hash(password),
     isActive: active,
+    mustChangePassword: false,
+    sessionVersion: 1,
     roles: ["ANALYST"],
     permissions: ["requirements.read", "requirements.write"],
   };
@@ -142,6 +169,7 @@ test("inicio, consulta, renovación y cierre de sesión", async () => {
 
   assert.equal(signedIn.user.id, fixture.user.id);
   assert.deepEqual(signedIn.user.roles, ["ANALYST"]);
+  assert.equal("passwordHash" in signedIn.user, false);
 
   const principal: AuthenticatedUser =
     await fixture.auth.authenticateAccessToken(signedIn.accessToken);
@@ -166,6 +194,49 @@ test("inicio, consulta, renovación y cierre de sesión", async () => {
     () => fixture.auth.refresh(refreshed.refreshToken),
     /Sesión de renovación inválida/,
   );
+});
+
+test("la contraseña temporal obliga cambio, revoca sesiones y no se filtra", async () => {
+  const fixture = await createFixture();
+  fixture.store.users.set(fixture.user.id, {
+    ...fixture.user,
+    mustChangePassword: true,
+  });
+  const signedIn = await fixture.auth.signIn({
+    email: fixture.user.email,
+    password: fixture.password,
+  });
+
+  assert.equal(signedIn.user.mustChangePassword, true);
+  assert.equal("passwordHash" in signedIn.user, false);
+
+  const changed = await fixture.auth.changePassword(
+    signedIn.user,
+    {
+      currentPassword: fixture.password,
+      newPassword: "NuevaPasswordSegura123!",
+    },
+  );
+
+  assert.equal(changed.user.mustChangePassword, false);
+  await assert.rejects(
+    () => fixture.auth.authenticateAccessToken(signedIn.accessToken),
+    /cuenta no está disponible/i,
+  );
+  await assert.rejects(
+    () =>
+      fixture.auth.signIn({
+        email: fixture.user.email,
+        password: fixture.password,
+      }),
+    /Credenciales inválidas/,
+  );
+
+  const next = await fixture.auth.signIn({
+    email: fixture.user.email,
+    password: "NuevaPasswordSegura123!",
+  });
+  assert.equal(next.user.mustChangePassword, false);
 });
 
 test("credenciales erróneas y usuarios inactivos son rechazados", async () => {
