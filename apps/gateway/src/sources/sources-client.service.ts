@@ -204,8 +204,12 @@ export class SourcesClientService {
     }
 
     if (!response.ok) {
+      const payload = await this.readPayload(response);
+
       throw new HttpException(
-        await this.readPayload(response),
+        payload && typeof payload === "object"
+          ? (payload as Readonly<Record<string, unknown>>)
+          : { message: "Sources Service rechazó la descarga." },
         response.status,
       );
     }

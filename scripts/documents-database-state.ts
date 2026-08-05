@@ -20,6 +20,10 @@ function options(
     defaultDatabaseName: "RqDocumentsDb",
   });
 
+  if (!config.enabled) {
+    throw new Error("DATABASE_ENABLED debe ser true.");
+  }
+
   return {
     type: "mssql",
     host: config.host,
@@ -102,4 +106,3 @@ void main().catch((error: unknown) => {
   console.error(`No se pudo consultar el estado de RqDocumentsDb: ${message}`);
   process.exitCode = 1;
 });
-

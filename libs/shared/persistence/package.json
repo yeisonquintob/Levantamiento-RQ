@@ -19,6 +19,7 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/typeorm": "11.0.3",
     "mssql": "12.7.0",
+    "supports-color": "7.2.0",
     "tslib": "^2.3.0",
     "typeorm": "0.3.31"
   }

@@ -40,7 +40,9 @@ async function spreadsheetText(buffer: Buffer): Promise<{
 }> {
   const workbook = new ExcelJS.Workbook();
 
-  await workbook.xlsx.load(buffer);
+  const workbookBytes = Uint8Array.from(buffer);
+
+  await workbook.xlsx.load(workbookBytes.buffer);
 
   const sections: string[] = [];
 

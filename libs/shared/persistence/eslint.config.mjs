@@ -8,7 +8,7 @@ export default [
       "@nx/dependency-checks": [
         "error",
         {
-          ignoredDependencies: ["mssql"],
+          ignoredDependencies: ["mssql", "supports-color"],
           ignoredFiles: ["{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}"],
           runtimeHelpers: ["tslib"],
         },

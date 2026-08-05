@@ -81,7 +81,8 @@ export function loadSourcesStorageConfig(
 
   return {
     connectionString: requiredText(
-      environment.AZURE_STORAGE_CONNECTION_STRING,
+      environment.AZURE_STORAGE_CONNECTION_STRING ??
+        environment.AZURE_STORAGE_CONNECTION_STRING_HOST,
       "AZURE_STORAGE_CONNECTION_STRING",
     ),
     containerName: readContainerName(

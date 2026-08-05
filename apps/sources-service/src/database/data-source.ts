@@ -1,5 +1,4 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import { loadEnvironmentFiles } from "@levantamiento-rq/shared-config";
 import {
@@ -8,10 +7,17 @@ import {
 } from "@levantamiento-rq/shared-persistence";
 
 loadEnvironmentFiles({
-  paths: [".env", "apps/sources-service/.env"],
+  paths: [
+    ".env",
+    "infrastructure/docker/.env",
+    "apps/sources-service/.env",
+  ],
 });
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const currentDirectory = resolve(
+  process.cwd(),
+  "apps/sources-service/src/database",
+);
 
 const config = loadSqlServerDatabaseConfig({
   serviceName: "sources-service",

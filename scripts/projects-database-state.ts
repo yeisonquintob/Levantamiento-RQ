@@ -20,6 +20,10 @@ function options(
     defaultDatabaseName: "RqProjectsDb",
   });
 
+  if (!config.enabled) {
+    throw new Error("DATABASE_ENABLED debe ser true.");
+  }
+
   return {
     type: "mssql",
     host: config.host,

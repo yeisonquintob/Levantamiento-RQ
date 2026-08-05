@@ -26,7 +26,7 @@ import type {
 import { ProjectsAccessClient } from "./projects-access.client";
 import { SourceBlobStorage } from "./source-blob-storage.service";
 import { SourceEntity } from "./source.entity";
-import { SourceExtractionService } from "./source-extraction.service";
+import { SourceProcessingQueue } from "./source-processing.queue";
 import {
   titleFromFileName,
   validateSourceFile,
@@ -92,9 +92,12 @@ export class SourcesService {
   constructor(
     @InjectRepository(SourceEntity)
     private readonly sources: Repository<SourceEntity>,
+    @Inject(ProjectsAccessClient)
     private readonly projectAccess: ProjectsAccessClient,
+    @Inject(SourceBlobStorage)
     private readonly storage: SourceBlobStorage,
-    private readonly extraction: SourceExtractionService,
+    @Inject(SourceProcessingQueue)
+    private readonly processingQueue: SourceProcessingQueue,
     @Inject(SOURCES_STORAGE_CONFIG)
     private readonly storageConfig: SourcesStorageConfig,
   ) {}
@@ -432,13 +435,15 @@ export class SourcesService {
       );
     }
 
-    const buffer = await this.storage.download(source.storagePath);
+    source.processingStatus = "PENDING";
+    source.processingMessage = "Reprocesamiento encolado.";
+    source.processedAt = null;
+    source.updatedByUserId = actor.id;
+    source.updatedAt = new Date();
+    await this.sources.save(source);
+    await this.processingQueue.enqueue(source.id, actor.id);
 
-    return this.processFileSource(
-      source,
-      buffer,
-      actor.id,
-    );
+    return this.toDetail(source);
   }
 
   async download(
@@ -539,14 +544,13 @@ export class SourcesService {
       sourceSaved = true;
 
       try {
-        return await this.processFileSource(
-          source,
-          buffer,
-          actor.id,
-        );
+        await this.processingQueue.enqueue(source.id, actor.id);
+        source.processingMessage = "Archivo almacenado y encolado.";
+        return this.toDetail(await this.sources.save(source));
       } catch (error) {
         source.processingStatus = "FAILED";
-        source.processingMessage = errorMessage(error);
+        source.processingMessage =
+          `No fue posible encolar el procesamiento: ${errorMessage(error)}`;
         source.processedAt = new Date();
         source.updatedByUserId = actor.id;
         source.updatedAt = new Date();
@@ -560,50 +564,6 @@ export class SourcesService {
 
       throw error;
     }
-  }
-
-  private async processFileSource(
-    source: SourceEntity,
-    buffer: Buffer,
-    actorId: string,
-  ): Promise<SourceDetail> {
-    source.processingStatus = "PROCESSING";
-    source.processingMessage = "Extrayendo contenido del archivo.";
-    source.updatedByUserId = actorId;
-    source.updatedAt = new Date();
-    await this.sources.save(source);
-
-    try {
-      if (!source.fileExtension) {
-        throw new Error(
-          "La fuente no contiene una extensión procesable.",
-        );
-      }
-
-      const result = await this.extraction.extract(
-        source.fileExtension,
-        buffer,
-      );
-
-      source.extractedText = result.extractedText;
-      source.processingStatus = "READY";
-      source.processingMessage = result.processingMessage;
-      source.processedAt = new Date();
-      source.pageCount = result.pageCount;
-      source.sheetCount = result.sheetCount;
-    } catch (error) {
-      source.extractedText = null;
-      source.processingStatus = "FAILED";
-      source.processingMessage = errorMessage(error);
-      source.processedAt = new Date();
-      source.pageCount = null;
-      source.sheetCount = null;
-    }
-
-    source.updatedByUserId = actorId;
-    source.updatedAt = new Date();
-
-    return this.toDetail(await this.sources.save(source));
   }
 
   private async requireSource(

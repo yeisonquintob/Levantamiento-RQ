@@ -37,6 +37,22 @@ function sameUuid(left: unknown, right: unknown): boolean {
   );
 }
 
+function matchesTemplateReference(
+  value: unknown,
+  template: Readonly<Record<string, unknown>>,
+): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const reference = value as Readonly<Record<string, unknown>>;
+
+  return (
+    sameUuid(reference.id, template.id) &&
+    reference.version === template.version
+  );
+}
+
 function createAccessToken(): { token: string; userId: string } {
   const secret = requiredSecret(
     process.env.JWT_ACCESS_SECRET,
@@ -175,13 +191,7 @@ async function main(): Promise<void> {
 
     createdProjectIds.push(directCreated.id);
 
-    if (
-      !directCreated.template ||
-      typeof directCreated.template !== "object" ||
-      Array.isArray(directCreated.template) ||
-      !sameUuid(directCreated.template.id, template.id) ||
-      directCreated.template.version !== template.version
-    ) {
+    if (!matchesTemplateReference(directCreated.template, template)) {
       throw new Error(
         "Projects Service no conservó la plantilla y versión seleccionadas.",
       );
@@ -211,13 +221,7 @@ async function main(): Promise<void> {
 
     createdProjectIds.push(gatewayCreated.id);
 
-    if (
-      !gatewayCreated.template ||
-      typeof gatewayCreated.template !== "object" ||
-      Array.isArray(gatewayCreated.template) ||
-      !sameUuid(gatewayCreated.template.id, template.id) ||
-      gatewayCreated.template.version !== template.version
-    ) {
+    if (!matchesTemplateReference(gatewayCreated.template, template)) {
       throw new Error(
         "Gateway no devolvió la plantilla y versión seleccionadas.",
       );

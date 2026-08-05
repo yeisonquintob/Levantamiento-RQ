@@ -313,7 +313,7 @@ test("el almacenamiento, la extracción y la descarga son privados", async () =>
   );
 
   assert.match(storage, /BlobServiceClient\.fromConnectionString/);
-  assert.match(storage, /uploadData/);
+  assert.match(storage, /client\.upload\(buffer, buffer\.length/);
   assert.match(storage, /downloadToBuffer/);
   assert.doesNotMatch(storage, /generateBlobSASQueryParameters/);
   assert.match(extraction, /mammoth\.extractRawText/);
@@ -322,6 +322,30 @@ test("el almacenamiento, la extracción y la descarga son privados", async () =>
   assert.match(service, /requireRead/);
   assert.match(service, /requireManage/);
   assert.match(service, /duplicateSourceId/);
+  assert.match(service, /processingQueue\.enqueue/);
+});
+
+test("BullMQ separa la cola, el worker y el procesamiento", async () => {
+  const queue = await readFile(
+    "apps/sources-service/src/sources/source-processing.queue.ts",
+    "utf8",
+  );
+  const worker = await readFile(
+    "apps/sources-service/src/sources/source-processing.worker.ts",
+    "utf8",
+  );
+  const processing = await readFile(
+    "apps/sources-service/src/sources/source-processing.service.ts",
+    "utf8",
+  );
+
+  assert.match(queue, /new Queue/);
+  assert.match(worker, /new Worker/);
+  assert.match(worker, /attemptsMade \+ 1/);
+  assert.match(processing, /storage\.download/);
+  assert.match(processing, /fileSizeBytes/);
+  assert.match(processing, /sha256/);
+  assert.match(processing, /processingStatus = "READY"/);
 });
 
 test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {

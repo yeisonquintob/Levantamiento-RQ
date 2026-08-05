@@ -17,7 +17,11 @@ import {
 import { loadSourcesStorageConfig } from "./sources/sources-storage.config";
 
 loadEnvironmentFiles({
-  paths: [".env", "apps/sources-service/.env"],
+  paths: [
+    ".env",
+    "infrastructure/docker/.env",
+    "apps/sources-service/.env",
+  ],
 });
 
 async function bootstrap(): Promise<void> {
@@ -33,7 +37,7 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
-  await app.register(fastifyMultipart, {
+  await app.register(fastifyMultipart as never, {
     limits: {
       files: storageConfig.maxFilesPerUpload,
       fileSize: storageConfig.maxFileBytes,

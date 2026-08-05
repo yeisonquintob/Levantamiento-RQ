@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { BlobServiceClient } from "@azure/storage-blob";
 
@@ -7,7 +7,11 @@ import {
 } from "../libs/shared/config/src/index.js";
 
 loadEnvironmentFiles({
-  paths: [".env", "apps/sources-service/.env"],
+  paths: [
+    ".env",
+    "infrastructure/docker/.env",
+    "apps/sources-service/.env",
+  ],
 });
 
 function requiredText(
@@ -25,7 +29,8 @@ function requiredText(
 
 async function main(): Promise<void> {
   const connectionString = requiredText(
-    process.env.AZURE_STORAGE_CONNECTION_STRING,
+    process.env.AZURE_STORAGE_CONNECTION_STRING ??
+      process.env.AZURE_STORAGE_CONNECTION_STRING_HOST,
     "AZURE_STORAGE_CONNECTION_STRING",
   );
   const containerName =
@@ -60,9 +65,20 @@ async function main(): Promise<void> {
       },
     });
 
+    const blobProperties = await blob.getProperties();
+
+    if (blobProperties.contentLength !== content.length) {
+      throw new Error("Content-Length no coincide con el Buffer cargado.");
+    }
+
     const downloaded = await blob.downloadToBuffer();
 
-    if (!downloaded.equals(content)) {
+    const expectedSha256 = createHash("sha256").update(content).digest("hex");
+    const actualSha256 = createHash("sha256")
+      .update(downloaded)
+      .digest("hex");
+
+    if (!downloaded.equals(content) || actualSha256 !== expectedSha256) {
       throw new Error(
         "El archivo descargado no coincide con el archivo cargado.",
       );
@@ -73,7 +89,7 @@ async function main(): Promise<void> {
 
   console.log("Azurite Blob verificado correctamente.");
   console.log(`Contenedor privado confirmado: ${containerName}`);
-  console.log("Carga, descarga y eliminación temporal correctas.");
+  console.log("Carga, tamaño, SHA-256, descarga y eliminación correctos.");
 }
 
 void main().catch((error: unknown) => {

@@ -13,3 +13,4 @@ allowBuilds:
   sharp: true
   core-js: true
   "@scarf/scarf": false
+  msgpackr-extract: true

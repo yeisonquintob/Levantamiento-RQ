@@ -1,5 +1,4 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 import { loadEnvironmentFiles } from "@levantamiento-rq/shared-config";
 import {
@@ -11,7 +10,10 @@ loadEnvironmentFiles({
   paths: [".env", "apps/documents-service/.env"],
 });
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const currentDirectory = resolve(
+  process.cwd(),
+  "apps/documents-service/src/database",
+);
 
 const config = loadSqlServerDatabaseConfig({
   serviceName: "documents-service",

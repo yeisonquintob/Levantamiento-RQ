@@ -17,6 +17,10 @@ async function main(): Promise<void> {
     defaultDatabaseName: "RqProjectsDb",
   });
 
+  if (!config.enabled) {
+    throw new Error("DATABASE_ENABLED debe ser true.");
+  }
+
   if (config.databaseName !== "RqProjectsDb") {
     throw new Error("Solo se permite eliminar RqProjectsDb.");
   }

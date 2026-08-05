@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "Levantamiento-RQ-backups"]
+}

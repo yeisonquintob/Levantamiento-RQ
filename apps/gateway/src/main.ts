@@ -31,7 +31,7 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
-  await app.register(fastifyMultipart, {
+  await app.register(fastifyMultipart as never, {
     limits: {
       files: config.sourcesMaxFilesPerUpload,
       fileSize: config.sourcesMaxFileBytes,

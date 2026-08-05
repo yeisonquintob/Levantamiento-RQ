@@ -17,6 +17,10 @@ async function main(): Promise<void> {
     defaultDatabaseName: "RqDocumentsDb",
   });
 
+  if (!config.enabled) {
+    throw new Error("DATABASE_ENABLED debe ser true.");
+  }
+
   if (config.databaseName !== "RqDocumentsDb") {
     throw new Error("Solo se permite eliminar RqDocumentsDb.");
   }
@@ -75,4 +79,3 @@ void main().catch((error: unknown) => {
   console.error(`No se pudo eliminar RqDocumentsDb: ${message}`);
   process.exitCode = 1;
 });
-

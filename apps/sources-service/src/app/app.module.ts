@@ -11,6 +11,9 @@ import { AppService } from "./app.service";
 import { SourceBlobStorage } from "../sources/source-blob-storage.service";
 import { SourceEntity } from "../sources/entities";
 import { SourceExtractionService } from "../sources/source-extraction.service";
+import { SourceProcessingQueue } from "../sources/source-processing.queue";
+import { SourceProcessingService } from "../sources/source-processing.service";
+import { SourceProcessingWorker } from "../sources/source-processing.worker";
 import { ProjectsAccessClient } from "../sources/projects-access.client";
 import {
   loadSourcesAuthConfig,
@@ -23,6 +26,10 @@ import {
   loadSourcesStorageConfig,
   SOURCES_STORAGE_CONFIG,
 } from "../sources/sources-storage.config";
+import {
+  loadSourcesProcessingConfig,
+  SOURCES_PROCESSING_CONFIG,
+} from "../sources/sources-processing.config";
 
 const databaseConfig = loadSqlServerDatabaseConfig({
   serviceName: "sources-service",
@@ -57,10 +64,17 @@ const sourceEntities = [SourceEntity];
             provide: SOURCES_STORAGE_CONFIG,
             useFactory: loadSourcesStorageConfig,
           },
+          {
+            provide: SOURCES_PROCESSING_CONFIG,
+            useFactory: loadSourcesProcessingConfig,
+          },
           SourcesAccessTokenGuard,
           ProjectsAccessClient,
           SourceBlobStorage,
           SourceExtractionService,
+          SourceProcessingQueue,
+          SourceProcessingService,
+          SourceProcessingWorker,
           SourcesService,
         ]
       : []),

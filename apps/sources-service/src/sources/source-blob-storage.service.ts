@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
   BlobServiceClient,
+  type BlobGetPropertiesResponse,
   type ContainerClient,
 } from "@azure/storage-blob";
 
@@ -55,7 +56,7 @@ export class SourceBlobStorage {
 
     const client = this.container.getBlockBlobClient(blobPath);
 
-    await client.uploadData(buffer, {
+    await client.upload(buffer, buffer.length, {
       blobHTTPHeaders: {
         blobContentType: mediaType,
       },
@@ -76,6 +77,14 @@ export class SourceBlobStorage {
     return client.downloadToBuffer();
   }
 
+  exists(blobPath: string): Promise<boolean> {
+    return this.container.getBlobClient(blobPath).exists();
+  }
+
+  getProperties(blobPath: string): Promise<BlobGetPropertiesResponse> {
+    return this.container.getBlobClient(blobPath).getProperties();
+  }
+
   async deleteIfExists(blobPath: string): Promise<void> {
     const client = this.container.getBlobClient(blobPath);
     await client.deleteIfExists();
@@ -87,7 +96,9 @@ export class SourceBlobStorage {
     const probe = `_health/${Date.now()}-${process.pid}.txt`;
     const client = this.container.getBlockBlobClient(probe);
 
-    await client.uploadData(Buffer.from("ok", "utf8"), {
+    const content = Buffer.from("ok", "utf8");
+
+    await client.upload(content, content.length, {
       blobHTTPHeaders: {
         blobContentType: "text/plain; charset=utf-8",
       },
