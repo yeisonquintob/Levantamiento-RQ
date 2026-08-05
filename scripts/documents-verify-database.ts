@@ -44,13 +44,51 @@ async function main(): Promise<void> {
         AND name = 'UQ_DocumentTemplates_Code_Version'
         AND is_unique = 1
     `);
+    const domainMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'CreateRequirementDocumentsDomain1786233600000'
+    `);
+    const domainTables = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.tables
+      WHERE schema_id = SCHEMA_ID('dbo')
+        AND name IN (
+          'AppliedDocumentTemplates',
+          'RequirementDocuments',
+          'DocumentVersions',
+          'DocumentSections',
+          'DocumentFields',
+          'DocumentRequirements',
+          'AcceptanceCriteria',
+          'DocumentEvidence',
+          'DocumentHistory'
+        )
+    `);
+    const versionUniqueIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE object_id = OBJECT_ID('dbo.DocumentVersions')
+        AND name = 'UQ_DocumentVersions_DocumentId_Number'
+        AND is_unique = 1
+    `);
+    const crossDatabaseForeignKeys = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.foreign_keys
+      WHERE name LIKE 'FK_%Projects%'
+         OR name LIKE 'FK_%Sources%'
+    `);
 
     if (
       templatesTable !== 1 ||
       migration !== 1 ||
       publishedTemplates < 4 ||
       canonicalDefinitions < 4 ||
-      uniqueIndex !== 1
+      uniqueIndex !== 1 ||
+      domainMigration !== 1 ||
+      domainTables !== 9 ||
+      versionUniqueIndex !== 1 ||
+      crossDatabaseForeignKeys !== 0
     ) {
       throw new Error(
         "RqDocumentsDb no contiene el catálogo completo del Paso 14.",
@@ -67,6 +105,11 @@ async function main(): Promise<void> {
     console.log(
       "Migración confirmada: CreateDocumentTemplateCatalog1785974400000",
     );
+    console.log("Tablas del dominio documental confirmadas: 9");
+    console.log(
+      "Migración confirmada: CreateRequirementDocumentsDomain1786233600000",
+    );
+    console.log("Versionado único y autonomía de base de datos confirmados.");
   } finally {
     await dataSource.destroy();
   }

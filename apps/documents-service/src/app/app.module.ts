@@ -8,6 +8,21 @@ import {
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import {
+  AcceptanceCriterionEntity,
+  AppliedDocumentTemplateEntity,
+  DocumentEvidenceEntity,
+  DocumentFieldEntity,
+  DocumentHistoryEntity,
+  DocumentRequirementEntity,
+  DocumentSectionEntity,
+  DocumentVersionEntity,
+  RequirementDocumentEntity,
+} from "../documents/entities";
+import { DocumentsController } from "../documents/documents.controller";
+import { DocumentsService } from "../documents/documents.service";
+import { DocumentsProjectsAccessClient } from "../documents/projects-access.client";
+import { DocumentsSourcesAccessClient } from "../documents/sources-access.client";
 import { DocumentTemplateEntity } from "../templates/entities";
 import {
   DOCUMENTS_AUTH_CONFIG,
@@ -22,7 +37,18 @@ const databaseConfig = loadSqlServerDatabaseConfig({
   defaultDatabaseName: "RqDocumentsDb",
 });
 
-const documentEntities = [DocumentTemplateEntity];
+const documentEntities = [
+  DocumentTemplateEntity,
+  AppliedDocumentTemplateEntity,
+  RequirementDocumentEntity,
+  DocumentVersionEntity,
+  DocumentSectionEntity,
+  DocumentFieldEntity,
+  DocumentRequirementEntity,
+  AcceptanceCriterionEntity,
+  DocumentEvidenceEntity,
+  DocumentHistoryEntity,
+];
 
 @Module({
   imports: [
@@ -37,7 +63,7 @@ const documentEntities = [DocumentTemplateEntity];
   controllers: [
     AppController,
     ...(databaseConfig.enabled
-      ? [DocumentTemplatesController]
+      ? [DocumentTemplatesController, DocumentsController]
       : []),
   ],
   providers: [
@@ -50,6 +76,9 @@ const documentEntities = [DocumentTemplateEntity];
           },
           DocumentsAccessTokenGuard,
           DocumentTemplatesService,
+          DocumentsProjectsAccessClient,
+          DocumentsSourcesAccessClient,
+          DocumentsService,
         ]
       : []),
   ],

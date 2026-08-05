@@ -1,5 +1,6 @@
 export * from "./lib/auth.js";
 export * from "./lib/document-templates.js";
+export * from "./lib/documents.js";
 export * from "./lib/health.js";
 export * from "./lib/identifiers.js";
 export * from "./lib/integration-event.js";

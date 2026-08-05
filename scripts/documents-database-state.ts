@@ -10,6 +10,7 @@ loadEnvironmentFiles({
 interface State {
   databaseExists: boolean;
   migrationExists: boolean;
+  documentsDomainMigrationExists: boolean;
 }
 
 function options(
@@ -75,6 +76,7 @@ async function main(): Promise<void> {
   }
 
   let migrationExists = false;
+  let documentsDomainMigrationExists = false;
 
   if (databaseExists) {
     const projectDatabase = new DataSource(options(config.databaseName));
@@ -91,12 +93,23 @@ async function main(): Promise<void> {
       `)) as Array<{ migrationCount: number | string }>;
 
       migrationExists = Number(rows[0]?.migrationCount ?? 0) > 0;
+      const domainRows = (await projectDatabase.query(`
+        SELECT COUNT(1) AS migrationCount
+        FROM dbo.migrations
+        WHERE name = 'CreateRequirementDocumentsDomain1786233600000';
+      `)) as Array<{ migrationCount: number | string }>;
+      documentsDomainMigrationExists =
+        Number(domainRows[0]?.migrationCount ?? 0) > 0;
     } finally {
       await projectDatabase.destroy();
     }
   }
 
-  const state: State = { databaseExists, migrationExists };
+  const state: State = {
+    databaseExists,
+    migrationExists,
+    documentsDomainMigrationExists,
+  };
   console.log(JSON.stringify(state));
 }
 

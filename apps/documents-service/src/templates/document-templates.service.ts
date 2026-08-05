@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import type { SelectQueryBuilder } from "typeorm";
 import { Repository } from "typeorm";
@@ -531,6 +532,7 @@ export class DocumentTemplatesService {
 
     const now = new Date();
     const entity = this.templates.create({
+      id: randomUUID(),
       code: request.code,
       name: request.name,
       description: request.description ?? null,
@@ -699,6 +701,7 @@ export class DocumentTemplatesService {
 
     const now = new Date();
     const entity = this.templates.create({
+      id: randomUUID(),
       code: source.code,
       name: request.name ?? source.name,
       description:

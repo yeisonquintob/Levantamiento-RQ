@@ -11,6 +11,8 @@ import { SourcesClientService } from "../sources/sources-client.service";
 import { SourcesGatewayController } from "../sources/sources-gateway.controller";
 import { UsersClientService } from "../users/users-client.service";
 import { UsersGatewayController } from "../users/users-gateway.controller";
+import { DocumentsClientService } from "../documents/documents-client.service";
+import { DocumentsGatewayController } from "../documents/documents-gateway.controller";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -22,6 +24,7 @@ import { AppService } from "./app.service";
     SourcesGatewayController,
     DocumentTemplatesGatewayController,
     UsersGatewayController,
+    DocumentsGatewayController,
   ],
   providers: [
     {
@@ -34,6 +37,7 @@ import { AppService } from "./app.service";
     SourcesClientService,
     DocumentTemplatesClientService,
     UsersClientService,
+    DocumentsClientService,
   ],
 })
 export class AppModule {}

@@ -112,6 +112,7 @@ export class SourcesService {
 
     const now = new Date();
     const source = this.sources.create({
+      id: randomUUID(),
       projectId,
       sourceType: request.sourceType,
       title: request.title,

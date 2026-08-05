@@ -383,6 +383,7 @@ export class ProjectsService {
     }
 
     const participant = this.participants.create({
+      id: randomUUID(),
       projectId: project.id,
       userId: request.userId,
       role: request.role,

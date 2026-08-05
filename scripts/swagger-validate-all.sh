@@ -72,14 +72,12 @@ for entry in "${SERVICES[@]}"; do
   json_file="$TMP_DIR/$service.json"
   CURRENT_PORT="$port"
 
-  NX_DAEMON=false pnpm exec nx reset >/dev/null
-
   nohup env \
     NODE_ENV=development \
     NX_DAEMON=false \
     NX_INTERACTIVE=false \
     NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-    pnpm exec nx serve "$service" \
+    pnpm exec nx serve "$service" --skip-nx-cache \
     > "$log_file" 2>&1 &
 
   CURRENT_PID=$!
@@ -148,6 +146,21 @@ if service in {"gateway", "projects-service"}:
         "/api/v1/projects",
         "/api/v1/projects/summary",
         "/api/v1/projects/{projectId}",
+    ):
+        if route not in paths:
+            raise SystemExit(f"{service}: falta {route}.")
+
+if service in {"gateway", "documents-service"}:
+    for route in (
+        "/api/v1/projects/{projectId}/documents",
+        "/api/v1/documents/{documentId}",
+        "/api/v1/documents/{documentId}/versions",
+        "/api/v1/documents/{documentId}/versions/{versionNumber}",
+        "/api/v1/documents/{documentId}/versions/{versionNumber}/sections/{sectionKey}",
+        "/api/v1/documents/{documentId}/versions/{versionNumber}/fields",
+        "/api/v1/documents/{documentId}/history",
+        "/api/v1/documents/{documentId}/template",
+        "/api/v1/documents/{documentId}/archive",
     ):
         if route not in paths:
             raise SystemExit(f"{service}: falta {route}.")

@@ -11,6 +11,7 @@ required_files=(
   "$ROOT/apps/identity-service/.env"
   "$ROOT/apps/projects-service/.env"
   "$ROOT/apps/sources-service/.env"
+  "$ROOT/apps/documents-service/.env"
   "$ROOT/apps/gateway/.env"
   "$ROOT/apps/web/.env.local"
 )
@@ -28,7 +29,7 @@ cd "$ROOT"
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-for port in 3000 3001 3002 3003 4200; do
+for port in 3000 3001 3002 3003 3004 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
     exit 1
@@ -59,7 +60,7 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve identity-service \
+  pnpm exec nx serve identity-service --skip-nx-cache \
   > "$LOG_DIR/identity-service.log" 2>&1 &
 echo $! > "$PID_DIR/identity-service.pid"
 
@@ -72,7 +73,7 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve projects-service \
+  pnpm exec nx serve projects-service --skip-nx-cache \
   > "$LOG_DIR/projects-service.log" 2>&1 &
 echo $! > "$PID_DIR/projects-service.pid"
 
@@ -85,7 +86,7 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve sources-service \
+  pnpm exec nx serve sources-service --skip-nx-cache \
   > "$LOG_DIR/sources-service.log" 2>&1 &
 echo $! > "$PID_DIR/sources-service.pid"
 
@@ -98,7 +99,20 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx serve gateway \
+  pnpm exec nx serve documents-service --skip-nx-cache \
+  > "$LOG_DIR/documents-service.log" 2>&1 &
+echo $! > "$PID_DIR/documents-service.pid"
+
+wait_for_url \
+  "Documents Service" \
+  "http://127.0.0.1:3004/api/v1/health" \
+  "$LOG_DIR/documents-service.log"
+
+nohup env \
+  NX_DAEMON=false \
+  NX_INTERACTIVE=false \
+  NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+  pnpm exec nx serve gateway --skip-nx-cache \
   > "$LOG_DIR/gateway.log" 2>&1 &
 echo $! > "$PID_DIR/gateway.pid"
 
@@ -111,7 +125,7 @@ nohup env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx dev web --port=4200 \
+  pnpm exec nx dev web --port=4200 --skip-nx-cache \
   > "$LOG_DIR/web.log" 2>&1 &
 echo $! > "$PID_DIR/web.pid"
 
@@ -128,6 +142,7 @@ echo "  Gateway:   http://127.0.0.1:3000/api/v1/health"
 echo "  Identity:  http://127.0.0.1:3001/api/v1/health"
 echo "  Projects:  http://127.0.0.1:3002/api/v1/health"
 echo "  Sources:   http://127.0.0.1:3003/api/v1/health"
+echo "  Documents: http://127.0.0.1:3004/api/v1/health"
 echo
 echo "Detener:"
 echo "  pnpm auth:local:down"

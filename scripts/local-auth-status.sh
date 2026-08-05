@@ -20,5 +20,6 @@ check() {
 check "Identity Service" 3001 "http://127.0.0.1:3001/api/v1/health"
 check "Projects Service" 3002 "http://127.0.0.1:3002/api/v1/health"
 check "Sources Service" 3003 "http://127.0.0.1:3003/api/v1/health"
+check "Documents Service" 3004 "http://127.0.0.1:3004/api/v1/health"
 check "Gateway" 3000 "http://127.0.0.1:3000/api/v1/health"
 check "Frontend" 4200 "http://127.0.0.1:4200/sign-in"

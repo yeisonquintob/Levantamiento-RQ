@@ -6,6 +6,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { jwtVerify } from "jose";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
@@ -95,6 +96,11 @@ export class DocumentsAccessTokenGuard implements CanActivate {
         permissions: requiredStringArray(result.payload.permissions),
         mustChangePassword,
       } satisfies AuthenticatedUser;
+      request.accessToken = token;
+      const correlation = request.headers["x-correlation-id"];
+      request.correlationId =
+        (Array.isArray(correlation) ? correlation[0] : correlation)?.trim() ||
+        randomUUID();
 
       return true;
     } catch (error) {
