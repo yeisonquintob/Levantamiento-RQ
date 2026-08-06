@@ -1,3 +1,4 @@
+export * from "./lib/ai-analysis.js";
 export * from "./lib/auth.js";
 export * from "./lib/document-templates.js";
 export * from "./lib/documents.js";
