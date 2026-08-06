@@ -7,6 +7,8 @@
     "ai:db:verify": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-verify-database.ts",
     "ai:migration:revert": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-revert-migration.ts",
     "ai:migration:run": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-run-migrations.ts",
+    "ai:requests:smoke": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-analysis-requests-smoke.ts",
+    "ai:requests:smoke:twice": "bash scripts/ai-analysis-requests-smoke-twice.sh",
     "auth:local:down": "bash scripts/local-auth-down.sh",
     "auth:local:status": "bash scripts/local-auth-status.sh",
     "auth:local:up": "bash scripts/local-auth-up.sh",

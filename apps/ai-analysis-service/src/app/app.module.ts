@@ -11,12 +11,16 @@ import {
   loadAiAnalysisAuthConfig,
 } from "../analysis/ai-analysis-auth.config";
 import { AiAnalysisAccessTokenGuard } from "../analysis/ai-analysis-access-token.guard";
+import { AiAnalysisController } from "../analysis/ai-analysis.controller";
+import { AiAnalysisService } from "../analysis/ai-analysis.service";
+import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
 import {
   AnalysisExecutionEntity,
   AnalysisRequestEntity,
   AnalysisRequestSourceEntity,
 } from "../analysis/entities";
 import { AiAnalysisProjectsAccessClient } from "../analysis/projects-access.client";
+import { AiAnalysisSourcesAccessClient } from "../analysis/sources-access.client";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -41,7 +45,10 @@ const aiAnalysisEntities = [
       ? [TypeOrmModule.forFeature(aiAnalysisEntities)]
       : []),
   ],
-  controllers: [AppController],
+  controllers: [
+    AppController,
+    ...(databaseConfig.enabled ? [AiAnalysisController] : []),
+  ],
   providers: [
     AppService,
     ...(databaseConfig.enabled
@@ -52,6 +59,9 @@ const aiAnalysisEntities = [
           },
           AiAnalysisAccessTokenGuard,
           AiAnalysisProjectsAccessClient,
+          AiAnalysisDocumentsAccessClient,
+          AiAnalysisSourcesAccessClient,
+          AiAnalysisService,
         ]
       : []),
   ],

@@ -91,7 +91,7 @@ test("TypeORM registra las tres entidades solo con persistencia habilitada", asy
   );
 });
 
-test("el subpaso no conecta OpenAI ni crea lógica de análisis", async () => {
+test("la API funcional sigue sin conectar un proveedor de IA", async () => {
   const packageFile = await readFile(
     "apps/ai-analysis-service/package.json",
     "utf8",
@@ -102,5 +102,9 @@ test("el subpaso no conecta OpenAI ni crea lógica de análisis", async () => {
   );
 
   assert.doesNotMatch(packageFile, /"openai"/i);
-  assert.doesNotMatch(moduleFile, /OpenAI|AiProvider|AnalysisController/);
+  assert.match(moduleFile, /AiAnalysisController/);
+  assert.doesNotMatch(
+    moduleFile,
+    /OpenAI|ChatCompletion|AzureOpenAI|Responses API/,
+  );
 });

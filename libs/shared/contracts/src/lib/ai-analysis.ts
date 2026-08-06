@@ -61,7 +61,7 @@ export interface AiAnalysisExecutionDetail {
   createdAt: string;
 }
 
-export interface AiAnalysisRequestDetail {
+export interface AiAnalysisRequestSummary {
   id: string;
   projectId: string;
   documentId: string;
@@ -69,9 +69,23 @@ export interface AiAnalysisRequestDetail {
   analysisType: AiAnalysisType;
   status: AiAnalysisStatus;
   requestedByUserId: string;
-  sources: readonly AiAnalysisRequestSourceDetail[];
-  executions: readonly AiAnalysisExecutionDetail[];
+  sourceCount: number;
+  executionCount: number;
   createdAt: string;
   updatedAt: string;
   cancelledAt: string | null;
+}
+
+export interface AiAnalysisRequestDetail
+  extends AiAnalysisRequestSummary {
+  sources: readonly AiAnalysisRequestSourceDetail[];
+  executions: readonly AiAnalysisExecutionDetail[];
+}
+
+export interface AiAnalysisRequestListResponse {
+  items: readonly AiAnalysisRequestSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }

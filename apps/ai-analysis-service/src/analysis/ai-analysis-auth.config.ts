@@ -6,6 +6,10 @@ export interface AiAnalysisAuthConfig {
   accessSecret: string;
   projectsServiceUrl: string;
   projectsTimeoutMs: number;
+  documentsServiceUrl: string;
+  documentsTimeoutMs: number;
+  sourcesServiceUrl: string;
+  sourcesTimeoutMs: number;
 }
 
 function requiredSecret(value: string | undefined, name: string): string {
@@ -60,6 +64,24 @@ export function loadAiAnalysisAuthConfig(
     projectsTimeoutMs: readTimeout(
       environment.PROJECTS_TIMEOUT_MS,
       "PROJECTS_TIMEOUT_MS",
+    ),
+    documentsServiceUrl: readUrl(
+      environment.DOCUMENTS_SERVICE_URL,
+      "http://127.0.0.1:3004",
+      "DOCUMENTS_SERVICE_URL",
+    ),
+    documentsTimeoutMs: readTimeout(
+      environment.DOCUMENTS_TIMEOUT_MS,
+      "DOCUMENTS_TIMEOUT_MS",
+    ),
+    sourcesServiceUrl: readUrl(
+      environment.SOURCES_SERVICE_URL,
+      "http://127.0.0.1:3003",
+      "SOURCES_SERVICE_URL",
+    ),
+    sourcesTimeoutMs: readTimeout(
+      environment.SOURCES_TIMEOUT_MS,
+      "SOURCES_TIMEOUT_MS",
     ),
   };
 }
