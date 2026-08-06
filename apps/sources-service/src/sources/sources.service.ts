@@ -18,6 +18,7 @@ import type {
   SourceClassification,
   SourceDetail,
   SourceFileExtension,
+  SourceProcessingStatus,
   SourceListResponse,
   SourceMetrics,
   SourceSummary,
@@ -456,7 +457,7 @@ export class SourcesService {
   ): Promise<SourceBatchProcessingResponse> {
     await this.projectAccess.requireManage(projectId, accessToken, actor);
 
-    return this.processFiles(actor, projectId, request.sourceIds);
+    return this.processFiles(actor, projectId, request.sourceIds, true);
   }
 
   async processAll(
@@ -481,6 +482,7 @@ export class SourcesService {
       actor,
       projectId,
       eligible.map((source) => source.id),
+      false,
     );
   }
 
@@ -603,6 +605,7 @@ export class SourcesService {
     actor: AuthenticatedUser,
     projectId: string,
     sourceIds: readonly string[],
+    allowReady: boolean,
   ): Promise<SourceBatchProcessingResponse> {
     if (sourceIds.length === 0) {
       return {
@@ -636,7 +639,7 @@ export class SourcesService {
         continue;
       }
 
-      const skipMessage = this.batchSkipMessage(source);
+      const skipMessage = this.batchSkipMessage(source, allowReady);
 
       if (skipMessage) {
         results.push({
@@ -648,17 +651,23 @@ export class SourcesService {
       }
 
       const now = new Date();
+      const isReprocess = source.processingStatus === "READY";
+      const claimableStatuses: readonly SourceProcessingStatus[] = allowReady
+        ? ["PENDING", "FAILED", "READY"]
+        : ["PENDING", "FAILED"];
       const claimed = await this.sources.update(
         {
           id: sourceId,
           projectId,
           sourceType: "FILE",
           status: "ACTIVE",
-          processingStatus: In(["PENDING", "FAILED"]),
+          processingStatus: In(claimableStatuses),
         },
         {
           processingStatus: "PROCESSING",
-          processingMessage: "Procesamiento encolado.",
+          processingMessage: isReprocess
+            ? "Reprocesamiento encolado."
+            : "Procesamiento encolado.",
           processedAt: null,
           updatedByUserId: actor.id,
           updatedAt: now,
@@ -679,7 +688,9 @@ export class SourcesService {
         results.push({
           sourceId,
           status: "ENQUEUED",
-          message: "Archivo encolado para procesamiento.",
+          message: isReprocess
+            ? "Archivo encolado para reprocesamiento."
+            : "Archivo encolado para procesamiento.",
         });
       } catch (error) {
         await this.sources.update(
@@ -713,7 +724,10 @@ export class SourcesService {
     };
   }
 
-  private batchSkipMessage(source: SourceEntity): string | null {
+  private batchSkipMessage(
+    source: SourceEntity,
+    allowReady: boolean,
+  ): string | null {
     if (source.sourceType !== "FILE") {
       return "La fuente no corresponde a un archivo.";
     }
@@ -726,7 +740,7 @@ export class SourcesService {
       return "El archivo ya se está procesando.";
     }
 
-    if (source.processingStatus === "READY") {
+    if (source.processingStatus === "READY" && !allowReady) {
       return "El archivo ya está listo.";
     }
 

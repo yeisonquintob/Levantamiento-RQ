@@ -240,7 +240,7 @@ test("la carga persiste archivos OTHER y PENDING sin encolarlos", async () => {
   );
 });
 
-test("el batch encola solo archivos activos PENDING o FAILED y es idempotente", async () => {
+test("el botón Procesar encola archivos seleccionados PENDING, FAILED o READY", async () => {
   const projectId = "15b9f080-0c27-4e5a-aa30-e2b53f63f834";
   const rows = [
     {
@@ -300,7 +300,7 @@ test("el batch encola solo archivos activos PENDING o FAILED y es idempotente", 
         !row ||
         row.sourceType !== "FILE" ||
         row.status !== "ACTIVE" ||
-        !["PENDING", "FAILED"].includes(row.processingStatus)
+        !["PENDING", "FAILED", "READY"].includes(row.processingStatus)
       ) {
         return { affected: 0 };
       }
@@ -346,7 +346,11 @@ test("el batch encola solo archivos activos PENDING o FAILED y es idempotente", 
     request,
   );
 
-  assert.deepEqual(enqueued, request.sourceIds.slice(0, 2));
+  assert.deepEqual(enqueued, [
+    request.sourceIds[0],
+    request.sourceIds[1],
+    request.sourceIds[3],
+  ]);
   assert.deepEqual(
     {
       requested: first.requested,
@@ -354,7 +358,7 @@ test("el batch encola solo archivos activos PENDING o FAILED y es idempotente", 
       skipped: first.skipped,
       failed: first.failed,
     },
-    { requested: 6, enqueued: 2, skipped: 4, failed: 0 },
+    { requested: 6, enqueued: 3, skipped: 3, failed: 0 },
   );
   assert.equal(second.enqueued, 0);
   assert.equal(second.skipped, 6);
@@ -622,10 +626,11 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
   assert.match(client, />\s*Editar\s*</);
   assert.match(client, />\s*Eliminar\s*</);
   assert.match(client, /data\.append\(\s*"metadata"/);
-  assert.match(client, /Reprocesar/);
+  assert.doesNotMatch(client, /Reprocesar/);
   assert.match(client, /Descargar/);
-  assert.match(client, /"Procesar"/);
-  assert.match(client, /"Procesar todos"/);
+  assert.equal((client.match(/"Procesar"/g) ?? []).length, 1);
+  assert.doesNotMatch(client, /Procesar todos/);
+  assert.match(client, /source\.processingStatus !== "PROCESSING"/);
   assert.match(client, /classification: "OTHER" as const/);
   assert.match(client, /Otro — clasificación predeterminada/);
   assert.match(client, /selectedSourceIds/);

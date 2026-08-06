@@ -113,7 +113,7 @@ interface AlertState {
 }
 
 type CreationMode = "TEXT" | "FILES";
-type BatchProcessingMode = "SELECTED" | "ALL";
+type BatchProcessingMode = "SELECTED";
 
 const EMPTY_FORM: SourceFormState = {
   sourceType: "NOTE",
@@ -327,7 +327,9 @@ export function SourcesWorkspace({
       sources.items
         .filter(
           (source) =>
-            source.sourceType === "FILE" && source.status === "ACTIVE",
+            source.sourceType === "FILE" &&
+            source.status === "ACTIVE" &&
+            source.processingStatus !== "PROCESSING",
         )
         .map((source) => source.id),
     [sources.items],
@@ -687,42 +689,6 @@ export function SourcesWorkspace({
     }
   }
 
-  async function reprocessSource(source: SourceSummary): Promise<void> {
-    setLoading(true);
-
-    try {
-      await requestJson<SourceDetail>(
-        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(source.id)}/reprocess`,
-        {
-          method: "POST",
-        },
-      );
-
-      setAlert({
-        tone: "success",
-        message: "El archivo fue reprocesado.",
-      });
-
-      await loadSources(
-        projectId,
-        search,
-        sourceType,
-        processingStatus,
-        status,
-      );
-    } catch (error) {
-      setAlert({
-        tone: "danger",
-        message:
-          error instanceof Error
-            ? error.message
-            : "No fue posible reprocesar el archivo.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function toggleSourceSelection(sourceId: string): void {
     setSelectedSourceIds((current) => {
       const next = new Set(current);
@@ -751,31 +717,24 @@ export function SourcesWorkspace({
     });
   }
 
-  async function processBatch(mode: BatchProcessingMode): Promise<void> {
-    if (!projectId || batchProcessing) return;
+  async function processBatch(): Promise<void> {
+    if (!projectId || batchProcessing || selectedSourceIds.size === 0) return;
 
     const selectedIds = [...selectedSourceIds];
-
-    if (mode === "SELECTED" && selectedIds.length === 0) return;
-
     const confirmed = window.confirm(
-      mode === "ALL"
-        ? "Se procesarán todos los archivos pendientes o con error del proyecto seleccionado."
-        : `Se procesarán las ${selectedIds.length} fuente(s) seleccionada(s) que estén pendientes o con error.`,
+      `Se procesarán o reprocesarán las ${selectedIds.length} fuente(s) seleccionada(s).`,
     );
 
     if (!confirmed) return;
 
-    setBatchProcessing(mode);
+    setBatchProcessing("SELECTED");
 
     try {
       const result = await requestJson<SourceBatchProcessingResponse>(
-        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${mode === "ALL" ? "process-all" : "process"}`,
+        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process`,
         {
           method: "POST",
-          ...(mode === "SELECTED"
-            ? { body: JSON.stringify({ sourceIds: selectedIds }) }
-            : {}),
+          body: JSON.stringify({ sourceIds: selectedIds }),
         },
       );
       const summary =
@@ -792,10 +751,7 @@ export function SourcesWorkspace({
             : result.enqueued > 0
               ? "success"
               : "information",
-        message:
-          result.requested === 0
-            ? `No hay archivos pendientes o con error. ${summary}`
-            : summary,
+        message: summary,
       });
 
       await loadSources(
@@ -925,19 +881,10 @@ export function SourcesWorkspace({
               batchProcessing !== null ||
               selectedSourceIds.size === 0
             }
-            onClick={() => void processBatch("SELECTED")}
+            onClick={() => void processBatch()}
             tone="operation"
           >
-            {batchProcessing === "SELECTED" ? "Procesando..." : "Procesar"}
-          </RqActionButton>
-          <RqActionButton
-            disabled={loading || batchProcessing !== null || !projectId}
-            onClick={() => void processBatch("ALL")}
-            tone="consult"
-          >
-            {batchProcessing === "ALL"
-              ? "Procesando todos..."
-              : "Procesar todos"}
+            {batchProcessing ? "Procesando..." : "Procesar"}
           </RqActionButton>
           <RqActionButton
             disabled={loading || batchProcessing !== null || !projectId}
@@ -1147,7 +1094,8 @@ export function SourcesWorkspace({
                 <tr key={source.id}>
                   <td>
                     {source.sourceType === "FILE" &&
-                    source.status === "ACTIVE" ? (
+                    source.status === "ACTIVE" &&
+                    source.processingStatus !== "PROCESSING" ? (
                       <input
                         aria-label={`Seleccionar ${source.title}`}
                         checked={selectedSourceIds.has(source.id)}
@@ -1199,24 +1147,14 @@ export function SourcesWorkspace({
                         Editar
                       </RqActionButton>
                       {source.sourceType === "FILE" ? (
-                        <>
-                          <RqActionButton
-                            compact
-                            disabled={loading}
-                            onClick={() => void downloadSource(source)}
-                            tone="consult"
-                          >
-                            Descargar
-                          </RqActionButton>
-                          <RqActionButton
-                            compact
-                            disabled={loading}
-                            onClick={() => void reprocessSource(source)}
-                            tone="secondary"
-                          >
-                            Reprocesar
-                          </RqActionButton>
-                        </>
+                        <RqActionButton
+                          compact
+                          disabled={loading}
+                          onClick={() => void downloadSource(source)}
+                          tone="consult"
+                        >
+                          Descargar
+                        </RqActionButton>
                       ) : null}
                       {source.status === "ACTIVE" ? (
                         <RqActionButton
@@ -1566,22 +1504,13 @@ export function SourcesWorkspace({
 
               <footer className="rq-project-modal__actions">
                 {fileDetail ? (
-                  <>
-                    <RqActionButton
-                      disabled={saving}
-                      onClick={() => void downloadSource(fileDetail)}
-                      tone="consult"
-                    >
-                      Descargar
-                    </RqActionButton>
-                    <RqActionButton
-                      disabled={saving}
-                      onClick={() => void reprocessSource(fileDetail)}
-                      tone="secondary"
-                    >
-                      Reprocesar
-                    </RqActionButton>
-                  </>
+                  <RqActionButton
+                    disabled={saving}
+                    onClick={() => void downloadSource(fileDetail)}
+                    tone="consult"
+                  >
+                    Descargar
+                  </RqActionButton>
                 ) : null}
                 <RqActionButton
                   disabled={saving}
