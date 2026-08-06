@@ -16,6 +16,15 @@ export const AI_PROVIDER_CODES = ["DISABLED"] as const;
 
 export type AiProviderCode = (typeof AI_PROVIDER_CODES)[number];
 
+export const AI_ANALYSIS_PROJECT_ACTIONS = [
+  "READ",
+  "CREATE",
+  "CANCEL",
+] as const;
+
+export type AiAnalysisProjectAction =
+  (typeof AI_ANALYSIS_PROJECT_ACTIONS)[number];
+
 export interface CreateAiAnalysisRequest {
   analysisType?: AiAnalysisType;
   documentId: string;

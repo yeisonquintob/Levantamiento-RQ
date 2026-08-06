@@ -38,7 +38,19 @@ async function bootstrap(): Promise<void> {
       .setTitle("Levantamiento RQ - AI Analysis Service API")
       .setDescription("Análisis asistido por inteligencia artificial.")
       .setVersion("1.0.0")
+      .addBearerAuth(
+        {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+        "access-token",
+      )
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag(
+        "analysis",
+        "Solicitudes de análisis protegidas por JWT y acceso al proyecto",
+      )
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
