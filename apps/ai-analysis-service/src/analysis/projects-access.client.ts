@@ -39,6 +39,10 @@ function canManageAnalysis(
   return role === "ADMIN" || role === "OWNER" || role === "EDITOR";
 }
 
+function sameUuid(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase();
+}
+
 @Injectable()
 export class AiAnalysisProjectsAccessClient {
   constructor(
@@ -132,7 +136,7 @@ export class AiAnalysisProjectsAccessClient {
     const role = administrator
       ? "ADMIN"
       : project.participants.find(
-          (participant) => participant.userId === actor.id,
+          (participant) => sameUuid(participant.userId, actor.id),
         )?.role;
 
     if (!role) {

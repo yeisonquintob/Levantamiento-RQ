@@ -191,7 +191,7 @@ test("el guard rechaza ausencia de token y contraseña temporal", async () => {
 
 test("la matriz permite leer a participantes y administrar a owner/editor", async () => {
   const originalFetch = globalThis.fetch;
-  const owner = actor("44444444-4444-4444-8444-444444444444");
+  const owner = actor("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   const viewer = actor("55555555-5555-4555-8555-555555555555");
   let receivedCorrelation = "";
 
@@ -202,7 +202,7 @@ test("la matriz permite leer a participantes y administrar a owner/editor", asyn
     return new Response(
       JSON.stringify(
         projectPayload([
-          { userId: owner.id, role: "OWNER" },
+          { userId: owner.id.toUpperCase(), role: "OWNER" },
           { userId: viewer.id, role: "VIEWER" },
         ]),
       ),
