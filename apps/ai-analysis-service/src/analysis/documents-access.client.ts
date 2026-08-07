@@ -13,6 +13,16 @@ import {
   type AiAnalysisAuthConfig,
 } from "./ai-analysis-auth.config";
 
+function sameUuid(
+  left: string | null | undefined,
+  right: string,
+): boolean {
+  return (
+    typeof left === "string" &&
+    left.toLowerCase() === right.toLowerCase()
+  );
+}
+
 @Injectable()
 export class AiAnalysisDocumentsAccessClient {
   constructor(
@@ -58,7 +68,7 @@ export class AiAnalysisDocumentsAccessClient {
 
     const document = payload as RequirementDocumentDetail;
 
-    if (document.projectId !== projectId) {
+    if (!sameUuid(document.projectId, projectId)) {
       throw new ConflictException(
         "El documento no pertenece al proyecto solicitado.",
       );
@@ -70,7 +80,12 @@ export class AiAnalysisDocumentsAccessClient {
       );
     }
 
-    if (document.currentVersionDetail?.id !== documentVersionId) {
+    if (
+      !sameUuid(
+        document.currentVersionDetail?.id,
+        documentVersionId,
+      )
+    ) {
       throw new ConflictException(
         "Solo se puede analizar la versión actual del documento.",
       );

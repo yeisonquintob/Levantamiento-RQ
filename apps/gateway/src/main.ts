@@ -57,7 +57,7 @@ async function bootstrap(): Promise<void> {
     const openApiConfig = new DocumentBuilder()
       .setTitle("Levantamiento RQ - Gateway API")
       .setDescription(
-        "Punto de entrada del frontend para identidad, proyectos y fuentes.",
+        "Punto de entrada del frontend para identidad, proyectos, fuentes, documentos y análisis.",
       )
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
@@ -70,6 +70,10 @@ async function bootstrap(): Promise<void> {
       .addTag(
         "templates",
         "Catálogo de plantillas documentales versionadas",
+      )
+      .addTag(
+        "analysis",
+        "Solicitudes controladas de análisis de requerimientos",
       )
       .addCookieAuth("rq_access")
       .addCookieAuth("rq_refresh")
@@ -111,6 +115,7 @@ async function bootstrap(): Promise<void> {
       projectsServiceUrl: config.projectsServiceUrl,
       sourcesServiceUrl: config.sourcesServiceUrl,
       documentsServiceUrl: config.documentsServiceUrl,
+      aiAnalysisServiceUrl: config.aiAnalysisServiceUrl,
       webOrigin: config.webOrigin,
     },
   });

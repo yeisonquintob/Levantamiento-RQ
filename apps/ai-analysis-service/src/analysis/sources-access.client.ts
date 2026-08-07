@@ -13,6 +13,16 @@ import {
   type AiAnalysisAuthConfig,
 } from "./ai-analysis-auth.config";
 
+function sameUuid(
+  left: string | null | undefined,
+  right: string,
+): boolean {
+  return (
+    typeof left === "string" &&
+    left.toLowerCase() === right.toLowerCase()
+  );
+}
+
 @Injectable()
 export class AiAnalysisSourcesAccessClient {
   constructor(
@@ -75,7 +85,7 @@ export class AiAnalysisSourcesAccessClient {
 
     const source = payload as SourceDetail;
 
-    if (source.projectId !== projectId) {
+    if (!sameUuid(source.projectId, projectId)) {
       throw new ConflictException(
         `La fuente ${sourceId} no pertenece al proyecto solicitado.`,
       );

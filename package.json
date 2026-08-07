@@ -5,6 +5,8 @@
   "scripts": {
     "ai:db:ensure": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-ensure-database.ts",
     "ai:db:verify": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-verify-database.ts",
+    "ai:gateway:e2e": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-analysis-gateway-e2e.ts",
+    "ai:gateway:e2e:twice": "bash scripts/ai-analysis-gateway-e2e-twice.sh",
     "ai:migration:revert": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-revert-migration.ts",
     "ai:migration:run": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-run-migrations.ts",
     "ai:requests:smoke": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-analysis-requests-smoke.ts",
@@ -45,6 +47,7 @@
     "projects:migration:revert": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-revert-migration.ts",
     "projects:migration:run": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-run-migrations.ts",
     "projects:smoke": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-smoke-test.ts",
+    "serve:ai-analysis": "nx serve ai-analysis-service",
     "serve:documents": "nx serve documents-service",
     "serve:gateway": "nx serve gateway",
     "serve:identity": "nx serve identity-service",

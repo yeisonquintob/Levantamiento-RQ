@@ -13,12 +13,10 @@ import {
 import { AiAnalysisAccessTokenGuard } from "../analysis/ai-analysis-access-token.guard";
 import { AiAnalysisController } from "../analysis/ai-analysis.controller";
 import { AiAnalysisService } from "../analysis/ai-analysis.service";
+import { AnalysisExecutionEntity } from "../analysis/analysis-execution.entity";
+import { AnalysisRequestSourceEntity } from "../analysis/analysis-request-source.entity";
+import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
 import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
-import {
-  AnalysisExecutionEntity,
-  AnalysisRequestEntity,
-  AnalysisRequestSourceEntity,
-} from "../analysis/entities";
 import { AiAnalysisProjectsAccessClient } from "../analysis/projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "../analysis/sources-access.client";
 import { AppController } from "./app.controller";

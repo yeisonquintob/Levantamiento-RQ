@@ -12,11 +12,13 @@ export interface GatewayConfig extends BaseServiceConfig {
   projectsServiceUrl: string;
   sourcesServiceUrl: string;
   documentsServiceUrl: string;
+  aiAnalysisServiceUrl: string;
   webOrigin: string;
   identityTimeoutMs: number;
   projectsTimeoutMs: number;
   sourcesTimeoutMs: number;
   documentsTimeoutMs: number;
+  aiAnalysisTimeoutMs: number;
   sourcesUploadTimeoutMs: number;
   sourcesMaxFileBytes: number;
   sourcesMaxFilesPerUpload: number;
@@ -147,6 +149,11 @@ export function loadGatewayConfig(
       "http://127.0.0.1:3004",
       "DOCUMENTS_SERVICE_URL",
     ),
+    aiAnalysisServiceUrl: readUrl(
+      environment.AI_ANALYSIS_SERVICE_URL,
+      "http://127.0.0.1:3005",
+      "AI_ANALYSIS_SERVICE_URL",
+    ),
     webOrigin: readUrl(
       environment.WEB_ORIGIN,
       "http://127.0.0.1:4200",
@@ -179,6 +186,13 @@ export function loadGatewayConfig(
       500,
       30000,
       "DOCUMENTS_TIMEOUT_MS",
+    ),
+    aiAnalysisTimeoutMs: readInteger(
+      environment.AI_ANALYSIS_TIMEOUT_MS,
+      15000,
+      500,
+      60000,
+      "AI_ANALYSIS_TIMEOUT_MS",
     ),
     sourcesUploadTimeoutMs: readInteger(
       environment.SOURCES_UPLOAD_TIMEOUT_MS,

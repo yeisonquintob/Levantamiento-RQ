@@ -12,6 +12,7 @@ required_files=(
   "$ROOT/apps/projects-service/.env"
   "$ROOT/apps/sources-service/.env"
   "$ROOT/apps/documents-service/.env"
+  "$ROOT/apps/ai-analysis-service/.env"
   "$ROOT/apps/gateway/.env"
   "$ROOT/apps/web/.env.local"
 )
@@ -26,10 +27,9 @@ done
 bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
 
 cd "$ROOT"
-
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-for port in 3000 3001 3002 3003 3004 4200; do
+for port in 3000 3001 3002 3003 3004 3005 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
     exit 1
@@ -42,10 +42,11 @@ env \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   pnpm exec nx run-many \
     --target=build \
-    --projects=identity-service,projects-service,sources-service,documents-service,gateway \
+    --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,gateway \
     --configuration=development \
     --skip-nx-cache \
   > "$LOG_DIR/local-services-build.log" 2>&1
+
 echo "✓ Servicios locales compilados."
 
 wait_for_url() {
@@ -58,12 +59,13 @@ wait_for_url() {
       echo "✓ $name disponible."
       return 0
     fi
+
     sleep 1
   done
 
   echo "ERROR: $name no respondió."
   echo "Log: $log_file"
-  tail -n 40 "$log_file" || true
+  tail -n 60 "$log_file" || true
   bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
   exit 1
 }
@@ -118,6 +120,16 @@ wait_for_url \
   "$LOG_DIR/documents-service.log"
 
 NODE_ENV=development start_detached \
+  "$PID_DIR/ai-analysis-service.pid" \
+  "$LOG_DIR/ai-analysis-service.log" \
+  node "$ROOT/apps/ai-analysis-service/dist/main.js"
+
+wait_for_url \
+  "AI Analysis Service" \
+  "http://127.0.0.1:3005/api/v1/health" \
+  "$LOG_DIR/ai-analysis-service.log"
+
+NODE_ENV=development start_detached \
   "$PID_DIR/gateway.pid" \
   "$LOG_DIR/gateway.log" \
   node "$ROOT/apps/gateway/dist/main.js"
@@ -133,6 +145,7 @@ env \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   pnpm exec nx build shared-ui --skip-nx-cache \
   > "$LOG_DIR/shared-ui-build.log" 2>&1
+
 echo "✓ Shared UI preparada."
 
 env \
@@ -151,13 +164,14 @@ wait_for_url \
 
 echo
 echo "Servicios ejecutándose:"
-echo "  Acceso:    http://127.0.0.1:4200/sign-in"
-echo "  Workspace: http://127.0.0.1:4200/workspace"
-echo "  Gateway:   http://127.0.0.1:3000/api/v1/health"
-echo "  Identity:  http://127.0.0.1:3001/api/v1/health"
-echo "  Projects:  http://127.0.0.1:3002/api/v1/health"
-echo "  Sources:   http://127.0.0.1:3003/api/v1/health"
-echo "  Documents: http://127.0.0.1:3004/api/v1/health"
+echo "  Acceso:      http://127.0.0.1:4200/sign-in"
+echo "  Workspace:   http://127.0.0.1:4200/workspace"
+echo "  Gateway:     http://127.0.0.1:3000/api/v1/health"
+echo "  Identity:    http://127.0.0.1:3001/api/v1/health"
+echo "  Projects:    http://127.0.0.1:3002/api/v1/health"
+echo "  Sources:     http://127.0.0.1:3003/api/v1/health"
+echo "  Documents:   http://127.0.0.1:3004/api/v1/health"
+echo "  AI Analysis: http://127.0.0.1:3005/api/v1/health"
 echo
 echo "Detener:"
 echo "  pnpm auth:local:down"

@@ -164,10 +164,12 @@ test("Documents Client exige proyecto y versión actual", async () => {
     new Response(
       JSON.stringify({
         id: UUID_B,
-        projectId: UUID_A,
+        projectId: UUID_A.toUpperCase(),
         status: "DRAFT",
         archivedAt: null,
-        currentVersionDetail: { id: UUID_C },
+        currentVersionDetail: {
+          id: UUID_C.toUpperCase(),
+        },
       }),
       {
         status: 200,
@@ -204,7 +206,9 @@ test("Documents Client exige proyecto y versión actual", async () => {
 
 test("Sources Client exige ACTIVE y READY", async () => {
   const originalFetch = globalThis.fetch;
-  let payload = source();
+  let payload = source({
+    projectId: UUID_A.toUpperCase(),
+  });
 
   globalThis.fetch = async () =>
     new Response(JSON.stringify(payload), {
@@ -270,4 +274,31 @@ test("la API registra PENDING y no crea ejecuciones ni OpenAI", async () => {
   assert.match(service, /requireCurrentVersion/);
   assert.match(service, /requireReadySources/);
   assert.doesNotMatch(service, /OpenAI|ChatCompletion|Responses API/);
+});
+
+test("AppModule y AiAnalysisService comparten las referencias directas de entidades", async () => {
+  const [moduleFile, service, servicePackage] = await Promise.all([
+    readFile("apps/ai-analysis-service/src/app/app.module.ts", "utf8"),
+    readFile(
+      "apps/ai-analysis-service/src/analysis/ai-analysis.service.ts",
+      "utf8",
+    ),
+    readFile("apps/ai-analysis-service/package.json", "utf8"),
+  ]);
+
+  for (const entityModule of [
+    "analysis-request.entity",
+    "analysis-request-source.entity",
+    "analysis-execution.entity",
+  ]) {
+    assert.match(moduleFile, new RegExp(`analysis/${entityModule}`));
+    assert.match(service, new RegExp(`\\./${entityModule}`));
+  }
+
+  assert.doesNotMatch(moduleFile, /analysis\/entities/);
+  assert.equal(
+    JSON.parse(servicePackage).dependencies["supports-color"],
+    "7.2.0",
+    "AI Analysis debe resolver la misma instancia de Nest/TypeORM que shared-persistence",
+  );
 });
