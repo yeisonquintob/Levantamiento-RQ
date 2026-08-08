@@ -94,6 +94,10 @@ function errorMessage(error: unknown): string {
   return "No fue posible procesar el archivo.";
 }
 
+function canonicalUuid(value: string): string {
+  return value.toLowerCase();
+}
+
 @Injectable()
 export class SourcesService {
   constructor(
@@ -617,18 +621,20 @@ export class SourcesService {
       };
     }
 
-    const uniqueSourceIds = [...new Set(sourceIds)];
+    const uniqueSourceIds = [...new Set(sourceIds.map(canonicalUuid))];
     const available = await this.sources.find({
       where: {
         projectId,
         id: In(uniqueSourceIds),
       },
     });
-    const sourceById = new Map(available.map((source) => [source.id, source]));
+    const sourceById = new Map(
+      available.map((source) => [canonicalUuid(source.id), source]),
+    );
     const results: SourceBatchProcessingResult[] = [];
 
     for (const sourceId of uniqueSourceIds) {
-      const source = sourceById.get(sourceId);
+      const source = sourceById.get(canonicalUuid(sourceId));
 
       if (!source) {
         results.push({

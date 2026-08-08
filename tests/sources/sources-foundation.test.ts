@@ -158,7 +158,9 @@ test("la solicitud batch valida, normaliza y deduplica SourceId", () => {
   const second = "a616457a-4ca5-45a8-b1db-1ad4f40f94fd";
 
   assert.deepEqual(
-    parseProcessSourcesRequest({ sourceIds: [first, first, second] }),
+    parseProcessSourcesRequest({
+      sourceIds: [first.toUpperCase(), first, second],
+    }),
     { sourceIds: [first, second] },
   );
   assert.throws(
@@ -244,42 +246,42 @@ test("el botón Procesar encola archivos seleccionados PENDING, FAILED o READY",
   const projectId = "15b9f080-0c27-4e5a-aa30-e2b53f63f834";
   const rows = [
     {
-      id: "00000000-0000-4000-8000-000000000001",
+      id: "00000000-0000-4000-8000-000000000001".toUpperCase(),
       projectId,
       sourceType: "FILE",
       status: "ACTIVE",
       processingStatus: "PENDING",
     },
     {
-      id: "00000000-0000-4000-8000-000000000002",
+      id: "00000000-0000-4000-8000-000000000002".toUpperCase(),
       projectId,
       sourceType: "FILE",
       status: "ACTIVE",
       processingStatus: "FAILED",
     },
     {
-      id: "00000000-0000-4000-8000-000000000003",
+      id: "00000000-0000-4000-8000-000000000003".toUpperCase(),
       projectId,
       sourceType: "FILE",
       status: "ACTIVE",
       processingStatus: "PROCESSING",
     },
     {
-      id: "00000000-0000-4000-8000-000000000004",
+      id: "00000000-0000-4000-8000-000000000004".toUpperCase(),
       projectId,
       sourceType: "FILE",
       status: "ACTIVE",
       processingStatus: "READY",
     },
     {
-      id: "00000000-0000-4000-8000-000000000005",
+      id: "00000000-0000-4000-8000-000000000005".toUpperCase(),
       projectId,
       sourceType: "FILE",
       status: "ARCHIVED",
       processingStatus: "PENDING",
     },
     {
-      id: "00000000-0000-4000-8000-000000000006",
+      id: "00000000-0000-4000-8000-000000000006".toUpperCase(),
       projectId,
       sourceType: "NOTE",
       status: "ACTIVE",
@@ -294,7 +296,9 @@ test("el botón Procesar encola archivos seleccionados PENDING, FAILED o READY",
       criteria: { id: string },
       changes: Record<string, unknown>,
     ) => {
-      const row = rows.find((item) => item.id === criteria.id);
+      const row = rows.find(
+        (item) => item.id.toLowerCase() === criteria.id.toLowerCase(),
+      );
 
       if (
         !row ||
@@ -332,7 +336,7 @@ test("el botón Procesar encola archivos seleccionados PENDING, FAILED o READY",
     permissions: ["system.admin"],
     mustChangePassword: false,
   };
-  const request = { sourceIds: rows.map((row) => row.id) };
+  const request = { sourceIds: rows.map((row) => row.id.toLowerCase()) };
   const first = await service.processSelected(
     actor,
     "token",
@@ -652,4 +656,14 @@ test("KPI y Nueva fuente aparecen antes del selector de proyecto", async () => {
   );
   assert.match(client, /Etapa del proyecto/);
   assert.match(client, /Paso 13 completo/);
+});
+
+test("el arranque local garantiza la infraestructura de Fuentes", async () => {
+  const up = await readFile("scripts/local-auth-up.sh", "utf8");
+  const infrastructure =
+    'bash "$ROOT/scripts/infrastructure-up.sh"';
+  const sourcesService = '"$PID_DIR/sources-service.pid"';
+
+  assert.match(up, /scripts\/infrastructure-up\.sh/);
+  assert.ok(up.indexOf(infrastructure) < up.indexOf(sourcesService));
 });

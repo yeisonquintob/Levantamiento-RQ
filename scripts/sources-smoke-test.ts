@@ -78,12 +78,15 @@ async function requireJson(
   token: string,
   options?: RequestInit,
 ): Promise<Readonly<Record<string, unknown>>> {
+  const isFormData = options?.body instanceof FormData;
   const response = await fetch(url, {
     ...options,
     headers: {
       accept: "application/json",
       authorization: `Bearer ${token}`,
-      ...(options?.body ? { "content-type": "application/json" } : {}),
+      ...(options?.body && !isFormData
+        ? { "content-type": "application/json" }
+        : {}),
     },
     signal: AbortSignal.timeout(8000),
   });
@@ -124,21 +127,76 @@ async function main(): Promise<void> {
     throw new Error("Sources Service no devolvió el identificador esperado.");
   }
 
+  const fileName = `sources-smoke-${randomUUID()}.txt`;
+  const fileContent = Buffer.from(
+    `Carga multipart temporal ${randomUUID()}`,
+    "utf8",
+  );
+  const form = new FormData();
+  form.append(
+    "metadata",
+    JSON.stringify([
+      {
+        fileName,
+        classification: "EVIDENCE",
+        description: "Validación automática de carga mediante Gateway.",
+      },
+    ]),
+  );
+  form.append(
+    "files",
+    new Blob([fileContent], { type: "text/plain" }),
+    fileName,
+  );
+
+  const upload = await requireJson(`${gatewayBase}/files`, token, {
+    method: "POST",
+    body: form,
+  });
+  const accepted = Array.isArray(upload.accepted) ? upload.accepted : [];
+  const uploadedSource = accepted[0];
+
+  if (
+    upload.acceptedFiles !== 1 ||
+    upload.rejectedFiles !== 0 ||
+    !uploadedSource ||
+    typeof uploadedSource !== "object" ||
+    !("id" in uploadedSource) ||
+    typeof uploadedSource.id !== "string"
+  ) {
+    throw new Error(
+      `Gateway no almacenó el archivo esperado: ${JSON.stringify(upload)}`,
+    );
+  }
+
   const list = await requireJson(`${gatewayBase}?page=1&pageSize=5`, token);
   const summary = await requireJson(`${gatewayBase}/summary`, token);
 
-  if (!Array.isArray(list.items) || typeof summary.total !== "number") {
+  if (
+    !Array.isArray(list.items) ||
+    !list.items.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        "id" in item &&
+        item.id === uploadedSource.id,
+    ) ||
+    typeof summary.total !== "number"
+  ) {
     throw new Error("Gateway no devolvió la estructura de fuentes esperada.");
   }
 
   await requireJson(`${directBase}/${created.id}`, token, {
     method: "DELETE",
   });
+  await requireJson(`${directBase}/${uploadedSource.id}`, token, {
+    method: "DELETE",
+  });
 
   console.log("✓ Sources Service autenticado y conectado a RqSourcesDb.");
   console.log("✓ Acceso al proyecto validado mediante Projects Service.");
-  console.log("✓ Gateway enruta fuentes sin modificar datos.");
-  console.log("✓ Fuente temporal creada, consultada y archivada.");
+  console.log("✓ Gateway carga archivos multipart sin modificar datos.");
+  console.log("✓ Fuentes temporales creadas, consultadas y archivadas.");
 }
 
 void main().catch((error: unknown) => {

@@ -24,6 +24,9 @@ for file in "${required_files[@]}"; do
   }
 done
 
+bash "$ROOT/scripts/infrastructure-up.sh"
+echo "✓ Redis, RabbitMQ y Azurite disponibles."
+
 bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
 
 cd "$ROOT"
