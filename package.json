@@ -85,7 +85,12 @@
     "validate:projects": "nx run-many --target=lint,build --projects=projects-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:projects",
     "validate:sources": "nx run-many --target=lint,build --projects=sources-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:sources",
     "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui",
-    "validate:workflow": "nx run-many --target=lint,build --projects=workflow-service,shared-contracts --parallel=2 && pnpm test:workflow"
+    "validate:workflow": "nx run-many --target=lint,build --projects=workflow-service,shared-contracts --parallel=2 && pnpm test:workflow",
+    "workflow:db:ensure": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-ensure-database.ts",
+    "workflow:db:state": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-database-state.ts",
+    "workflow:db:verify": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-verify-database.ts",
+    "workflow:migration:revert": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-revert-migration.ts",
+    "workflow:migration:run": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-run-migrations.ts"
   },
   "private": true,
   "devDependencies": {

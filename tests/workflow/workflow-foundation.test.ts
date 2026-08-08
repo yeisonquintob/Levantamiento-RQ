@@ -62,10 +62,7 @@ test("la migración protege estados, auditoría e idempotencia", async () => {
   assert.match(migration, /CK_WorkflowReviewActivities_Type/);
   assert.match(migration, /CorrelationId uniqueidentifier NOT NULL/);
   assert.match(migration, /IdempotencyKey nvarchar\(120\) NULL/);
-  assert.match(
-    migration,
-    /UX_WorkflowReviewActivities_Request_IdempotencyKey/,
-  );
+  assert.match(migration, /UX_WorkflowReviewActivities_Request_IdempotencyKey/);
 });
 
 test("TypeORM usa una sola integración y registra entidades propias", async () => {
@@ -89,4 +86,35 @@ test("TypeORM usa una sola integración y registra entidades propias", async () 
   assert.match(entities, /@Entity\(\{ name: "WorkflowReviewActivities" \}\)/);
   assert.match(moduleFile, /TypeOrmModule\.forFeature\(workflowEntities\)/);
   assert.match(moduleFile, /databaseConfig\.enabled/);
+});
+
+test("Workflow publica comandos repetibles para activar y verificar su base", async () => {
+  const packageFile = await readFile("package.json", "utf8");
+  const environmentExample = await readFile(
+    "apps/workflow-service/.env.example",
+    "utf8",
+  );
+  const ensureScript = await readFile(
+    "scripts/workflow-ensure-database.ts",
+    "utf8",
+  );
+  const verifyScript = await readFile(
+    "scripts/workflow-verify-database.ts",
+    "utf8",
+  );
+
+  for (const command of [
+    "workflow:db:ensure",
+    "workflow:db:state",
+    "workflow:db:verify",
+    "workflow:migration:run",
+    "workflow:migration:revert",
+  ]) {
+    assert.match(packageFile, new RegExp(`"${command}"`));
+  }
+
+  assert.match(environmentExample, /DATABASE_ENABLED=true/);
+  assert.match(environmentExample, /WORKFLOW_CREATE_DATABASE=false/);
+  assert.match(ensureScript, /WORKFLOW_CREATE_DATABASE/);
+  assert.match(verifyScript, /CreateWorkflowFoundation1786406400000/);
 });
