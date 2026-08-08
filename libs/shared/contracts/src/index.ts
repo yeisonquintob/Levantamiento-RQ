@@ -10,3 +10,4 @@ export * from "./lib/problem-details.js";
 export * from "./lib/projects.js";
 export * from "./lib/sources.js";
 export * from "./lib/users.js";
+export * from "./lib/workflow.js";

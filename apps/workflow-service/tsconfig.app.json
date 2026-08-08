@@ -22,6 +22,9 @@
     },
     {
       "path": "../../libs/shared/config/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/shared/contracts/tsconfig.lib.json"
     }
   ]
 }

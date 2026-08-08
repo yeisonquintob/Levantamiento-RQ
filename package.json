@@ -71,8 +71,9 @@
     "test:projects": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx --test tests/projects/projects-foundation.test.ts",
     "test:smoke": "pnpm sources:async:smoke && pnpm sources:async:smoke",
     "test:sources": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx --test tests/sources/sources-foundation.test.ts",
-    "test:structural": "pnpm test:projects && pnpm test:sources && pnpm test:documents",
-    "test:unit": "pnpm test:auth && pnpm test:projects && pnpm test:sources && pnpm test:documents",
+    "test:workflow": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx --test tests/workflow/*.test.ts",
+    "test:structural": "pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:workflow",
+    "test:unit": "pnpm test:auth && pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:workflow",
     "typecheck:all": "tsc -p tsconfig.scripts.json --noEmit && nx run-many --target=typecheck --all --parallel=3 --skip-nx-cache",
     "validate:ai": "nx run-many --target=lint,build --projects=ai-analysis-service,shared-contracts --parallel=2 && pnpm test:ai",
     "validate:all": "bash scripts/validate-all.sh",
@@ -83,7 +84,8 @@
     "validate:persistence": "nx run-many --target=lint,build --projects=shared-persistence,identity-service,projects-service,sources-service,documents-service,ai-analysis-service,erp-knowledge-service,workflow-service,operations-service",
     "validate:projects": "nx run-many --target=lint,build --projects=projects-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:projects",
     "validate:sources": "nx run-many --target=lint,build --projects=sources-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:sources",
-    "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui"
+    "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui",
+    "validate:workflow": "nx run-many --target=lint,build --projects=workflow-service,shared-contracts --parallel=2 && pnpm test:workflow"
   },
   "private": true,
   "devDependencies": {
