@@ -27,6 +27,8 @@ pnpm sources:migration:run
 pnpm sources:db:verify
 pnpm documents:migration:run
 pnpm documents:db:verify
+pnpm workflow:migration:run
+pnpm workflow:db:verify
 pnpm sources:queue:verify
 pnpm sources:storage:verify
 pnpm test:smoke

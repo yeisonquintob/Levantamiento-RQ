@@ -190,6 +190,8 @@ test("la API coordina revisiones sin apropiarse de datos documentales", async ()
   assert.match(controller, /WorkflowAccessTokenGuard/);
   assert.match(service, /expectedReviewRevision/);
   assert.match(service, /idempotencyKey/);
+  assert.match(service, /x-idempotency-key es obligatorio/);
+  assert.match(service, /clave idempotente ya fue utilizada/);
   assert.match(service, /WorkflowReviewActivityEntity/);
   assert.match(documentsClient, /submit-review/);
   assert.match(documentsClient, /"approve" \| "reject"/);
@@ -231,4 +233,20 @@ test("Gateway y editor exponen Workflow y cierran las transiciones directas", as
   assert.match(localUp, /3007/);
   assert.match(localDown, /workflow-service/);
   assert.match(localDown, /3007/);
+});
+
+test("el E2E cubre aprobación, correcciones, rechazo, auditoría y limpieza", async () => {
+  const e2e = await readFile("scripts/workflow-gateway-e2e.ts", "utf8");
+  const swagger = await readFile("scripts/swagger-validate-all.sh", "utf8");
+  const packageFile = await readFile("package.json", "utf8");
+
+  assert.match(packageFile, /workflow:gateway:e2e/);
+  assert.match(e2e, /request-changes/);
+  assert.match(e2e, /\/approve/);
+  assert.match(e2e, /\/reject/);
+  assert.match(e2e, /AuditedActivityCount/);
+  assert.match(e2e, /DELETE FROM dbo\.WorkflowReviewRequests/);
+  assert.match(e2e, /DELETE FROM dbo\.IdentityUsers/);
+  assert.match(swagger, /workflow-service/);
+  assert.match(swagger, /directa/);
 });

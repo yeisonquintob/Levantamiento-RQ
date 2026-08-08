@@ -90,6 +90,7 @@
     "workflow:db:ensure": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-ensure-database.ts",
     "workflow:db:state": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-database-state.ts",
     "workflow:db:verify": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-verify-database.ts",
+    "workflow:gateway:e2e": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-gateway-e2e.ts",
     "workflow:migration:revert": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-revert-migration.ts",
     "workflow:migration:run": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-run-migrations.ts"
   },

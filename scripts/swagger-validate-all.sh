@@ -72,13 +72,19 @@ for entry in "${SERVICES[@]}"; do
   json_file="$TMP_DIR/$service.json"
   CURRENT_PORT="$port"
 
-  nohup env \
-    NODE_ENV=development \
-    NX_DAEMON=false \
-    NX_INTERACTIVE=false \
-    NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-    pnpm exec nx serve "$service" --skip-nx-cache \
-    > "$log_file" 2>&1 &
+  if [ "$service" = "workflow-service" ]; then
+    nohup bash -lc \
+      "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development NX_DAEMON=false NX_INTERACTIVE=false NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false; exec pnpm exec nx serve workflow-service --skip-nx-cache" \
+      > "$log_file" 2>&1 &
+  else
+    nohup env \
+      NODE_ENV=development \
+      NX_DAEMON=false \
+      NX_INTERACTIVE=false \
+      NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+      pnpm exec nx serve "$service" --skip-nx-cache \
+      > "$log_file" 2>&1 &
+  fi
 
   CURRENT_PID=$!
   ready=0
@@ -164,6 +170,28 @@ if service in {"gateway", "documents-service"}:
     ):
         if route not in paths:
             raise SystemExit(f"{service}: falta {route}.")
+
+if service in {"gateway", "workflow-service"}:
+    for route in (
+        "/api/v1/projects/{projectId}/documents/{documentId}/versions/{versionNumber}/reviews",
+        "/api/v1/projects/{projectId}/reviews",
+        "/api/v1/projects/{projectId}/reviews/{reviewId}",
+        "/api/v1/projects/{projectId}/reviews/{reviewId}/comments",
+        "/api/v1/projects/{projectId}/reviews/{reviewId}/request-changes",
+        "/api/v1/projects/{projectId}/reviews/{reviewId}/approve",
+        "/api/v1/projects/{projectId}/reviews/{reviewId}/reject",
+    ):
+        if route not in paths:
+            raise SystemExit(f"{service}: falta {route}.")
+
+if service == "gateway":
+    for route in (
+        "/api/v1/documents/{documentId}/versions/{versionNumber}/submit-review",
+        "/api/v1/documents/{documentId}/versions/{versionNumber}/approve",
+        "/api/v1/documents/{documentId}/versions/{versionNumber}/reject",
+    ):
+        if route in paths:
+            raise SystemExit(f"{service}: conserva transición directa {route}.")
 
 print(f"✓ {service}: OpenAPI, UI y recursos estáticos válidos.")
 PY_JSON

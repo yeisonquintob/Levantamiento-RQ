@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -81,6 +82,7 @@ export class WorkflowReviewsService {
     versionNumber: number,
     request: CreateWorkflowReviewRequest,
   ): Promise<WorkflowReviewDetail> {
+    this.requireIdempotencyKey(context);
     const access = await this.projects.requireRead(
       projectId,
       context.accessToken,
@@ -106,7 +108,18 @@ export class WorkflowReviewsService {
         );
       }
 
-      return this.loadDetail(projectId, existing.id);
+      const initialActivity = await this.activities.findOneBy({
+        reviewRequestId: existing.id,
+        type: "REVIEW_REQUESTED",
+      });
+
+      if (initialActivity?.idempotencyKey === context.idempotencyKey) {
+        return this.loadDetail(projectId, existing.id);
+      }
+
+      throw new ConflictException(
+        "La versión ya tiene una revisión creada con otra clave idempotente.",
+      );
     }
 
     const document = await this.documents.requireDraftVersion(
@@ -221,6 +234,7 @@ export class WorkflowReviewsService {
     reviewId: string,
     request: AddWorkflowCommentRequest,
   ): Promise<WorkflowReviewDetail> {
+    this.requireIdempotencyKey(context);
     const access = await this.requireProjectAccess(context, projectId);
 
     if (!access.canReview) {
@@ -234,7 +248,18 @@ export class WorkflowReviewsService {
       context.idempotencyKey,
     );
 
-    if (duplicate) return this.loadDetail(projectId, reviewId);
+    if (duplicate) {
+      if (
+        duplicate.type === "COMMENTED" &&
+        duplicate.comment === request.comment
+      ) {
+        return this.loadDetail(projectId, reviewId);
+      }
+
+      throw new ConflictException(
+        "La clave idempotente ya fue utilizada por otra mutación.",
+      );
+    }
 
     const review = await this.requireActiveReview(projectId, reviewId);
 
@@ -341,6 +366,7 @@ export class WorkflowReviewsService {
     documentAction: "approve" | "reject",
     requiredAssignment: "REVIEWER" | "APPROVER",
   ): Promise<WorkflowReviewDetail> {
+    this.requireIdempotencyKey(context);
     const access = await this.requireProjectAccess(context, projectId);
 
     if (requiredAssignment === "APPROVER" && !access.canApprove) {
@@ -359,7 +385,18 @@ export class WorkflowReviewsService {
       context.idempotencyKey,
     );
 
-    if (duplicate) return this.loadDetail(projectId, reviewId);
+    if (duplicate) {
+      if (
+        duplicate.type === activityType &&
+        duplicate.comment === (request.comment ?? null)
+      ) {
+        return this.loadDetail(projectId, reviewId);
+      }
+
+      throw new ConflictException(
+        "La clave idempotente ya fue utilizada por otra mutación.",
+      );
+    }
 
     const review = await this.requireActiveReview(projectId, reviewId);
 
@@ -461,6 +498,16 @@ export class WorkflowReviewsService {
       context.actor,
       context.correlationId,
     );
+  }
+
+  private requireIdempotencyKey(context: WorkflowActorContext): string {
+    if (!context.idempotencyKey) {
+      throw new BadRequestException(
+        "x-idempotency-key es obligatorio para mutaciones de Workflow.",
+      );
+    }
+
+    return context.idempotencyKey;
   }
 
   private async requireAssignment(

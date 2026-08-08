@@ -58,7 +58,11 @@ function idempotencyKey(request: RequestLike): string | null {
 @ApiTags("workflow")
 @ApiCookieAuth("rq_access")
 @ApiBearerAuth()
-@ApiHeader({ name: "x-idempotency-key", required: false })
+@ApiHeader({
+  name: "x-idempotency-key",
+  required: false,
+  description: "Obligatoria en mutaciones de Workflow.",
+})
 @Controller()
 export class WorkflowGatewayController {
   constructor(private readonly workflow: WorkflowClientService) {}

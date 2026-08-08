@@ -68,7 +68,7 @@ const decisionSchema = {
 @ApiHeader({
   name: "x-idempotency-key",
   required: false,
-  description: "Clave repetible para mutaciones, máximo 120 caracteres.",
+  description: "Obligatoria en mutaciones; máximo 120 caracteres.",
 })
 @UseGuards(WorkflowAccessTokenGuard)
 @Controller()
