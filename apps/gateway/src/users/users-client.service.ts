@@ -15,10 +15,7 @@ import type {
   RevokeIdentityUserSessionsResponse,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 type Method = "GET" | "POST" | "PATCH" | "PUT";
 
@@ -51,7 +48,10 @@ export class UsersClientService {
     );
   }
 
-  summary(accessToken: string, correlationId?: string): Promise<IdentityUserMetrics> {
+  summary(
+    accessToken: string,
+    correlationId?: string,
+  ): Promise<IdentityUserMetrics> {
     return this.request(
       "/api/v1/users/summary",
       "GET",
@@ -61,7 +61,10 @@ export class UsersClientService {
     );
   }
 
-  roles(accessToken: string, correlationId?: string): Promise<readonly IdentityRoleSummary[]> {
+  roles(
+    accessToken: string,
+    correlationId?: string,
+  ): Promise<readonly IdentityRoleSummary[]> {
     return this.request(
       "/api/v1/users/roles",
       "GET",
@@ -71,7 +74,11 @@ export class UsersClientService {
     );
   }
 
-  get(accessToken: string, userId: string, correlationId?: string): Promise<IdentityUserDetail> {
+  get(
+    accessToken: string,
+    userId: string,
+    correlationId?: string,
+  ): Promise<IdentityUserDetail> {
     return this.request(
       `/api/v1/users/${encodeURIComponent(userId)}`,
       "GET",
@@ -81,7 +88,11 @@ export class UsersClientService {
     );
   }
 
-  create(accessToken: string, body: unknown, correlationId?: string): Promise<CreateIdentityUserResponse> {
+  create(
+    accessToken: string,
+    body: unknown,
+    correlationId?: string,
+  ): Promise<CreateIdentityUserResponse> {
     return this.request(
       "/api/v1/users",
       "POST",
@@ -91,7 +102,12 @@ export class UsersClientService {
     );
   }
 
-  update(accessToken: string, userId: string, body: unknown, correlationId?: string): Promise<IdentityUserDetail> {
+  update(
+    accessToken: string,
+    userId: string,
+    body: unknown,
+    correlationId?: string,
+  ): Promise<IdentityUserDetail> {
     return this.request(
       `/api/v1/users/${encodeURIComponent(userId)}`,
       "PATCH",
@@ -101,7 +117,12 @@ export class UsersClientService {
     );
   }
 
-  setRoles(accessToken: string, userId: string, body: unknown, correlationId?: string): Promise<IdentityUserDetail> {
+  setRoles(
+    accessToken: string,
+    userId: string,
+    body: unknown,
+    correlationId?: string,
+  ): Promise<IdentityUserDetail> {
     return this.request(
       `/api/v1/users/${encodeURIComponent(userId)}/roles`,
       "PUT",

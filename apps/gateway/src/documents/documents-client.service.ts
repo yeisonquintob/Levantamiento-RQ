@@ -21,10 +21,7 @@ import type {
   UpdateRequirementDocumentRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 type DocumentsMethod = "GET" | "POST" | "PATCH";
 

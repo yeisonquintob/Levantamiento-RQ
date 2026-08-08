@@ -120,10 +120,7 @@ export class UsersGatewayController {
   }
 
   @Post(":userId/revoke-sessions")
-  revokeSessions(
-    @Req() request: RequestLike,
-    @Param("userId") userId: string,
-  ) {
+  revokeSessions(@Req() request: RequestLike, @Param("userId") userId: string) {
     const { token, correlationId } = context(request);
     return this.users.revokeSessions(token, userId, correlationId);
   }

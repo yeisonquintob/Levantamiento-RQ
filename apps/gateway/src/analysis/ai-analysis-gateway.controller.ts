@@ -27,30 +27,21 @@ import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
 import { AiAnalysisClientService } from "./ai-analysis-client.service";
 
 interface RequestLike {
-  headers: Readonly<
-    Record<string, string | string[] | undefined>
-  >;
+  headers: Readonly<Record<string, string | string[] | undefined>>;
 }
 
-function first(
-  value: string | string[] | undefined,
-): string | undefined {
+function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
 function accessToken(request: RequestLike): string {
-  const cookie = readCookie(
-    first(request.headers.cookie),
-    ACCESS_COOKIE,
-  );
+  const cookie = readCookie(first(request.headers.cookie), ACCESS_COOKIE);
 
   if (cookie) {
     return cookie;
   }
 
-  const match = first(
-    request.headers.authorization,
-  )?.match(/^Bearer\s+(.+)$/i);
+  const match = first(request.headers.authorization)?.match(/^Bearer\s+(.+)$/i);
 
   if (!match?.[1]) {
     throw new UnauthorizedException("Sesión requerida.");
@@ -60,10 +51,7 @@ function accessToken(request: RequestLike): string {
 }
 
 function correlationId(request: RequestLike): string {
-  return (
-    first(request.headers["x-correlation-id"])?.trim() ||
-    randomUUID()
-  );
+  return first(request.headers["x-correlation-id"])?.trim() || randomUUID();
 }
 
 @ApiTags("analysis")
@@ -71,20 +59,14 @@ function correlationId(request: RequestLike): string {
 @ApiBearerAuth()
 @Controller("projects/:projectId/analysis-requests")
 export class AiAnalysisGatewayController {
-  constructor(
-    private readonly analysis: AiAnalysisClientService,
-  ) {}
+  constructor(private readonly analysis: AiAnalysisClientService) {}
 
   @ApiOperation({ summary: "Crear una solicitud de análisis" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiBody({
     schema: {
       type: "object",
-      required: [
-        "documentId",
-        "documentVersionId",
-        "sourceIds",
-      ],
+      required: ["documentId", "documentVersionId", "sourceIds"],
       properties: {
         analysisType: {
           type: "string",

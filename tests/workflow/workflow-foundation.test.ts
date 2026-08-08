@@ -198,3 +198,37 @@ test("la API coordina revisiones sin apropiarse de datos documentales", async ()
     /DocumentVersionEntity|RequirementDocumentEntity/,
   );
 });
+
+test("Gateway y editor exponen Workflow y cierran las transiciones directas", async () => {
+  const gatewayConfig = await readFile(
+    "apps/gateway/src/config/gateway-config.ts",
+    "utf8",
+  );
+  const workflowGateway = await readFile(
+    "apps/gateway/src/workflow/workflow-gateway.controller.ts",
+    "utf8",
+  );
+  const documentsGateway = await readFile(
+    "apps/gateway/src/documents/documents-gateway.controller.ts",
+    "utf8",
+  );
+  const editor = await readFile(
+    "apps/web/src/app/workspace/documents/[documentId]/requirement-document-editor.tsx",
+    "utf8",
+  );
+  const localUp = await readFile("scripts/local-auth-up.sh", "utf8");
+  const localDown = await readFile("scripts/local-auth-down.sh", "utf8");
+
+  assert.match(gatewayConfig, /WORKFLOW_SERVICE_URL/);
+  assert.match(workflowGateway, /WorkflowClientService/);
+  assert.match(workflowGateway, /x-idempotency-key/);
+  assert.doesNotMatch(documentsGateway, /submitReview\(|approve\(|reject\(/);
+  assert.match(editor, /WorkflowReviewDetail/);
+  assert.match(editor, /request-changes/);
+  assert.match(editor, /Agregar comentario/);
+  assert.match(editor, /crypto\.randomUUID\(\)/);
+  assert.match(localUp, /workflow-service/);
+  assert.match(localUp, /3007/);
+  assert.match(localDown, /workflow-service/);
+  assert.match(localDown, /3007/);
+});

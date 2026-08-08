@@ -32,9 +32,7 @@ interface RequestLike {
   headers: Readonly<Record<string, string | string[] | undefined>>;
 }
 
-function firstHeader(
-  value: string | string[] | undefined,
-): string | undefined {
+function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -48,9 +46,7 @@ function requireAccessToken(request: RequestLike): string {
     return cookieToken;
   }
 
-  const authorization = firstHeader(
-    request.headers.authorization,
-  );
+  const authorization = firstHeader(request.headers.authorization);
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
 
   if (!match?.[1]) {
@@ -65,9 +61,7 @@ function requireAccessToken(request: RequestLike): string {
 @ApiBearerAuth()
 @Controller("templates")
 export class DocumentTemplatesGatewayController {
-  constructor(
-    private readonly templates: DocumentTemplatesClientService,
-  ) {}
+  constructor(private readonly templates: DocumentTemplatesClientService) {}
 
   @ApiOperation({
     summary: "Consultar indicadores del catálogo de plantillas",
@@ -83,23 +77,14 @@ export class DocumentTemplatesGatewayController {
     @Req() request: RequestLike,
     @Query() query: Readonly<Record<string, unknown>>,
   ) {
-    return this.templates.list(
-      requireAccessToken(request),
-      query,
-    );
+    return this.templates.list(requireAccessToken(request), query);
   }
 
   @ApiOperation({ summary: "Crear una plantilla en borrador" })
   @ApiBody({
     schema: {
       type: "object",
-      required: [
-        "code",
-        "name",
-        "templateType",
-        "version",
-        "includesScrum",
-      ],
+      required: ["code", "name", "templateType", "version", "includesScrum"],
     },
   })
   @ApiResponse({ status: 201, description: "Plantilla creada." })
@@ -108,10 +93,7 @@ export class DocumentTemplatesGatewayController {
     @Req() request: RequestLike,
     @Body() body: CreateDocumentTemplateRequest | unknown,
   ) {
-    return this.templates.create(
-      requireAccessToken(request),
-      body,
-    );
+    return this.templates.create(requireAccessToken(request), body);
   }
 
   @ApiOperation({ summary: "Consultar una plantilla" })
@@ -121,10 +103,7 @@ export class DocumentTemplatesGatewayController {
     @Req() request: RequestLike,
     @Param("templateId") templateId: string,
   ) {
-    return this.templates.getById(
-      requireAccessToken(request),
-      templateId,
-    );
+    return this.templates.getById(requireAccessToken(request), templateId);
   }
 
   @ApiOperation({ summary: "Actualizar una plantilla en borrador" })
@@ -135,11 +114,7 @@ export class DocumentTemplatesGatewayController {
     @Param("templateId") templateId: string,
     @Body() body: UpdateDocumentTemplateRequest | unknown,
   ) {
-    return this.templates.update(
-      requireAccessToken(request),
-      templateId,
-      body,
-    );
+    return this.templates.update(requireAccessToken(request), templateId, body);
   }
 
   @ApiOperation({ summary: "Publicar una plantilla inmutable" })
@@ -149,23 +124,14 @@ export class DocumentTemplatesGatewayController {
     @Req() request: RequestLike,
     @Param("templateId") templateId: string,
   ) {
-    return this.templates.publish(
-      requireAccessToken(request),
-      templateId,
-    );
+    return this.templates.publish(requireAccessToken(request), templateId);
   }
 
   @ApiOperation({ summary: "Retirar una plantilla publicada" })
   @ApiParam({ name: "templateId", format: "uuid" })
   @Post(":templateId/retire")
-  retire(
-    @Req() request: RequestLike,
-    @Param("templateId") templateId: string,
-  ) {
-    return this.templates.retire(
-      requireAccessToken(request),
-      templateId,
-    );
+  retire(@Req() request: RequestLike, @Param("templateId") templateId: string) {
+    return this.templates.retire(requireAccessToken(request), templateId);
   }
 
   @ApiOperation({
@@ -178,10 +144,6 @@ export class DocumentTemplatesGatewayController {
     @Param("templateId") templateId: string,
     @Body() body: CloneDocumentTemplateRequest | unknown,
   ) {
-    return this.templates.clone(
-      requireAccessToken(request),
-      templateId,
-      body,
-    );
+    return this.templates.clone(requireAccessToken(request), templateId, body);
   }
 }

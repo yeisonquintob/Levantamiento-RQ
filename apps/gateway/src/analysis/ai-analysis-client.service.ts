@@ -11,10 +11,7 @@ import type {
   CreateAiAnalysisRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 type AiAnalysisMethod = "GET" | "POST";
 
@@ -116,20 +113,12 @@ export class AiAnalysisClientService {
     let response: Response;
 
     try {
-      response = await fetch(
-        `${this.config.aiAnalysisServiceUrl}${path}`,
-        {
-          method,
-          headers,
-          body:
-            body === undefined
-              ? undefined
-              : JSON.stringify(body),
-          signal: AbortSignal.timeout(
-            this.config.aiAnalysisTimeoutMs,
-          ),
-        },
-      );
+      response = await fetch(`${this.config.aiAnalysisServiceUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.config.aiAnalysisTimeoutMs),
+      });
     } catch {
       throw new ServiceUnavailableException(
         "AI Analysis Service no está disponible.",

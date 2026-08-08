@@ -11,10 +11,7 @@ import type {
   SignOutResponse,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 interface ClientContext {
   userAgent?: string;
@@ -28,10 +25,7 @@ export class IdentityClientService {
     private readonly config: GatewayConfig,
   ) {}
 
-  signIn(
-    body: unknown,
-    context: ClientContext,
-  ): Promise<AuthSessionResponse> {
+  signIn(body: unknown, context: ClientContext): Promise<AuthSessionResponse> {
     return this.request<AuthSessionResponse>(
       "/api/v1/auth/sign-in",
       "POST",
@@ -115,15 +109,12 @@ export class IdentityClientService {
     let response: Response;
 
     try {
-      response = await fetch(
-        `${this.config.identityServiceUrl}${path}`,
-        {
-          method,
-          headers,
-          body: body === undefined ? undefined : JSON.stringify(body),
-          signal: AbortSignal.timeout(this.config.identityTimeoutMs),
-        },
-      );
+      response = await fetch(`${this.config.identityServiceUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.config.identityTimeoutMs),
+      });
     } catch {
       throw new ServiceUnavailableException(
         "Identity Service no está disponible.",

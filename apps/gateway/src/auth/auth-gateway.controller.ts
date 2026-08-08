@@ -86,11 +86,7 @@ export class AuthGatewayController {
       ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
     });
 
-    this.setSessionCookies(
-      reply,
-      session,
-      session.user.mustChangePassword,
-    );
+    this.setSessionCookies(reply, session, session.user.mustChangePassword);
 
     return {
       user: session.user,
@@ -122,11 +118,7 @@ export class AuthGatewayController {
       ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
     });
 
-    this.setSessionCookies(
-      reply,
-      session,
-      session.user.mustChangePassword,
-    );
+    this.setSessionCookies(reply, session, session.user.mustChangePassword);
 
     return {
       user: session.user,
@@ -196,15 +188,10 @@ export class AuthGatewayController {
       throw new UnauthorizedException("Sesión requerida.");
     }
 
-    const session = await this.identity.changePassword(
-      accessToken,
-      body,
-      {
-        userAgent: firstHeader(request.headers["user-agent"]),
-        ipAddress:
-          firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
-      },
-    );
+    const session = await this.identity.changePassword(accessToken, body, {
+      userAgent: firstHeader(request.headers["user-agent"]),
+      ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
+    });
 
     this.setSessionCookies(reply, session, false);
 

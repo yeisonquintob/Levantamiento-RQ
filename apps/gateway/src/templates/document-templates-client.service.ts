@@ -14,10 +14,7 @@ import type {
   UpdateDocumentTemplateRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-import {
-  GATEWAY_CONFIG,
-  type GatewayConfig,
-} from "../config/gateway-config";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
 type DocumentsMethod = "GET" | "POST" | "PATCH";
 
@@ -53,9 +50,7 @@ export class DocumentTemplatesClientService {
     );
   }
 
-  summary(
-    accessToken: string,
-  ): Promise<DocumentTemplateMetrics> {
+  summary(accessToken: string): Promise<DocumentTemplateMetrics> {
     return this.request<DocumentTemplateMetrics>(
       "/api/v1/templates/summary",
       "GET",
@@ -152,20 +147,12 @@ export class DocumentTemplatesClientService {
     let response: Response;
 
     try {
-      response = await fetch(
-        `${this.config.documentsServiceUrl}${path}`,
-        {
-          method,
-          headers,
-          body:
-            body === undefined
-              ? undefined
-              : JSON.stringify(body),
-          signal: AbortSignal.timeout(
-            this.config.documentsTimeoutMs,
-          ),
-        },
-      );
+      response = await fetch(`${this.config.documentsServiceUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(this.config.documentsTimeoutMs),
+      });
     } catch {
       throw new ServiceUnavailableException(
         "Documents Service no está disponible.",

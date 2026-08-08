@@ -32,7 +32,7 @@ bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
 cd "$ROOT"
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-for port in 3000 3001 3002 3003 3004 3005 4200; do
+for port in 3000 3001 3002 3003 3004 3005 3007 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
     exit 1
@@ -45,7 +45,7 @@ env \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   pnpm exec nx run-many \
     --target=build \
-    --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,gateway \
+    --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,workflow-service,gateway \
     --configuration=development \
     --skip-nx-cache \
   > "$LOG_DIR/local-services-build.log" 2>&1
@@ -132,6 +132,17 @@ wait_for_url \
   "http://127.0.0.1:3005/api/v1/health" \
   "$LOG_DIR/ai-analysis-service.log"
 
+start_detached \
+  "$PID_DIR/workflow-service.pid" \
+  "$LOG_DIR/workflow-service.log" \
+  bash -lc \
+  "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development; exec node '$ROOT/apps/workflow-service/dist/main.js'"
+
+wait_for_url \
+  "Workflow Service" \
+  "http://127.0.0.1:3007/api/v1/health" \
+  "$LOG_DIR/workflow-service.log"
+
 NODE_ENV=development start_detached \
   "$PID_DIR/gateway.pid" \
   "$LOG_DIR/gateway.log" \
@@ -175,6 +186,7 @@ echo "  Projects:    http://127.0.0.1:3002/api/v1/health"
 echo "  Sources:     http://127.0.0.1:3003/api/v1/health"
 echo "  Documents:   http://127.0.0.1:3004/api/v1/health"
 echo "  AI Analysis: http://127.0.0.1:3005/api/v1/health"
+echo "  Workflow:    http://127.0.0.1:3007/api/v1/health"
 echo
 echo "Detener:"
 echo "  pnpm auth:local:down"

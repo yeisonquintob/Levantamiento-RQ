@@ -48,6 +48,7 @@ async function bootstrap(): Promise<void> {
       "content-type",
       "authorization",
       "x-correlation-id",
+      "x-idempotency-key",
     ],
   });
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
@@ -63,27 +64,22 @@ async function bootstrap(): Promise<void> {
       .addTag("health", "Disponibilidad técnica del servicio")
       .addTag("authentication", "Identidad y sesiones")
       .addTag("projects", "Proyectos y participantes")
-      .addTag(
-        "sources",
-        "Fuentes textuales, archivos y procesamiento",
-      )
-      .addTag(
-        "templates",
-        "Catálogo de plantillas documentales versionadas",
-      )
+      .addTag("sources", "Fuentes textuales, archivos y procesamiento")
+      .addTag("templates", "Catálogo de plantillas documentales versionadas")
       .addTag(
         "analysis",
         "Solicitudes controladas de análisis de requerimientos",
+      )
+      .addTag(
+        "workflow",
+        "Revisiones, comentarios, correcciones, aprobaciones y rechazos",
       )
       .addCookieAuth("rq_access")
       .addCookieAuth("rq_refresh")
       .addBearerAuth()
       .build();
 
-    const openApiDocument = SwaggerModule.createDocument(
-      app,
-      openApiConfig,
-    );
+    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
       customSwaggerUiPath: resolve(
@@ -116,6 +112,7 @@ async function bootstrap(): Promise<void> {
       sourcesServiceUrl: config.sourcesServiceUrl,
       documentsServiceUrl: config.documentsServiceUrl,
       aiAnalysisServiceUrl: config.aiAnalysisServiceUrl,
+      workflowServiceUrl: config.workflowServiceUrl,
       webOrigin: config.webOrigin,
     },
   });
@@ -125,9 +122,7 @@ async function bootstrap(): Promise<void> {
 
 void bootstrap().catch((error: unknown) => {
   const message =
-    error instanceof Error
-      ? (error.stack ?? error.message)
-      : String(error);
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
 
   Logger.error(message, "Bootstrap");
   process.exitCode = 1;

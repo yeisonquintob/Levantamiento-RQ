@@ -21,7 +21,6 @@ import type {
   ArchiveRequirementDocumentRequest,
   CreateDocumentVersionRequest,
   CreateRequirementDocumentRequest,
-  DocumentTransitionRequest,
   ReplaceDocumentFieldsRequest,
   UpdateDocumentSectionRequest,
   UpdateRequirementDocumentRequest,
@@ -59,8 +58,17 @@ export class DocumentsGatewayController {
 
   @ApiOperation({ summary: "Crear un documento" })
   @Post("projects/:projectId/documents")
-  create(@Req() req: RequestLike, @Param("projectId") projectId: string, @Body() body: CreateRequirementDocumentRequest | unknown) {
-    return this.documents.create(accessToken(req), correlationId(req), projectId, body);
+  create(
+    @Req() req: RequestLike,
+    @Param("projectId") projectId: string,
+    @Body() body: CreateRequirementDocumentRequest | unknown,
+  ) {
+    return this.documents.create(
+      accessToken(req),
+      correlationId(req),
+      projectId,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Listar documentos del proyecto" })
@@ -72,76 +80,127 @@ export class DocumentsGatewayController {
   @ApiOperation({ summary: "Consultar un documento" })
   @Get("documents/:documentId")
   getById(@Req() req: RequestLike, @Param("documentId") documentId: string) {
-    return this.documents.getById(accessToken(req), correlationId(req), documentId);
+    return this.documents.getById(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+    );
   }
 
   @ApiOperation({ summary: "Consultar una versión" })
   @Get("documents/:documentId/versions/:versionNumber")
-  getVersion(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string) {
-    return this.documents.getVersion(accessToken(req), correlationId(req), documentId, versionNumber);
+  getVersion(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+  ) {
+    return this.documents.getVersion(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      versionNumber,
+    );
   }
 
   @ApiOperation({ summary: "Actualizar metadatos" })
   @Patch("documents/:documentId")
-  updateMetadata(@Req() req: RequestLike, @Param("documentId") documentId: string, @Body() body: UpdateRequirementDocumentRequest | unknown) {
-    return this.documents.updateMetadata(accessToken(req), correlationId(req), documentId, body);
+  updateMetadata(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Body() body: UpdateRequirementDocumentRequest | unknown,
+  ) {
+    return this.documents.updateMetadata(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Crear una nueva versión" })
   @Post("documents/:documentId/versions")
-  createVersion(@Req() req: RequestLike, @Param("documentId") documentId: string, @Body() body: CreateDocumentVersionRequest | unknown) {
-    return this.documents.createVersion(accessToken(req), correlationId(req), documentId, body);
+  createVersion(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Body() body: CreateDocumentVersionRequest | unknown,
+  ) {
+    return this.documents.createVersion(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Actualizar una sección" })
   @Patch("documents/:documentId/versions/:versionNumber/sections/:sectionKey")
-  updateSection(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string, @Param("sectionKey") sectionKey: string, @Body() body: UpdateDocumentSectionRequest | unknown) {
-    return this.documents.updateSection(accessToken(req), correlationId(req), documentId, versionNumber, sectionKey, body);
+  updateSection(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+    @Param("sectionKey") sectionKey: string,
+    @Body() body: UpdateDocumentSectionRequest | unknown,
+  ) {
+    return this.documents.updateSection(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      versionNumber,
+      sectionKey,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Actualizar contenido estructurado" })
   @Patch("documents/:documentId/versions/:versionNumber/fields")
-  replaceFields(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string, @Body() body: ReplaceDocumentFieldsRequest | unknown) {
-    return this.documents.replaceFields(accessToken(req), correlationId(req), documentId, versionNumber, body);
-  }
-
-  @ApiOperation({ summary: "Enviar a validación" })
-  @Post("documents/:documentId/versions/:versionNumber/submit-review")
-  @HttpCode(200)
-  submitReview(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string, @Body() body: DocumentTransitionRequest | unknown) {
-    return this.documents.transition(accessToken(req), correlationId(req), documentId, versionNumber, "submit-review", body);
-  }
-
-  @ApiOperation({ summary: "Aprobar y bloquear la versión" })
-  @Post("documents/:documentId/versions/:versionNumber/approve")
-  @HttpCode(200)
-  approve(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string, @Body() body: DocumentTransitionRequest | unknown) {
-    return this.documents.transition(accessToken(req), correlationId(req), documentId, versionNumber, "approve", body);
-  }
-
-  @ApiOperation({ summary: "Rechazar la versión" })
-  @Post("documents/:documentId/versions/:versionNumber/reject")
-  @HttpCode(200)
-  reject(@Req() req: RequestLike, @Param("documentId") documentId: string, @Param("versionNumber") versionNumber: string, @Body() body: DocumentTransitionRequest | unknown) {
-    return this.documents.transition(accessToken(req), correlationId(req), documentId, versionNumber, "reject", body);
+  replaceFields(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+    @Body() body: ReplaceDocumentFieldsRequest | unknown,
+  ) {
+    return this.documents.replaceFields(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      versionNumber,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Consultar historial" })
   @Get("documents/:documentId/history")
   history(@Req() req: RequestLike, @Param("documentId") documentId: string) {
-    return this.documents.history(accessToken(req), correlationId(req), documentId);
+    return this.documents.history(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+    );
   }
 
   @ApiOperation({ summary: "Consultar plantilla aplicada" })
   @Get("documents/:documentId/template")
   template(@Req() req: RequestLike, @Param("documentId") documentId: string) {
-    return this.documents.appliedTemplate(accessToken(req), correlationId(req), documentId);
+    return this.documents.appliedTemplate(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+    );
   }
 
   @ApiOperation({ summary: "Archivar documento" })
   @Post("documents/:documentId/archive")
   @HttpCode(200)
-  archive(@Req() req: RequestLike, @Param("documentId") documentId: string, @Body() body: ArchiveRequirementDocumentRequest | unknown) {
-    return this.documents.archive(accessToken(req), correlationId(req), documentId, body);
+  archive(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Body() body: ArchiveRequirementDocumentRequest | unknown,
+  ) {
+    return this.documents.archive(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      body,
+    );
   }
 }
