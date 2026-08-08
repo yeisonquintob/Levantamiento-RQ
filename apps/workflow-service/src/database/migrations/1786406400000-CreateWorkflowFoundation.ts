@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateWorkflowFoundation1786406400000
-  implements MigrationInterface
-{
+export class CreateWorkflowFoundation1786406400000 implements MigrationInterface {
   name = "CreateWorkflowFoundation1786406400000";
 
   async up(queryRunner: QueryRunner): Promise<void> {

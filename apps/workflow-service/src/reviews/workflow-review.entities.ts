@@ -8,10 +8,11 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 
 @Entity({ name: "WorkflowReviewRequests" })
-@Index("UQ_WorkflowReviewRequests_Document_Version", [
-  "documentId",
-  "versionNumber",
-], { unique: true })
+@Index(
+  "UQ_WorkflowReviewRequests_Document_Version",
+  ["documentId", "versionNumber"],
+  { unique: true },
+)
 @Index("IX_WorkflowReviewRequests_Project_Status_UpdatedAt", [
   "projectId",
   "status",
@@ -67,11 +68,11 @@ export class WorkflowReviewRequestEntity {
 }
 
 @Entity({ name: "WorkflowReviewAssignments" })
-@Index("UQ_WorkflowReviewAssignments_Request_User_Role", [
-  "reviewRequestId",
-  "userId",
-  "role",
-], { unique: true })
+@Index(
+  "UQ_WorkflowReviewAssignments_Request_User_Role",
+  ["reviewRequestId", "userId", "role"],
+  { unique: true },
+)
 @Index("IX_WorkflowReviewAssignments_User_Status", ["userId", "status"])
 export class WorkflowReviewAssignmentEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })

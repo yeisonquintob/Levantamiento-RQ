@@ -53,6 +53,7 @@
     "serve:identity": "nx serve identity-service",
     "serve:projects": "nx serve projects-service",
     "serve:sources": "nx serve sources-service",
+    "serve:workflow": "nx serve workflow-service",
     "sources:async:smoke": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-async-processing-smoke-test.ts",
     "sources:db:drop": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-drop-database.ts",
     "sources:db:ensure": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx scripts/sources-ensure-database.ts",

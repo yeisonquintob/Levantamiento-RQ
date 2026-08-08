@@ -13,6 +13,15 @@ import {
   WorkflowReviewAssignmentEntity,
   WorkflowReviewRequestEntity,
 } from "../reviews/entities";
+import { WorkflowDocumentsAccessClient } from "../reviews/documents-access.client";
+import { WorkflowProjectsAccessClient } from "../reviews/projects-access.client";
+import { WorkflowAccessTokenGuard } from "../reviews/workflow-access-token.guard";
+import {
+  loadWorkflowAuthConfig,
+  WORKFLOW_AUTH_CONFIG,
+} from "../reviews/workflow-auth.config";
+import { WorkflowReviewsController } from "../reviews/workflow-reviews.controller";
+import { WorkflowReviewsService } from "../reviews/workflow-reviews.service";
 
 const databaseConfig = loadSqlServerDatabaseConfig({
   serviceName: "workflow-service",
@@ -35,7 +44,24 @@ const workflowEntities = [
       ? [TypeOrmModule.forFeature(workflowEntities)]
       : []),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [
+    AppController,
+    ...(databaseConfig.enabled ? [WorkflowReviewsController] : []),
+  ],
+  providers: [
+    AppService,
+    ...(databaseConfig.enabled
+      ? [
+          {
+            provide: WORKFLOW_AUTH_CONFIG,
+            useFactory: loadWorkflowAuthConfig,
+          },
+          WorkflowAccessTokenGuard,
+          WorkflowProjectsAccessClient,
+          WorkflowDocumentsAccessClient,
+          WorkflowReviewsService,
+        ]
+      : []),
+  ],
 })
 export class AppModule {}

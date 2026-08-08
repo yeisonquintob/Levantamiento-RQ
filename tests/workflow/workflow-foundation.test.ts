@@ -8,6 +8,12 @@ import {
   WORKFLOW_ASSIGNMENT_STATUSES,
   WORKFLOW_REVIEW_STATUSES,
 } from "../../libs/shared/contracts/src/lib/workflow.js";
+import { loadWorkflowAuthConfig } from "../../apps/workflow-service/src/reviews/workflow-auth.config.js";
+import {
+  parseAddComment,
+  parseCreateReview,
+  parseDecision,
+} from "../../apps/workflow-service/src/reviews/workflow-input.js";
 
 test("el contrato publica los estados y acciones del Punto 19", () => {
   assert.deepEqual(WORKFLOW_REVIEW_STATUSES, [
@@ -117,4 +123,78 @@ test("Workflow publica comandos repetibles para activar y verificar su base", as
   assert.match(environmentExample, /WORKFLOW_CREATE_DATABASE=false/);
   assert.match(ensureScript, /WORKFLOW_CREATE_DATABASE/);
   assert.match(verifyScript, /CreateWorkflowFoundation1786406400000/);
+});
+
+test("la entrada exige concurrencia optimista y limita comentarios", () => {
+  assert.deepEqual(
+    parseCreateReview({ expectedDocumentRevision: 3, comment: "Lista" }),
+    { expectedDocumentRevision: 3, comment: "Lista" },
+  );
+  assert.deepEqual(
+    parseAddComment({
+      expectedReviewRevision: 2,
+      comment: " Revisar alcance ",
+    }),
+    { expectedReviewRevision: 2, comment: "Revisar alcance" },
+  );
+  assert.deepEqual(
+    parseDecision({
+      expectedReviewRevision: 2,
+      expectedDocumentRevision: 4,
+    }),
+    {
+      expectedReviewRevision: 2,
+      expectedDocumentRevision: 4,
+      comment: null,
+    },
+  );
+  assert.throws(() =>
+    parseAddComment({ expectedReviewRevision: 1, comment: "" }),
+  );
+  assert.throws(() => parseCreateReview({ expectedDocumentRevision: 0 }));
+});
+
+test("la configuración segura valida secreto, URLs y tiempos", () => {
+  const config = loadWorkflowAuthConfig({
+    JWT_ACCESS_SECRET: "s".repeat(32),
+    PROJECTS_SERVICE_URL: "http://projects.internal:3002/",
+    DOCUMENTS_SERVICE_URL: "http://documents.internal:3004/",
+    PROJECTS_TIMEOUT_MS: "1200",
+    DOCUMENTS_TIMEOUT_MS: "1500",
+  });
+
+  assert.equal(config.projectsServiceUrl, "http://projects.internal:3002");
+  assert.equal(config.documentsServiceUrl, "http://documents.internal:3004");
+  assert.equal(config.projectsTimeoutMs, 1200);
+  assert.equal(config.documentsTimeoutMs, 1500);
+  assert.throws(() => loadWorkflowAuthConfig({ JWT_ACCESS_SECRET: "short" }));
+});
+
+test("la API coordina revisiones sin apropiarse de datos documentales", async () => {
+  const controller = await readFile(
+    "apps/workflow-service/src/reviews/workflow-reviews.controller.ts",
+    "utf8",
+  );
+  const service = await readFile(
+    "apps/workflow-service/src/reviews/workflow-reviews.service.ts",
+    "utf8",
+  );
+  const documentsClient = await readFile(
+    "apps/workflow-service/src/reviews/documents-access.client.ts",
+    "utf8",
+  );
+
+  for (const action of ["comments", "request-changes", "approve", "reject"]) {
+    assert.match(controller, new RegExp(action));
+  }
+  assert.match(controller, /WorkflowAccessTokenGuard/);
+  assert.match(service, /expectedReviewRevision/);
+  assert.match(service, /idempotencyKey/);
+  assert.match(service, /WorkflowReviewActivityEntity/);
+  assert.match(documentsClient, /submit-review/);
+  assert.match(documentsClient, /"approve" \| "reject"/);
+  assert.doesNotMatch(
+    service,
+    /DocumentVersionEntity|RequirementDocumentEntity/,
+  );
 });

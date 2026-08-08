@@ -39,6 +39,11 @@ async function bootstrap(): Promise<void> {
       .setDescription("Revisión, aprobación y control de estados.")
       .setVersion("1.0.0")
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag("workflow", "Revisiones, comentarios, correcciones y decisiones")
+      .addBearerAuth(
+        { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+        "access-token",
+      )
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
