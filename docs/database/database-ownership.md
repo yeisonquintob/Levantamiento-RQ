@@ -1,15 +1,15 @@
 # Propiedad de bases de datos
 
-| Servicio      | Base prevista    | Estado      |
-| ------------- | ---------------- | ----------- |
+| Servicio      | Base prevista    | Estado       |
+| ------------- | ---------------- | ------------ |
 | Identity      | RqIdentityDb     | Implementada |
 | Projects      | RqProjectsDb     | Implementada |
 | Sources       | RqSourcesDb      | Implementada |
 | Documents     | RqDocumentsDb    | Implementada |
-| AI Analysis   | RqAiDb           | Planificada |
-| ERP Knowledge | RqErpKnowledgeDb | Futura      |
-| Workflow      | RqWorkflowDb     | Planificada |
-| Operations    | RqOperationsDb   | Planificada |
+| AI Analysis   | RqAiDb           | Implementada |
+| ERP Knowledge | RqErpKnowledgeDb | Futura       |
+| Workflow      | RqWorkflowDb     | Implementada |
+| Operations    | RqOperationsDb   | Planificada  |
 
 ## Reglas
 
@@ -40,3 +40,10 @@ metadatos, versión SemVer, estado y definición JSON de cada plantilla. No
 existen claves foráneas hacia otras bases; los identificadores de usuario y
 la plantilla de origen se conservan como referencias externas o internas sin
 acoplar dominios.
+
+## Workflow Service
+
+`RqWorkflowDb` almacena solicitudes, asignaciones y actividades de revisión.
+Proyecto, documento, versión y usuario se conservan como identificadores
+externos. Solo asignaciones y actividades tienen claves foráneas internas hacia
+su solicitud de revisión.

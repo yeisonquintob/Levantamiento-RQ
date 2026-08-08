@@ -51,3 +51,7 @@ CSS, JavaScript y favicons desde la dependencia local `swagger-ui-dist`.
 La validación automática comprueba la interfaz, el documento OpenAPI y los
 seis recursos estáticos necesarios. Una respuesta HTML por sí sola no se
 considera una validación completa.
+
+Para Gateway y Workflow también comprueba las siete rutas del expediente de
+revisión. En Gateway verifica además que no reaparezcan las transiciones
+directas de aprobación o rechazo de Documents.

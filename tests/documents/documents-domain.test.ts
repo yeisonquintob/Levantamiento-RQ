@@ -45,7 +45,10 @@ test("el contrato conserva exactamente los trece puntos canónicos", () => {
 
 test("las ediciones exigen revisión optimista y JSON serializable", () => {
   assert.deepEqual(
-    parseUpdateSection({ expectedRevision: 4, content: { general: "Definir" } }),
+    parseUpdateSection({
+      expectedRevision: 4,
+      content: { general: "Definir" },
+    }),
     { expectedRevision: 4, content: { general: "Definir" } },
   );
   assert.throws(
@@ -166,7 +169,7 @@ test("aprobación, bloqueo, historial y concurrencia están protegidos", async (
   assert.match(service, /templateControlled/);
 });
 
-test("REST y Gateway publican el dominio documental completo", async () => {
+test("REST publica Documents y Gateway delega las decisiones a Workflow", async () => {
   const controller = await readFile(
     "apps/documents-service/src/documents/documents.controller.ts",
     "utf8",
@@ -175,20 +178,37 @@ test("REST y Gateway publican el dominio documental completo", async () => {
     "apps/gateway/src/documents/documents-gateway.controller.ts",
     "utf8",
   );
+  const workflowGateway = await readFile(
+    "apps/gateway/src/workflow/workflow-gateway.controller.ts",
+    "utf8",
+  );
 
   for (const routeFragment of [
     "projects/:projectId/documents",
     "documents/:documentId/versions",
     "sections/:sectionKey",
     "versions/:versionNumber/fields",
-    "submit-review",
-    "approve",
-    "reject",
     "history",
     "template",
     "archive",
   ]) {
     assert.match(controller, new RegExp(routeFragment.replaceAll("/", "\\/")));
     assert.match(gateway, new RegExp(routeFragment.replaceAll("/", "\\/")));
+  }
+
+  for (const internalTransition of ["submit-review", "approve", "reject"]) {
+    assert.match(controller, new RegExp(internalTransition));
+    assert.doesNotMatch(gateway, new RegExp(internalTransition));
+  }
+
+  for (const workflowAction of [
+    "reviews/:reviewId/request-changes",
+    "reviews/:reviewId/approve",
+    "reviews/:reviewId/reject",
+  ]) {
+    assert.match(
+      workflowGateway,
+      new RegExp(workflowAction.replaceAll("/", "\\/")),
+    );
   }
 });

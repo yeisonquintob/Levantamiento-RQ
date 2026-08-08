@@ -61,3 +61,4 @@
 - [Projects Service y Workspace](projects-service-foundation.md)
 - [Sources Service, archivos y extracción](sources-service-foundation.md)
 - [Documents Service y catálogo de plantillas](documents-template-catalog.md)
+- [Workflow funcional, revisión y aprobación](workflow-review-approval.md)

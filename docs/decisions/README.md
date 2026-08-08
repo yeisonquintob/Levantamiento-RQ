@@ -29,3 +29,4 @@
 - [ADR-0022: Sources Service y fuentes textuales](0022-sources-text-foundation.md)
 - [ADR-0023: Archivos de fuentes y extracción controlada](0023-source-files-and-extraction.md)
 - [ADR-0024: Catálogo de plantillas documentales versionadas](0024-document-template-catalog.md)
+- [ADR-0025: Workflow coordina la revisión y Documents conserva el contenido](0025-workflow-review-approval.md)

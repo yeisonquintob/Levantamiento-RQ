@@ -162,3 +162,24 @@ tratan como datos y no pueden reemplazar instrucciones de la plantilla.
 
 Una versión publicada es inmutable. Los cambios se realizan clonando una
 versión publicada o retirada hacia un nuevo borrador SemVer.
+
+## Punto 19: versionamiento, revisión y aprobaciones
+
+`RqWorkflowDb` y Workflow Service implementan solicitudes de revisión,
+asignaciones, comentarios, correcciones, aprobaciones, rechazos e historial
+correlacionado. Documents conserva el contenido y bloquea toda versión
+aprobada; modificarla exige crear una versión nueva.
+
+El Gateway publica únicamente el flujo formal de Workflow y el editor permite
+enviar a validación, comentar, solicitar correcciones, aprobar o rechazar. Las
+mutaciones requieren `x-idempotency-key` y revisiones optimistas.
+
+Validación específica:
+
+```bash
+pnpm validate:workflow
+pnpm workflow:gateway:e2e
+pnpm swagger:validate
+```
+
+Detalle: [Workflow funcional, revisión y aprobación](docs/architecture/workflow-review-approval.md).

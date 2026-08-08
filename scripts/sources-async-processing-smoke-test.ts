@@ -66,6 +66,7 @@ async function removeSmokeJobs(
     "waiting",
     "delayed",
     "paused",
+    "prioritized",
   ]);
 
   for (const job of jobs) {
@@ -73,6 +74,31 @@ async function removeSmokeJobs(
       await job.remove();
     }
   }
+}
+
+async function waitForSmokeJobsToSettle(
+  queue: SourceProcessingQueue["bullQueue"],
+  sourceIds: readonly string[],
+): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const jobs = await queue.getJobs([
+      "active",
+      "waiting",
+      "delayed",
+      "paused",
+      "prioritized",
+    ]);
+    const pendingSmokeJob = jobs.some((job) =>
+      sourceIds.includes(job.data.sourceId),
+    );
+
+    if (!pendingSmokeJob) return;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+
+  throw new Error(
+    "Los trabajos temporales del smoke no finalizaron antes de la limpieza.",
+  );
 }
 
 async function main(): Promise<void> {
@@ -234,7 +260,10 @@ async function main(): Promise<void> {
       );
     }
 
+    await waitForSmokeJobsToSettle(queue, sourceIds);
     await removeSmokeJobs(queue, sourceIds);
+    await queue.clean(0, 1000, "completed");
+    await queue.clean(0, 1000, "failed");
     await sources.delete({ projectId });
 
     for (const blobPath of blobPaths) {
@@ -252,7 +281,9 @@ async function main(): Promise<void> {
       remainingRows !== 0 ||
       blobsRemain
     ) {
-      throw new Error("La limpieza temporal del smoke no quedó completa.");
+      throw new Error(
+        `La limpieza temporal del smoke no quedó completa: jobs=${JSON.stringify(finalCounts)}, rows=${remainingRows}, blobs=${blobsRemain}.`,
+      );
     }
 
     console.log("✓ Dos archivos sin clasificación quedaron OTHER y PENDING.");
@@ -261,6 +292,7 @@ async function main(): Promise<void> {
     console.log("✓ Procesar todos completó solo la pendiente y omitió READY.");
     console.log("✓ Repetición idempotente, filas, blobs y jobs eliminados.");
   } finally {
+    await waitForSmokeJobsToSettle(queue, sourceIds);
     await removeSmokeJobs(queue, sourceIds);
     await sources.delete({ projectId });
 

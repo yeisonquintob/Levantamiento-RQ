@@ -108,6 +108,10 @@ test("Workflow publica comandos repetibles para activar y verificar su base", as
     "scripts/workflow-verify-database.ts",
     "utf8",
   );
+  const commandScript = await readFile(
+    "scripts/workflow-database-command.sh",
+    "utf8",
+  );
 
   for (const command of [
     "workflow:db:ensure",
@@ -123,6 +127,9 @@ test("Workflow publica comandos repetibles para activar y verificar su base", as
   assert.match(environmentExample, /WORKFLOW_CREATE_DATABASE=false/);
   assert.match(ensureScript, /WORKFLOW_CREATE_DATABASE/);
   assert.match(verifyScript, /CreateWorkflowFoundation1786406400000/);
+  assert.match(commandScript, /apps\/workflow-service\/\.env/);
+  assert.match(commandScript, /apps\/documents-service\/\.env/);
+  assert.match(commandScript, /DB_NAME=RqWorkflowDb/);
 });
 
 test("la entrada exige concurrencia optimista y limita comentarios", () => {

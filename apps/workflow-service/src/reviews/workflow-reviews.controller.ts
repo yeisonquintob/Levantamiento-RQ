@@ -54,14 +54,14 @@ function actorContext(request: WorkflowRequest): WorkflowActorContext {
 }
 
 const decisionSchema = {
-  type: "object",
+  type: "object" as const,
   required: ["expectedReviewRevision", "expectedDocumentRevision"],
   properties: {
-    expectedReviewRevision: { type: "integer", minimum: 1 },
-    expectedDocumentRevision: { type: "integer", minimum: 1 },
-    comment: { type: "string", maxLength: 4000, nullable: true },
+    expectedReviewRevision: { type: "integer" as const, minimum: 1 },
+    expectedDocumentRevision: { type: "integer" as const, minimum: 1 },
+    comment: { type: "string" as const, maxLength: 4000, nullable: true },
   },
-} as const;
+};
 
 @ApiTags("workflow")
 @ApiBearerAuth("access-token")

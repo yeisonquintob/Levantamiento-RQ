@@ -87,12 +87,12 @@
     "validate:sources": "nx run-many --target=lint,build --projects=sources-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:sources",
     "validate:web": "nx run-many --target=lint,build --projects=web,shared-ui",
     "validate:workflow": "nx run-many --target=lint,build --projects=workflow-service,gateway,web,shared-contracts,shared-ui --parallel=3 && pnpm test:workflow",
-    "workflow:db:ensure": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-ensure-database.ts",
-    "workflow:db:state": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-database-state.ts",
-    "workflow:db:verify": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-verify-database.ts",
+    "workflow:db:ensure": "bash scripts/workflow-database-command.sh ensure",
+    "workflow:db:state": "bash scripts/workflow-database-command.sh state",
+    "workflow:db:verify": "bash scripts/workflow-database-command.sh verify",
     "workflow:gateway:e2e": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-gateway-e2e.ts",
-    "workflow:migration:revert": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-revert-migration.ts",
-    "workflow:migration:run": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-run-migrations.ts"
+    "workflow:migration:revert": "bash scripts/workflow-database-command.sh migration-revert",
+    "workflow:migration:run": "bash scripts/workflow-database-command.sh migration-run"
   },
   "private": true,
   "devDependencies": {

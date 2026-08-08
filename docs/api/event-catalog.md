@@ -46,3 +46,10 @@
 - El payload es mínimo.
 - No se envían archivos completos ni secretos.
 - Cada consumidor debe ser idempotente.
+
+## Estado de implementación
+
+El Punto 19 implementa revisión y aprobación mediante HTTP autenticado e
+idempotente. Los eventos `review.requested.v1`, `document.approved.v1` y
+`document.rejected.v1` continúan catalogados, pero su publicación en RabbitMQ o
+Azure Service Bus pertenece al alcance pendiente del Punto 10.
