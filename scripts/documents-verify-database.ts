@@ -99,6 +99,20 @@ async function main(): Promise<void> {
           'FK_AppliedAiAnalysisResults_Version'
         )
     `);
+    const scalarJsonMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AllowJsonScalarDocumentValues1786838400000'
+    `);
+    const scalarJsonConstraints = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.check_constraints
+      WHERE name IN (
+        'CK_DocumentSections_ContentJson',
+        'CK_DocumentFields_ValueJson'
+      )
+        AND definition LIKE '%CONCAT%'
+    `);
     const crossDatabaseForeignKeys = await count(`
       SELECT COUNT(1) AS countValue
       FROM sys.foreign_keys
@@ -119,6 +133,8 @@ async function main(): Promise<void> {
       aiApplicationTable !== 1 ||
       aiResultUniqueIndex !== 1 ||
       aiApplicationForeignKeys !== 2 ||
+      scalarJsonMigration !== 1 ||
+      scalarJsonConstraints !== 2 ||
       crossDatabaseForeignKeys !== 0
     ) {
       throw new Error(
@@ -143,6 +159,12 @@ async function main(): Promise<void> {
     );
     console.log(
       "Migración confirmada: AddAppliedAiAnalysisResults1786665600000",
+    );
+    console.log(
+      "Valores JSON escalares confirmados en secciones y campos documentales.",
+    );
+    console.log(
+      "Migración confirmada: AllowJsonScalarDocumentValues1786838400000",
     );
     console.log("Versionado único y autonomía de base de datos confirmados.");
   } finally {

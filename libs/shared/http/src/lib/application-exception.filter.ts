@@ -3,6 +3,7 @@ import {
   Catch,
   type ExceptionFilter,
   HttpException,
+  Logger,
 } from "@nestjs/common";
 
 import {
@@ -139,8 +140,25 @@ function resolveError(exception: unknown): ResolvedError {
   };
 }
 
+function safeUnhandledError(exception: unknown): string {
+  const raw =
+    exception instanceof Error
+      ? `${exception.name}: ${exception.message}`
+      : "UnknownError";
+
+  return raw
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [REDACTED]")
+    .replace(
+      /(password|token|secret|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+      "$1=[REDACTED]",
+    )
+    .slice(0, 2_000);
+}
+
 @Catch()
 export class ApplicationExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApplicationExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
     const request = http.getRequest<CorrelationAwareRequest>();
@@ -150,6 +168,16 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
     const correlationId =
       request.correlationId ??
       resolveCorrelationId(request.headers?.[CORRELATION_ID_HEADER]);
+
+    if (resolved.code === "UNHANDLED_ERROR") {
+      this.logger.error(
+        JSON.stringify({
+          correlationId,
+          instance: request.url ?? request.raw?.url ?? "",
+          error: safeUnhandledError(exception),
+        }),
+      );
+    }
 
     const body: ProblemDetails = {
       type: `https://errors.levantamiento-rq.local/${resolved.code.toLowerCase()}`,

@@ -232,6 +232,19 @@ test("aprobación, bloqueo, historial y concurrencia están protegidos", async (
   assert.match(service, /analysisResultId/);
 });
 
+test("la persistencia acepta los valores JSON escalares del contrato", async () => {
+  const migration = await readFile(
+    "apps/documents-service/src/database/migrations/1786838400000-AllowJsonScalarDocumentValues.ts",
+    "utf8",
+  );
+
+  assert.match(migration, /CK_DocumentSections_ContentJson/);
+  assert.match(migration, /CK_DocumentFields_ValueJson/);
+  assert.match(migration, /ISJSON\(CONCAT\(N'\[', ContentJson, N'\]'\)\) = 1/);
+  assert.match(migration, /ISJSON\(CONCAT\(N'\[', ValueJson, N'\]'\)\) = 1/);
+  assert.match(migration, /LEN\(LTRIM\(RTRIM\(ContentJson\)\)\) > 0/);
+});
+
 test("REST publica Documents y Gateway delega las decisiones a Workflow", async () => {
   const controller = await readFile(
     "apps/documents-service/src/documents/documents.controller.ts",

@@ -84,6 +84,7 @@
     "test:events": "TSX_TSCONFIG_PATH=libs/shared/messaging/tsconfig.lib.json node --import tsx --test tests/integration-events/*.test.ts",
     "test:operations": "TSX_TSCONFIG_PATH=apps/operations-service/tsconfig.app.json node --import tsx --test tests/operations/*.test.ts",
     "test:integration": "pnpm identity:db:verify && pnpm projects:db:verify && pnpm sources:db:verify && pnpm documents:db:verify && pnpm workflow:db:verify && pnpm sources:storage:verify && pnpm sources:queue:verify",
+    "test:e2e:v1": "bash scripts/v1-complete-e2e.sh",
     "test:projects": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx --test tests/projects/projects-foundation.test.ts",
     "test:smoke": "pnpm sources:async:smoke && pnpm sources:async:smoke",
     "test:sources": "TSX_TSCONFIG_PATH=apps/sources-service/tsconfig.app.json node --import tsx --test tests/sources/sources-foundation.test.ts",
