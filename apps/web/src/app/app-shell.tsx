@@ -27,12 +27,43 @@ interface WorkspacePageContext {
 }
 
 function resolvePageContext(pathname: string): WorkspacePageContext {
-  if (pathname.startsWith("/workspace/templates")) {
+  if (pathname.startsWith("/workspace/settings/templates")) {
     return {
-      eyebrow: "Configuración documental",
+      eyebrow: "Configuración",
       title: "Plantillas",
-      description:
-        "Catálogo versionado para requerimientos pequeños, medianos, grandes y FDD ERP.",
+      description: "Catálogo documental versionado.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/settings/users")) {
+    return {
+      eyebrow: "Configuración",
+      title: "Usuarios y roles",
+      description: "Cuentas, permisos y seguridad.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/settings/ai-providers")) {
+    return {
+      eyebrow: "Configuración",
+      title: "Proveedores de IA",
+      description: "Modelos, límites y credenciales protegidas.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/settings/audit")) {
+    return {
+      eyebrow: "Configuración",
+      title: "Auditoría",
+      description: "Trazabilidad de operaciones y eventos.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/settings/general")) {
+    return {
+      eyebrow: "Configuración",
+      title: "General",
+      description: "Preferencias personales y parámetros existentes.",
     };
   }
 
@@ -86,19 +117,11 @@ function resolvePageContext(pathname: string): WorkspacePageContext {
     };
   }
 
-  if (pathname.startsWith("/workspace/audit")) {
-    return {
-      eyebrow: "Trazabilidad",
-      title: "Auditoría",
-      description: "Actividad verificable y correlacionada por proyecto.",
-    };
-  }
-
   if (pathname.startsWith("/workspace/settings")) {
     return {
       eyebrow: "Sistema",
       title: "Configuración",
-      description: "Plantillas, permisos y parámetros de la plataforma.",
+      description: "Administración y parámetros de la plataforma.",
     };
   }
 
@@ -149,13 +172,6 @@ export function AppShell({ children, user }: AppShellProps) {
   const initials = resolveInitials(user.displayName);
   const profile = resolveProfile(user.roles);
   const pageContext = resolvePageContext(pathname);
-  const canManageUsers = user.permissions.includes("system.admin");
-  const canManageTemplates =
-    user.roles.some((role) => role.toUpperCase() === "ADMIN") ||
-    user.permissions.includes("system.admin") ||
-    user.permissions.includes("documents.templates.manage");
-  const showAdministration = canManageTemplates || canManageUsers;
-
   useEffect(() => {
     function closeFromOutside(event: MouseEvent): void {
       if (
@@ -368,22 +384,10 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Notificaciones</span>
           </a>
 
+          <span className="rq-nav__label">Administración</span>
           <a
             aria-current={
-              pathname.startsWith("/workspace/audit") ? "page" : undefined
-            }
-            href="/workspace/audit"
-            onClick={() => setMenuOpen(false)}
-          >
-            <span aria-hidden="true" className="rq-nav__icon">
-              A
-            </span>
-            <span>Auditoría</span>
-          </a>
-
-          <a
-            aria-current={
-              pathname === "/workspace/settings" ? "page" : undefined
+              pathname.startsWith("/workspace/settings") ? "page" : undefined
             }
             href="/workspace/settings"
             onClick={() => setMenuOpen(false)}
@@ -393,60 +397,6 @@ export function AppShell({ children, user }: AppShellProps) {
             </span>
             <span>Configuración</span>
           </a>
-
-          {showAdministration ? (
-            <>
-              <span className="rq-nav__label">Administración</span>
-              {canManageTemplates ? (
-                <a
-                  aria-current={
-                    pathname.startsWith("/workspace/templates")
-                      ? "page"
-                      : undefined
-                  }
-                  href="/workspace/templates"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <span aria-hidden="true" className="rq-nav__icon">
-                    T
-                  </span>
-                  <span>Plantillas</span>
-                </a>
-              ) : null}
-              {canManageUsers ? (
-                <>
-                  <a
-                    aria-current={
-                      pathname.startsWith("/workspace/settings/users")
-                        ? "page"
-                        : undefined
-                    }
-                    href="/workspace/settings/users"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <span aria-hidden="true" className="rq-nav__icon">
-                      U
-                    </span>
-                    <span>Usuarios</span>
-                  </a>
-                  <a
-                    aria-current={
-                      pathname.startsWith("/workspace/settings/ai-providers")
-                        ? "page"
-                        : undefined
-                    }
-                    href="/workspace/settings/ai-providers"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <span aria-hidden="true" className="rq-nav__icon">
-                      IA
-                    </span>
-                    <span>Proveedores IA</span>
-                  </a>
-                </>
-              ) : null}
-            </>
-          ) : null}
         </nav>
       </aside>
 
@@ -471,21 +421,21 @@ export function AppShell({ children, user }: AppShellProps) {
               ? "Revisión, observaciones y aprobación documental · Paso 17"
               : pathname.startsWith("/workspace/notifications")
                 ? "Notificaciones internas generadas por eventos idempotentes"
-                : pathname.startsWith("/workspace/audit")
+                : pathname.startsWith("/workspace/settings/audit")
                   ? "Auditoría funcional y correlación por proyecto"
-                  : pathname === "/workspace/settings"
-                    ? "Preferencias personales y administración segura del sistema"
-                    : pathname.startsWith("/workspace/templates")
-                      ? "Catálogo de plantillas configurables y versionadas · Paso 14"
-                      : pathname.startsWith("/workspace/sources")
-                        ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-                        : pathname.startsWith("/workspace/projects")
-                          ? "Gestión de proyectos y participantes · Paso 12"
-                          : pathname.startsWith(
-                                "/workspace/settings/ai-providers",
-                              )
-                            ? "Configuración segura de proveedores de inteligencia artificial"
-                            : "Flujo documental: datos, análisis, borradores y aprobación"}
+                  : pathname.startsWith("/workspace/settings/templates")
+                    ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+                    : pathname.startsWith("/workspace/settings/users")
+                      ? "Administración segura de usuarios, roles y sesiones"
+                      : pathname.startsWith("/workspace/settings/ai-providers")
+                        ? "Configuración segura de proveedores de inteligencia artificial"
+                        : pathname.startsWith("/workspace/settings")
+                          ? "Preferencias personales y administración segura del sistema"
+                          : pathname.startsWith("/workspace/sources")
+                            ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+                            : pathname.startsWith("/workspace/projects")
+                              ? "Gestión de proyectos y participantes · Paso 12"
+                              : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );

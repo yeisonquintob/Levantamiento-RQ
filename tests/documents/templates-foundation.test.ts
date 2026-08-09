@@ -259,7 +259,7 @@ test("publicadas y retiradas son inmutables y se clonan a borrador", async () =>
   assert.match(service, /sourceTemplateId: source\.id/);
 });
 
-test("Gateway y Workspace exponen Plantillas dentro de Administración", async () => {
+test("Gateway y Configuración exponen Plantillas sin duplicar su lógica", async () => {
   const gatewayModule = await readFile(
     "apps/gateway/src/app/app.module.ts",
     "utf8",
@@ -269,7 +269,7 @@ test("Gateway y Workspace exponen Plantillas dentro de Administración", async (
     "utf8",
   );
   const page = await readFile(
-    "apps/web/src/app/workspace/templates/page.tsx",
+    "apps/web/src/app/workspace/settings/templates/page.tsx",
     "utf8",
   );
   const workspace = await readFile(
@@ -292,19 +292,9 @@ test("Gateway y Workspace exponen Plantillas dentro de Administración", async (
   assert.match(workspace, /removeSection/);
   assert.match(workspace, /payload\.detail/);
   assert.match(workspace, /credentials: "include"/);
-  assert.match(shell, /href="\/workspace\/templates"/);
+  assert.doesNotMatch(shell, /href="\/workspace\/templates"/);
+  assert.match(shell, /href="\/workspace\/settings"/);
   assert.match(shell, /Catálogo de plantillas/);
-  assert.match(shell, /documents\.templates\.manage/);
-  assert.match(shell, /role\.toUpperCase\(\) === "ADMIN"/);
-  assert.match(shell, /\{canManageTemplates \? \(/);
-  assert.ok(
-    shell.indexOf('<span className="rq-nav__label">Administración</span>') <
-      shell.indexOf('href="/workspace/templates"'),
-  );
-  assert.ok(
-    shell.indexOf('href="/workspace/templates"') <
-      shell.indexOf('href="/workspace/settings/users"'),
-  );
   assert.ok(
     shell.indexOf('href="/workspace/validation"') <
       shell.indexOf('<span className="rq-nav__label">Administración</span>'),
