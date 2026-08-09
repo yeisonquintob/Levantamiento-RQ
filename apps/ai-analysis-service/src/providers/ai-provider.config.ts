@@ -7,6 +7,7 @@ export type AiSecretVaultMode = "MACOS_KEYCHAIN" | "DISABLED";
 export interface AiProviderRuntimeConfig {
   vaultMode: AiSecretVaultMode;
   keychainService: string;
+  executionMode: "OPENAI" | "FAKE";
 }
 
 export function loadAiProviderRuntimeConfig(
@@ -28,5 +29,18 @@ export function loadAiProviderRuntimeConfig(
     throw new Error("AI_KEYCHAIN_SERVICE no es válido.");
   }
 
-  return { vaultMode, keychainService };
+  const rawExecutionMode =
+    environment.AI_EXECUTION_MODE?.trim().toUpperCase() || "OPENAI";
+  if (!["OPENAI", "FAKE"].includes(rawExecutionMode)) {
+    throw new Error("AI_EXECUTION_MODE debe ser OPENAI o FAKE.");
+  }
+  if (rawExecutionMode === "FAKE" && environment.NODE_ENV === "production") {
+    throw new Error("AI_EXECUTION_MODE=FAKE no está permitido en producción.");
+  }
+
+  return {
+    vaultMode,
+    keychainService,
+    executionMode: rawExecutionMode as "OPENAI" | "FAKE",
+  };
 }

@@ -13,14 +13,8 @@ import {
   type AiAnalysisAuthConfig,
 } from "./ai-analysis-auth.config";
 
-function sameUuid(
-  left: string | null | undefined,
-  right: string,
-): boolean {
-  return (
-    typeof left === "string" &&
-    left.toLowerCase() === right.toLowerCase()
-  );
+function sameUuid(left: string | null | undefined, right: string): boolean {
+  return typeof left === "string" && left.toLowerCase() === right.toLowerCase();
 }
 
 @Injectable()
@@ -80,12 +74,7 @@ export class AiAnalysisDocumentsAccessClient {
       );
     }
 
-    if (
-      !sameUuid(
-        document.currentVersionDetail?.id,
-        documentVersionId,
-      )
-    ) {
+    if (!sameUuid(document.currentVersionDetail?.id, documentVersionId)) {
       throw new ConflictException(
         "Solo se puede analizar la versión actual del documento.",
       );

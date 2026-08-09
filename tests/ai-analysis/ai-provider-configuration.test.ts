@@ -65,10 +65,12 @@ test("la configuración de runtime rechaza bóvedas inseguras o desconocidas", (
     loadAiProviderRuntimeConfig({
       AI_SECRET_VAULT: "MACOS_KEYCHAIN",
       AI_KEYCHAIN_SERVICE: "com.example.ai",
+      AI_EXECUTION_MODE: "OPENAI",
     }),
     {
       vaultMode: "MACOS_KEYCHAIN",
       keychainService: "com.example.ai",
+      executionMode: "OPENAI",
     },
   );
 });

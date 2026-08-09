@@ -13,14 +13,8 @@ import {
   type AiAnalysisAuthConfig,
 } from "./ai-analysis-auth.config";
 
-function sameUuid(
-  left: string | null | undefined,
-  right: string,
-): boolean {
-  return (
-    typeof left === "string" &&
-    left.toLowerCase() === right.toLowerCase()
-  );
+function sameUuid(left: string | null | undefined, right: string): boolean {
+  return typeof left === "string" && left.toLowerCase() === right.toLowerCase();
 }
 
 @Injectable()
@@ -92,9 +86,7 @@ export class AiAnalysisSourcesAccessClient {
     }
 
     if (source.status !== "ACTIVE") {
-      throw new ConflictException(
-        `La fuente ${sourceId} no está activa.`,
-      );
+      throw new ConflictException(`La fuente ${sourceId} no está activa.`);
     }
 
     if (source.processingStatus !== "READY") {

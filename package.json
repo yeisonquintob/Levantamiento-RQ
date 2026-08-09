@@ -5,6 +5,7 @@
   "scripts": {
     "ai:db:ensure": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-ensure-database.ts",
     "ai:db:verify": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-verify-database.ts",
+    "ai:execution:smoke": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-analysis-execution-smoke.ts",
     "ai:gateway:e2e": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-analysis-gateway-e2e.ts",
     "ai:gateway:e2e:twice": "bash scripts/ai-analysis-gateway-e2e-twice.sh",
     "ai:migration:revert": "TSX_TSCONFIG_PATH=apps/ai-analysis-service/tsconfig.app.json node --import tsx scripts/ai-revert-migration.ts",

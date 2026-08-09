@@ -1,3 +1,5 @@
+import type { DocumentJsonValue, DocumentSectionKey } from "./documents.js";
+
 export const AI_ANALYSIS_TYPES = ["REQUIREMENT_DOCUMENT"] as const;
 
 export type AiAnalysisType = (typeof AI_ANALYSIS_TYPES)[number];
@@ -119,6 +121,55 @@ export interface AiAnalysisRequestSourceDetail {
   createdAt: string;
 }
 
+export const AI_ANALYSIS_RESULT_STATUSES = [
+  "GENERATED",
+  "ACCEPTED",
+  "REJECTED",
+] as const;
+
+export type AiAnalysisResultStatus =
+  (typeof AI_ANALYSIS_RESULT_STATUSES)[number];
+
+export interface AiAnalysisDraftSection {
+  key: DocumentSectionKey;
+  title: string;
+  content: DocumentJsonValue;
+}
+
+export interface AiAnalysisDraftRequirement {
+  clientId: string;
+  sectionKey: DocumentSectionKey;
+  code: string;
+  title: string;
+  description: string;
+  requirementType: string;
+  acceptanceCriteria: readonly string[];
+  sourceIds: readonly string[];
+}
+
+export interface AiAnalysisDraft {
+  schemaVersion: "1.0.0";
+  sections: readonly AiAnalysisDraftSection[];
+  requirements: readonly AiAnalysisDraftRequirement[];
+  pendingQuestions: readonly string[];
+  contradictions: readonly string[];
+  warnings: readonly string[];
+}
+
+export interface AiAnalysisResultDetail {
+  id: string;
+  analysisRequestId: string;
+  analysisExecutionId: string;
+  status: AiAnalysisResultStatus;
+  schemaVersion: string;
+  draft: AiAnalysisDraft;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  reviewComment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AiAnalysisExecutionDetail {
   id: string;
   analysisRequestId: string;
@@ -156,6 +207,7 @@ export interface AiAnalysisRequestSummary {
 export interface AiAnalysisRequestDetail extends AiAnalysisRequestSummary {
   sources: readonly AiAnalysisRequestSourceDetail[];
   executions: readonly AiAnalysisExecutionDetail[];
+  result: AiAnalysisResultDetail | null;
 }
 
 export interface AiAnalysisRequestListResponse {

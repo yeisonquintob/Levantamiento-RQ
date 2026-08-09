@@ -14,11 +14,20 @@ import { AiAnalysisAccessTokenGuard } from "../analysis/ai-analysis-access-token
 import { AiAnalysisController } from "../analysis/ai-analysis.controller";
 import { AiAnalysisService } from "../analysis/ai-analysis.service";
 import { AnalysisExecutionEntity } from "../analysis/analysis-execution.entity";
+import { AnalysisPromptVersionEntity } from "../analysis/analysis-prompt-version.entity";
 import { AnalysisRequestSourceEntity } from "../analysis/analysis-request-source.entity";
 import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
+import { AnalysisResultEntity } from "../analysis/analysis-result.entity";
 import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
 import { AiAnalysisProjectsAccessClient } from "../analysis/projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "../analysis/sources-access.client";
+import { AiAnalysisExecutionService } from "../execution/ai-analysis-execution.service";
+import {
+  AI_ANALYSIS_PROCESSING_CONFIG,
+  loadAiAnalysisProcessingConfig,
+} from "../execution/ai-analysis-processing.config";
+import { AiAnalysisWorker } from "../execution/ai-analysis.worker";
+import { AiAnalysisQueue } from "../execution/ai-analysis.queue";
 import { AiProviderAuditEntity } from "../providers/ai-provider-audit.entity";
 import { AiProviderConfigurationEntity } from "../providers/ai-provider-configuration.entity";
 import { AiProviderConfigurationsController } from "../providers/ai-provider-configurations.controller";
@@ -45,6 +54,8 @@ const aiAnalysisEntities = [
   AnalysisExecutionEntity,
   AiProviderConfigurationEntity,
   AiProviderAuditEntity,
+  AnalysisPromptVersionEntity,
+  AnalysisResultEntity,
 ];
 
 @Module({
@@ -77,6 +88,11 @@ const aiAnalysisEntities = [
           AiAnalysisSourcesAccessClient,
           AiAnalysisService,
           {
+            provide: AI_ANALYSIS_PROCESSING_CONFIG,
+            useFactory: loadAiAnalysisProcessingConfig,
+          },
+          AiAnalysisQueue,
+          {
             provide: AI_PROVIDER_RUNTIME_CONFIG,
             useFactory: loadAiProviderRuntimeConfig,
           },
@@ -86,6 +102,8 @@ const aiAnalysisEntities = [
             useExisting: PlatformAiSecretVault,
           },
           AiProviderConfigurationsService,
+          AiAnalysisExecutionService,
+          AiAnalysisWorker,
         ]
       : []),
   ],

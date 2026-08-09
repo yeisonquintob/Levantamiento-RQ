@@ -53,11 +53,7 @@ function integer(
 
   const parsed = Number(raw);
 
-  if (
-    !Number.isInteger(parsed) ||
-    parsed < minimum ||
-    parsed > maximum
-  ) {
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
     throw new BadRequestException(
       `${name} debe estar entre ${minimum} y ${maximum}.`,
     );
@@ -112,10 +108,7 @@ export function parseCreateAiAnalysisRequest(
   return {
     analysisType: "REQUIREMENT_DOCUMENT",
     documentId: uuid(record.documentId, "documentId"),
-    documentVersionId: uuid(
-      record.documentVersionId,
-      "documentVersionId",
-    ),
+    documentVersionId: uuid(record.documentVersionId, "documentVersionId"),
     sourceIds,
   };
 }

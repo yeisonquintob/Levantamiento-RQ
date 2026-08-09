@@ -18,9 +18,7 @@ import {
 } from "./ai-analysis-auth.config";
 import type { AiAnalysisRequest } from "./ai-analysis-request";
 
-function readBearerToken(
-  authorization: string | string[] | undefined,
-): string {
+function readBearerToken(authorization: string | string[] | undefined): string {
   const header = Array.isArray(authorization)
     ? authorization[0]
     : authorization;
@@ -57,9 +55,7 @@ export class AiAnalysisAccessTokenGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context
-      .switchToHttp()
-      .getRequest<AiAnalysisRequest>();
+    const request = context.switchToHttp().getRequest<AiAnalysisRequest>();
     const token = readBearerToken(request.headers.authorization);
 
     try {
@@ -77,8 +73,7 @@ export class AiAnalysisAccessTokenGuard implements CanActivate {
         throw new UnauthorizedException("Tipo de token inválido.");
       }
 
-      const mustChangePassword =
-        result.payload.mustChangePassword === true;
+      const mustChangePassword = result.payload.mustChangePassword === true;
 
       if (mustChangePassword) {
         throw new ForbiddenException(

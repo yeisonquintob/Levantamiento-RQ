@@ -33,9 +33,7 @@ function isAdministrator(actor: AuthenticatedUser): boolean {
   );
 }
 
-function canManageAnalysis(
-  role: ProjectParticipantRole | "ADMIN",
-): boolean {
+function canManageAnalysis(role: ProjectParticipantRole | "ADMIN"): boolean {
   return role === "ADMIN" || role === "OWNER" || role === "EDITOR";
 }
 
@@ -56,13 +54,7 @@ export class AiAnalysisProjectsAccessClient {
     actor: AuthenticatedUser,
     correlationId: string,
   ): Promise<AiAnalysisProjectAccess> {
-    return this.resolve(
-      projectId,
-      accessToken,
-      actor,
-      correlationId,
-      "READ",
-    );
+    return this.resolve(projectId, accessToken, actor, correlationId, "READ");
   }
 
   requireCreate(
@@ -71,13 +63,7 @@ export class AiAnalysisProjectsAccessClient {
     actor: AuthenticatedUser,
     correlationId: string,
   ): Promise<AiAnalysisProjectAccess> {
-    return this.resolve(
-      projectId,
-      accessToken,
-      actor,
-      correlationId,
-      "CREATE",
-    );
+    return this.resolve(projectId, accessToken, actor, correlationId, "CREATE");
   }
 
   requireCancel(
@@ -86,13 +72,7 @@ export class AiAnalysisProjectsAccessClient {
     actor: AuthenticatedUser,
     correlationId: string,
   ): Promise<AiAnalysisProjectAccess> {
-    return this.resolve(
-      projectId,
-      accessToken,
-      actor,
-      correlationId,
-      "CANCEL",
-    );
+    return this.resolve(projectId, accessToken, actor, correlationId, "CANCEL");
   }
 
   private async resolve(
@@ -135,8 +115,8 @@ export class AiAnalysisProjectsAccessClient {
     const administrator = isAdministrator(actor);
     const role = administrator
       ? "ADMIN"
-      : project.participants.find(
-          (participant) => sameUuid(participant.userId, actor.id),
+      : project.participants.find((participant) =>
+          sameUuid(participant.userId, actor.id),
         )?.role;
 
     if (!role) {

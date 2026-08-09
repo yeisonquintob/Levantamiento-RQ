@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  PrimaryColumn,
-} from "typeorm";
+import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 
 import type {
   AiAnalysisStatus,
@@ -47,6 +42,15 @@ export class AnalysisExecutionEntity {
     nullable: true,
   })
   model!: string | null;
+
+  @Column("uniqueidentifier", {
+    name: "ProviderConfigurationId",
+    nullable: true,
+  })
+  providerConfigurationId!: string | null;
+
+  @Column("uniqueidentifier", { name: "PromptVersionId", nullable: true })
+  promptVersionId!: string | null;
 
   @Column("datetime2", {
     name: "StartedAt",

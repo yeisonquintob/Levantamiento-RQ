@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  PrimaryColumn,
-} from "typeorm";
+import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 
 import type {
   AiAnalysisStatus,
@@ -46,6 +41,9 @@ export class AnalysisRequestEntity {
 
   @Column("uniqueidentifier", { name: "RequestedByUserId" })
   requestedByUserId!: string;
+
+  @Column("nvarchar", { name: "DocumentSnapshotJson", nullable: true })
+  documentSnapshotJson!: string | null;
 
   @Column("datetime2", {
     name: "CreatedAt",

@@ -5,6 +5,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
@@ -15,17 +16,21 @@ import type {
   AiAnalysisRequestListResponse,
   AiAnalysisRequestSourceDetail,
   AiAnalysisRequestSummary,
+  AiAnalysisResultDetail,
   CreateAiAnalysisRequest,
 } from "@levantamiento-rq/shared-contracts";
 
 import { AnalysisExecutionEntity } from "./analysis-execution.entity";
 import { AnalysisRequestSourceEntity } from "./analysis-request-source.entity";
 import { AnalysisRequestEntity } from "./analysis-request.entity";
+import { AnalysisResultEntity } from "./analysis-result.entity";
 import type { AiAnalysisRequestListQuery } from "./ai-analysis-input";
 import type { AiAnalysisRequest } from "./ai-analysis-request";
 import { AiAnalysisDocumentsAccessClient } from "./documents-access.client";
 import { AiAnalysisProjectsAccessClient } from "./projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "./sources-access.client";
+import { parseAiAnalysisDraft } from "../execution/ai-analysis-draft";
+import { AiAnalysisQueue } from "../execution/ai-analysis.queue";
 
 export interface AiAnalysisActorContext {
   actor: NonNullable<AiAnalysisRequest["authPrincipal"]>;
@@ -62,10 +67,13 @@ export class AiAnalysisService {
     private readonly requestSources: Repository<AnalysisRequestSourceEntity>,
     @InjectRepository(AnalysisExecutionEntity)
     private readonly executions: Repository<AnalysisExecutionEntity>,
+    @InjectRepository(AnalysisResultEntity)
+    private readonly results: Repository<AnalysisResultEntity>,
     private readonly dataSource: DataSource,
     private readonly projectsAccess: AiAnalysisProjectsAccessClient,
     private readonly documentsAccess: AiAnalysisDocumentsAccessClient,
     private readonly sourcesAccess: AiAnalysisSourcesAccessClient,
+    private readonly queue: AiAnalysisQueue,
   ) {}
 
   async create(
@@ -79,7 +87,7 @@ export class AiAnalysisService {
       context.actor,
       context.correlationId,
     );
-    await this.documentsAccess.requireCurrentVersion(
+    const document = await this.documentsAccess.requireCurrentVersion(
       projectId,
       input.documentId,
       input.documentVersionId,
@@ -106,6 +114,7 @@ export class AiAnalysisService {
           analysisType: input.analysisType ?? "REQUIREMENT_DOCUMENT",
           status: "PENDING",
           requestedByUserId: context.actor.id,
+          documentSnapshotJson: JSON.stringify(document),
           createdAt: now,
           updatedAt: now,
           cancelledAt: null,
@@ -123,12 +132,68 @@ export class AiAnalysisService {
             `updatedAt de la fuente ${source.id}`,
           ),
           sourceSha256: source.sha256,
+          sourceTitle: source.title,
+          sourceClassification: source.classification,
+          snapshotText: (source.extractedText ?? source.content ?? "").slice(
+            0,
+            2_000_000,
+          ),
           position: index + 1,
           createdAt: now,
         })),
       );
     });
 
+    try {
+      await this.queue.enqueue(analysisRequestId);
+    } catch {
+      await this.requests.update(analysisRequestId, {
+        status: "FAILED",
+        updatedAt: new Date(),
+      });
+      throw new ServiceUnavailableException(
+        "La solicitud fue registrada, pero la cola de análisis no está disponible. Puedes reintentarlo.",
+      );
+    }
+
+    return this.loadDetail(projectId, analysisRequestId);
+  }
+
+  async retry(
+    context: AiAnalysisActorContext,
+    projectId: string,
+    analysisRequestId: string,
+  ): Promise<AiAnalysisRequestDetail> {
+    await this.projectsAccess.requireCreate(
+      projectId,
+      context.accessToken,
+      context.actor,
+      context.correlationId,
+    );
+    const entity = await this.requireRequest(projectId, analysisRequestId);
+    if (entity.status !== "FAILED") {
+      throw new ConflictException(
+        "Solo una solicitud FAILED puede reintentarse.",
+      );
+    }
+    if (await this.results.existsBy({ analysisRequestId })) {
+      throw new ConflictException(
+        "La solicitud ya tiene un resultado generado.",
+      );
+    }
+    entity.status = "PENDING";
+    entity.updatedAt = new Date();
+    await this.requests.save(entity);
+    try {
+      await this.queue.enqueue(analysisRequestId, `retry-${Date.now()}`);
+    } catch {
+      entity.status = "FAILED";
+      entity.updatedAt = new Date();
+      await this.requests.save(entity);
+      throw new ServiceUnavailableException(
+        "La cola de análisis no está disponible.",
+      );
+    }
     return this.loadDetail(projectId, analysisRequestId);
   }
 
@@ -182,8 +247,7 @@ export class AiAnalysisService {
       page: query.page,
       pageSize: query.pageSize,
       totalItems,
-      totalPages:
-        totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
+      totalPages: totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
     };
   }
 
@@ -253,11 +317,8 @@ export class AiAnalysisService {
     projectId: string,
     analysisRequestId: string,
   ): Promise<AiAnalysisRequestDetail> {
-    const request = await this.requireRequest(
-      projectId,
-      analysisRequestId,
-    );
-    const [sources, executions] = await Promise.all([
+    const request = await this.requireRequest(projectId, analysisRequestId);
+    const [sources, executions, result] = await Promise.all([
       this.requestSources.find({
         where: { analysisRequestId },
         order: { position: "ASC" },
@@ -266,14 +327,14 @@ export class AiAnalysisService {
         where: { analysisRequestId },
         order: { attempt: "ASC" },
       }),
+      this.results.findOneBy({ analysisRequestId }),
     ]);
 
     return {
       ...this.toSummary(request, sources.length, executions.length),
       sources: sources.map((source) => this.toSource(source)),
-      executions: executions.map((execution) =>
-        this.toExecution(execution),
-      ),
+      executions: executions.map((execution) => this.toExecution(execution)),
+      result: result ? this.toResult(result) : null,
     };
   }
 
@@ -350,6 +411,22 @@ export class AiAnalysisService {
       errorCode: entity.errorCode,
       errorMessage: entity.errorMessage,
       createdAt: iso(entity.createdAt),
+    };
+  }
+
+  private toResult(entity: AnalysisResultEntity): AiAnalysisResultDetail {
+    return {
+      id: entity.id,
+      analysisRequestId: entity.analysisRequestId,
+      analysisExecutionId: entity.analysisExecutionId,
+      status: entity.status,
+      schemaVersion: entity.schemaVersion,
+      draft: parseAiAnalysisDraft(JSON.parse(entity.contentJson)),
+      reviewedByUserId: entity.reviewedByUserId,
+      reviewedAt: optionalIso(entity.reviewedAt),
+      reviewComment: entity.reviewComment,
+      createdAt: iso(entity.createdAt),
+      updatedAt: iso(entity.updatedAt),
     };
   }
 }

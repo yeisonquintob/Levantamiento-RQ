@@ -96,6 +96,20 @@ export class AiAnalysisClientService {
     );
   }
 
+  retry(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    analysisRequestId: string,
+  ): Promise<AiAnalysisRequestDetail> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(analysisRequestId)}/retry`,
+      "POST",
+      accessToken,
+      correlationId,
+    );
+  }
+
   listProviders(
     accessToken: string,
     correlationId: string,

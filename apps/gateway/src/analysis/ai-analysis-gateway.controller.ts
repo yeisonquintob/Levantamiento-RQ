@@ -161,4 +161,20 @@ export class AiAnalysisGatewayController {
       analysisRequestId,
     );
   }
+
+  @ApiOperation({ summary: "Reintentar una solicitud de análisis fallida" })
+  @Post(":analysisRequestId/retry")
+  @HttpCode(200)
+  retry(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+  ) {
+    return this.analysis.retry(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      analysisRequestId,
+    );
+  }
 }

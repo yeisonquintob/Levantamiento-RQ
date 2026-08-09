@@ -22,7 +22,9 @@ async function main(): Promise<void> {
           'AnalysisRequestSources',
           'AnalysisExecutions',
           'AiProviderConfigurations',
-          'AiProviderAuditEvents'
+          'AiProviderAuditEvents',
+          'AnalysisPromptVersions',
+          'AnalysisResults'
         )
     `);
     const migration = await count(`
@@ -30,7 +32,8 @@ async function main(): Promise<void> {
       FROM dbo.migrations
       WHERE name IN (
         'CreateAiAnalysisFoundation1786320000000',
-        'AddAiProviderConfiguration1786492800000'
+        'AddAiProviderConfiguration1786492800000',
+        'AddAiExecutionPipeline1786579200000'
       )
     `);
     const indexes = await count(`
@@ -48,7 +51,12 @@ async function main(): Promise<void> {
         'UQ_AiProviderConfigurations_SecretReference',
         'IX_AiProviderConfigurations_Enabled_Default',
         'UQ_AiProviderConfigurations_Default',
-        'IX_AiProviderAuditEvents_Provider_CreatedAt'
+        'IX_AiProviderAuditEvents_Provider_CreatedAt',
+        'UQ_AnalysisPromptVersions_Code_Version',
+        'UQ_AnalysisPromptVersions_ActiveCode',
+        'IX_AnalysisExecutions_ProviderConfigurationId',
+        'UQ_AnalysisResults_Request',
+        'UQ_AnalysisResults_Execution'
       )
     `);
     const internalForeignKeys = await count(`
@@ -57,7 +65,11 @@ async function main(): Promise<void> {
       WHERE name IN (
         'FK_AnalysisRequestSources_Request',
         'FK_AnalysisExecutions_Request',
-        'FK_AiProviderAuditEvents_Provider'
+        'FK_AiProviderAuditEvents_Provider',
+        'FK_AnalysisExecutions_ProviderConfiguration',
+        'FK_AnalysisExecutions_PromptVersion',
+        'FK_AnalysisResults_Request',
+        'FK_AnalysisResults_Execution'
       )
     `);
     const externalReferenceColumns = await count(`
@@ -90,7 +102,9 @@ async function main(): Promise<void> {
       )
         AND name NOT IN (
           'FK_AnalysisRequestSources_Request',
-          'FK_AnalysisExecutions_Request'
+          'FK_AnalysisExecutions_Request',
+          'FK_AnalysisExecutions_ProviderConfiguration',
+          'FK_AnalysisExecutions_PromptVersion'
         )
     `);
     const secretValueColumns = await count(`
@@ -108,15 +122,36 @@ async function main(): Promise<void> {
           'Password'
         )
     `);
+    const activePrompt = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.AnalysisPromptVersions
+      WHERE Code = N'REQUIREMENT_DOCUMENT'
+        AND Version = N'1.0.0'
+        AND IsActive = 1
+    `);
+    const snapshotColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND (
+          (TABLE_NAME = 'AnalysisRequests' AND COLUMN_NAME = 'DocumentSnapshotJson')
+          OR (
+            TABLE_NAME = 'AnalysisRequestSources'
+            AND COLUMN_NAME IN ('SourceTitle', 'SourceClassification', 'SnapshotText')
+          )
+        )
+    `);
 
     if (
-      tables !== 5 ||
-      migration !== 2 ||
-      indexes !== 12 ||
-      internalForeignKeys !== 3 ||
+      tables !== 7 ||
+      migration !== 3 ||
+      indexes !== 17 ||
+      internalForeignKeys !== 7 ||
       externalReferenceColumns !== 5 ||
       unexpectedForeignKeys !== 0 ||
-      secretValueColumns !== 0
+      secretValueColumns !== 0 ||
+      activePrompt !== 1 ||
+      snapshotColumns !== 4
     ) {
       throw new Error(
         "RqAiDb no contiene la estructura aprobada del Paso 18.1B.",
@@ -124,14 +159,15 @@ async function main(): Promise<void> {
     }
 
     console.log("RqAiDb verificada correctamente.");
-    console.log("Tablas confirmadas: 5");
-    console.log("Índices confirmados: 12");
-    console.log("Claves foráneas internas confirmadas: 3");
+    console.log("Tablas confirmadas: 7");
+    console.log("Índices confirmados: 17");
+    console.log("Claves foráneas internas confirmadas: 7");
     console.log("Referencias externas sin claves foráneas confirmadas: 5");
     console.log(
       "Migraciones confirmadas: foundation y configuración segura de proveedores.",
     );
     console.log("Columnas de secretos en SQL confirmadas: 0");
+    console.log("Prompt activo y cuatro columnas de snapshot confirmados.");
   } finally {
     await dataSource.destroy();
   }

@@ -10,6 +10,7 @@ import dataSource from "../apps/ai-analysis-service/src/database/data-source.js"
 import { AnalysisExecutionEntity } from "../apps/ai-analysis-service/src/analysis/analysis-execution.entity.js";
 import { AnalysisRequestSourceEntity } from "../apps/ai-analysis-service/src/analysis/analysis-request-source.entity.js";
 import { AnalysisRequestEntity } from "../apps/ai-analysis-service/src/analysis/analysis-request.entity.js";
+import { AnalysisResultEntity } from "../apps/ai-analysis-service/src/analysis/analysis-result.entity.js";
 import { AiAnalysisService } from "../apps/ai-analysis-service/src/analysis/ai-analysis.service.js";
 
 loadEnvironmentFiles({
@@ -58,10 +59,9 @@ async function main(): Promise<void> {
   await dataSource.initialize();
 
   const requests = dataSource.getRepository(AnalysisRequestEntity);
-  const requestSources = dataSource.getRepository(
-    AnalysisRequestSourceEntity,
-  );
+  const requestSources = dataSource.getRepository(AnalysisRequestSourceEntity);
   const executions = dataSource.getRepository(AnalysisExecutionEntity);
+  const results = dataSource.getRepository(AnalysisResultEntity);
 
   const projectId = randomUUID();
   const documentId = randomUUID();
@@ -83,6 +83,7 @@ async function main(): Promise<void> {
     requests,
     requestSources,
     executions,
+    results,
     dataSource,
     {
       requireCreate: async () => undefined,
@@ -90,10 +91,13 @@ async function main(): Promise<void> {
       requireCancel: async () => undefined,
     } as never,
     {
-      requireCurrentVersion: async () => undefined,
+      requireCurrentVersion: async () => ({}),
     } as never,
     {
       requireReadySources: async () => sourceDetails,
+    } as never,
+    {
+      enqueue: async () => undefined,
     } as never,
   );
 
@@ -129,16 +133,9 @@ async function main(): Promise<void> {
     assert.equal(listed.totalItems, 1);
     assert.equal(listed.items[0]?.id, analysisRequestId);
 
-    const detail = await service.getById(
-      context,
-      projectId,
-      analysisRequestId,
-    );
+    const detail = await service.getById(context, projectId, analysisRequestId);
 
-    assert.equal(
-      detail.documentId.toLowerCase(),
-      documentId.toLowerCase(),
-    );
+    assert.equal(detail.documentId.toLowerCase(), documentId.toLowerCase());
     assert.equal(
       detail.documentVersionId.toLowerCase(),
       documentVersionId.toLowerCase(),
@@ -190,7 +187,8 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   console.error(`Smoke de solicitudes de análisis fallido: ${message}`);
   process.exitCode = 1;
 });

@@ -130,9 +130,7 @@ export class AiAnalysisController {
   @ApiOperation({ summary: "Cancelar una solicitud pendiente" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "analysisRequestId", format: "uuid" })
-  @Post(
-    "projects/:projectId/analysis-requests/:analysisRequestId/cancel",
-  )
+  @Post("projects/:projectId/analysis-requests/:analysisRequestId/cancel")
   @HttpCode(200)
   cancel(
     @Req() request: AiAnalysisRequest,
@@ -140,6 +138,21 @@ export class AiAnalysisController {
     @Param("analysisRequestId") analysisRequestId: string,
   ) {
     return this.analysis.cancel(
+      context(request),
+      parseProjectId(projectId),
+      parseAnalysisRequestId(analysisRequestId),
+    );
+  }
+
+  @ApiOperation({ summary: "Reintentar una solicitud fallida" })
+  @Post("projects/:projectId/analysis-requests/:analysisRequestId/retry")
+  @HttpCode(200)
+  retry(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+  ) {
+    return this.analysis.retry(
       context(request),
       parseProjectId(projectId),
       parseAnalysisRequestId(analysisRequestId),
