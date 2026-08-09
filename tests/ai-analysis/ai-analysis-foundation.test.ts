@@ -17,7 +17,7 @@ test("el contrato publica el alcance aprobado del Paso 18.1A", () => {
     "FAILED",
     "CANCELLED",
   ]);
-  assert.deepEqual(AI_PROVIDER_CODES, ["DISABLED"]);
+  assert.deepEqual(AI_PROVIDER_CODES, ["DISABLED", "OPENAI", "FAKE"]);
 });
 
 test("RqAiDb contiene tres tablas y solo relaciones internas", async () => {
@@ -81,17 +81,11 @@ test("TypeORM registra las tres entidades solo con persistencia habilitada", asy
   assert.match(moduleFile, /TypeOrmModule\.forFeature\(aiAnalysisEntities\)/);
   assert.match(moduleFile, /databaseConfig\.enabled/);
   assert.match(requestEntity, /@Entity\(\{ name: "AnalysisRequests" \}\)/);
-  assert.match(
-    sourceEntity,
-    /@Entity\(\{ name: "AnalysisRequestSources" \}\)/,
-  );
-  assert.match(
-    executionEntity,
-    /@Entity\(\{ name: "AnalysisExecutions" \}\)/,
-  );
+  assert.match(sourceEntity, /@Entity\(\{ name: "AnalysisRequestSources" \}\)/);
+  assert.match(executionEntity, /@Entity\(\{ name: "AnalysisExecutions" \}\)/);
 });
 
-test("la API funcional sigue sin conectar un proveedor de IA", async () => {
+test("la integración no acopla el dominio al SDK de un proveedor", async () => {
   const packageFile = await readFile(
     "apps/ai-analysis-service/package.json",
     "utf8",
@@ -103,8 +97,6 @@ test("la API funcional sigue sin conectar un proveedor de IA", async () => {
 
   assert.doesNotMatch(packageFile, /"openai"/i);
   assert.match(moduleFile, /AiAnalysisController/);
-  assert.doesNotMatch(
-    moduleFile,
-    /OpenAI|ChatCompletion|AzureOpenAI|Responses API/,
-  );
+  assert.match(moduleFile, /AI_SECRET_VAULT/);
+  assert.doesNotMatch(moduleFile, /ChatCompletion|AzureOpenAI|Responses API/);
 });

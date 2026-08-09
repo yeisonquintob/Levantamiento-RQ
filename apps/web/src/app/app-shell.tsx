@@ -334,20 +334,36 @@ export function AppShell({ children, user }: AppShellProps) {
                 </a>
               ) : null}
               {canManageUsers ? (
-                <a
-                  aria-current={
-                    pathname.startsWith("/workspace/settings/users")
-                      ? "page"
-                      : undefined
-                  }
-                  href="/workspace/settings/users"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <span aria-hidden="true" className="rq-nav__icon">
-                    C
-                  </span>
-                  <span>Configuración</span>
-                </a>
+                <>
+                  <a
+                    aria-current={
+                      pathname.startsWith("/workspace/settings/users")
+                        ? "page"
+                        : undefined
+                    }
+                    href="/workspace/settings/users"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <span aria-hidden="true" className="rq-nav__icon">
+                      U
+                    </span>
+                    <span>Usuarios</span>
+                  </a>
+                  <a
+                    aria-current={
+                      pathname.startsWith("/workspace/settings/ai-providers")
+                        ? "page"
+                        : undefined
+                    }
+                    href="/workspace/settings/ai-providers"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <span aria-hidden="true" className="rq-nav__icon">
+                      IA
+                    </span>
+                    <span>Proveedores IA</span>
+                  </a>
+                </>
               ) : null}
             </>
           ) : null}
@@ -377,7 +393,9 @@ export function AppShell({ children, user }: AppShellProps) {
                 ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
                 : pathname.startsWith("/workspace/projects")
                   ? "Gestión de proyectos y participantes · Paso 12"
-                  : "Flujo documental: datos, análisis, borradores y aprobación"}
+                  : pathname.startsWith("/workspace/settings/ai-providers")
+                    ? "Configuración segura de proveedores de inteligencia artificial"
+                    : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );

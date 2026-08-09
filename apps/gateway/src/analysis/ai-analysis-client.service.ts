@@ -6,6 +6,9 @@ import {
 } from "@nestjs/common";
 
 import type {
+  AiProviderConfigurationListResponse,
+  AiProviderConfigurationSummary,
+  AiProviderConnectionTestResult,
   AiAnalysisRequestDetail,
   AiAnalysisRequestListResponse,
   CreateAiAnalysisRequest,
@@ -13,7 +16,7 @@ import type {
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
-type AiAnalysisMethod = "GET" | "POST";
+type AiAnalysisMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 @Injectable()
 export class AiAnalysisClientService {
@@ -88,6 +91,88 @@ export class AiAnalysisClientService {
     return this.request(
       `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(analysisRequestId)}/cancel`,
       "POST",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  listProviders(
+    accessToken: string,
+    correlationId: string,
+  ): Promise<AiProviderConfigurationListResponse> {
+    return this.request(
+      "/api/v1/admin/ai-providers",
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  createProvider(
+    accessToken: string,
+    correlationId: string,
+    body: unknown,
+  ): Promise<AiProviderConfigurationSummary> {
+    return this.request(
+      "/api/v1/admin/ai-providers",
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  updateProvider(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+    body: unknown,
+  ): Promise<AiProviderConfigurationSummary> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}`,
+      "PATCH",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  rotateProviderCredential(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+    body: unknown,
+  ): Promise<AiProviderConfigurationSummary> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}/credential`,
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  testProvider(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+  ): Promise<AiProviderConnectionTestResult> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}/test`,
+      "POST",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  deleteProvider(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+  ): Promise<{ deleted: true; id: string }> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}`,
+      "DELETE",
       accessToken,
       correlationId,
     );

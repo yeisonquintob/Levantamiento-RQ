@@ -20,13 +20,18 @@ async function main(): Promise<void> {
         AND name IN (
           'AnalysisRequests',
           'AnalysisRequestSources',
-          'AnalysisExecutions'
+          'AnalysisExecutions',
+          'AiProviderConfigurations',
+          'AiProviderAuditEvents'
         )
     `);
     const migration = await count(`
       SELECT COUNT(1) AS countValue
       FROM dbo.migrations
-      WHERE name = 'CreateAiAnalysisFoundation1786320000000'
+      WHERE name IN (
+        'CreateAiAnalysisFoundation1786320000000',
+        'AddAiProviderConfiguration1786492800000'
+      )
     `);
     const indexes = await count(`
       SELECT COUNT(1) AS countValue
@@ -38,7 +43,12 @@ async function main(): Promise<void> {
         'UQ_AnalysisRequestSources_Request_Source',
         'IX_AnalysisRequestSources_SourceId',
         'UQ_AnalysisExecutions_Request_Attempt',
-        'IX_AnalysisExecutions_Status_CreatedAt'
+        'IX_AnalysisExecutions_Status_CreatedAt',
+        'UQ_AiProviderConfigurations_Name',
+        'UQ_AiProviderConfigurations_SecretReference',
+        'IX_AiProviderConfigurations_Enabled_Default',
+        'UQ_AiProviderConfigurations_Default',
+        'IX_AiProviderAuditEvents_Provider_CreatedAt'
       )
     `);
     const internalForeignKeys = await count(`
@@ -46,7 +56,8 @@ async function main(): Promise<void> {
       FROM sys.foreign_keys
       WHERE name IN (
         'FK_AnalysisRequestSources_Request',
-        'FK_AnalysisExecutions_Request'
+        'FK_AnalysisExecutions_Request',
+        'FK_AiProviderAuditEvents_Provider'
       )
     `);
     const externalReferenceColumns = await count(`
@@ -82,14 +93,30 @@ async function main(): Promise<void> {
           'FK_AnalysisExecutions_Request'
         )
     `);
+    const secretValueColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = 'dbo'
+        AND TABLE_NAME IN (
+          'AiProviderConfigurations',
+          'AiProviderAuditEvents'
+        )
+        AND COLUMN_NAME IN (
+          'ApiKey',
+          'SecretValue',
+          'Credential',
+          'Password'
+        )
+    `);
 
     if (
-      tables !== 3 ||
-      migration !== 1 ||
-      indexes !== 7 ||
-      internalForeignKeys !== 2 ||
+      tables !== 5 ||
+      migration !== 2 ||
+      indexes !== 12 ||
+      internalForeignKeys !== 3 ||
       externalReferenceColumns !== 5 ||
-      unexpectedForeignKeys !== 0
+      unexpectedForeignKeys !== 0 ||
+      secretValueColumns !== 0
     ) {
       throw new Error(
         "RqAiDb no contiene la estructura aprobada del Paso 18.1B.",
@@ -97,13 +124,14 @@ async function main(): Promise<void> {
     }
 
     console.log("RqAiDb verificada correctamente.");
-    console.log("Tablas confirmadas: 3");
-    console.log("Índices confirmados: 7");
-    console.log("Claves foráneas internas confirmadas: 2");
+    console.log("Tablas confirmadas: 5");
+    console.log("Índices confirmados: 12");
+    console.log("Claves foráneas internas confirmadas: 3");
     console.log("Referencias externas sin claves foráneas confirmadas: 5");
     console.log(
-      "Migración confirmada: CreateAiAnalysisFoundation1786320000000",
+      "Migraciones confirmadas: foundation y configuración segura de proveedores.",
     );
+    console.log("Columnas de secretos en SQL confirmadas: 0");
   } finally {
     await dataSource.destroy();
   }

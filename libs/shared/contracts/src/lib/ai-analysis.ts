@@ -12,9 +12,86 @@ export const AI_ANALYSIS_STATUSES = [
 
 export type AiAnalysisStatus = (typeof AI_ANALYSIS_STATUSES)[number];
 
-export const AI_PROVIDER_CODES = ["DISABLED"] as const;
+export const AI_PROVIDER_CODES = ["DISABLED", "OPENAI", "FAKE"] as const;
 
 export type AiProviderCode = (typeof AI_PROVIDER_CODES)[number];
+
+export const AI_PROVIDER_CONFIGURATION_TYPES = ["OPENAI"] as const;
+
+export type AiProviderConfigurationType =
+  (typeof AI_PROVIDER_CONFIGURATION_TYPES)[number];
+
+export const AI_PROVIDER_TEST_STATUSES = [
+  "NOT_TESTED",
+  "SUCCEEDED",
+  "FAILED",
+] as const;
+
+export type AiProviderTestStatus = (typeof AI_PROVIDER_TEST_STATUSES)[number];
+
+export interface AiProviderConfigurationSummary {
+  id: string;
+  name: string;
+  providerType: AiProviderConfigurationType;
+  model: string;
+  baseUrl: string;
+  isEnabled: boolean;
+  isDefault: boolean;
+  timeoutMs: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  maxAttempts: number;
+  credentialConfigured: boolean;
+  lastConnectionTestAt: string | null;
+  lastConnectionTestStatus: AiProviderTestStatus;
+  lastErrorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiProviderConfigurationListResponse {
+  items: readonly AiProviderConfigurationSummary[];
+  totalItems: number;
+  enabled: number;
+  credentialConfigured: number;
+}
+
+export interface CreateAiProviderConfiguration {
+  name: string;
+  providerType: AiProviderConfigurationType;
+  model: string;
+  baseUrl?: string;
+  timeoutMs?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  maxAttempts?: number;
+  apiKey: string;
+  isEnabled?: boolean;
+  isDefault?: boolean;
+}
+
+export interface UpdateAiProviderConfiguration {
+  name?: string;
+  model?: string;
+  baseUrl?: string;
+  timeoutMs?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  maxAttempts?: number;
+  isEnabled?: boolean;
+  isDefault?: boolean;
+}
+
+export interface RotateAiProviderCredential {
+  apiKey: string;
+}
+
+export interface AiProviderConnectionTestResult {
+  providerConfiguration: AiProviderConfigurationSummary;
+  succeeded: boolean;
+  testedAt: string;
+  message: string;
+}
 
 export const AI_ANALYSIS_PROJECT_ACTIONS = [
   "READ",
@@ -76,8 +153,7 @@ export interface AiAnalysisRequestSummary {
   cancelledAt: string | null;
 }
 
-export interface AiAnalysisRequestDetail
-  extends AiAnalysisRequestSummary {
+export interface AiAnalysisRequestDetail extends AiAnalysisRequestSummary {
   sources: readonly AiAnalysisRequestSourceDetail[];
   executions: readonly AiAnalysisExecutionDetail[];
 }

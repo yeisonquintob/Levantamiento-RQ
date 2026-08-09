@@ -51,6 +51,10 @@ async function bootstrap(): Promise<void> {
         "analysis",
         "Solicitudes de análisis protegidas por JWT y acceso al proyecto",
       )
+      .addTag(
+        "ai-providers",
+        "Configuración administrativa con credenciales protegidas fuera de SQL",
+      )
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);

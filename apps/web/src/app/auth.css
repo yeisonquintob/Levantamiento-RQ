@@ -99,6 +99,67 @@
   gap: var(--rq-space-4);
 }
 
+.rq-ai-providers-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.rq-ai-security-note {
+  align-items: flex-start;
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 8%,
+    var(--rq-color-surface)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--rq-action-affirmative) 45%, var(--rq-color-border));
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+}
+
+.rq-ai-security-note span,
+.rq-ai-providers-table small,
+.rq-field small {
+  color: var(--rq-color-muted);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
+
+.rq-ai-provider-modal {
+  max-width: 54rem;
+}
+
+.rq-ai-provider-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rq-ai-provider-form__wide {
+  grid-column: 1 / -1;
+}
+
+.rq-ai-checkbox {
+  align-items: center;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 0.6rem;
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .rq-ai-provider-form {
+    grid-template-columns: 1fr;
+  }
+
+  .rq-ai-provider-form__wide {
+    grid-column: auto;
+  }
+}
+
 .rq-users-table__identity {
   display: grid;
   gap: 2px;

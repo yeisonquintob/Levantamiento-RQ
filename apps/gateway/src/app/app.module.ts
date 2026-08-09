@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { AiAnalysisClientService } from "../analysis/ai-analysis-client.service";
 import { AiAnalysisGatewayController } from "../analysis/ai-analysis-gateway.controller";
+import { AiProviderConfigurationsGatewayController } from "../analysis/ai-provider-configurations-gateway.controller";
 import { AuthGatewayController } from "../auth/auth-gateway.controller";
 import { IdentityClientService } from "../auth/identity-client.service";
 import { GATEWAY_CONFIG, loadGatewayConfig } from "../config/gateway-config";
@@ -30,6 +31,7 @@ import { AppService } from "./app.service";
     UsersGatewayController,
     DocumentsGatewayController,
     AiAnalysisGatewayController,
+    AiProviderConfigurationsGatewayController,
     WorkflowGatewayController,
   ],
   providers: [

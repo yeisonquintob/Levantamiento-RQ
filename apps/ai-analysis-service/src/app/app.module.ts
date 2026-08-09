@@ -19,6 +19,18 @@ import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
 import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
 import { AiAnalysisProjectsAccessClient } from "../analysis/projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "../analysis/sources-access.client";
+import { AiProviderAuditEntity } from "../providers/ai-provider-audit.entity";
+import { AiProviderConfigurationEntity } from "../providers/ai-provider-configuration.entity";
+import { AiProviderConfigurationsController } from "../providers/ai-provider-configurations.controller";
+import { AiProviderConfigurationsService } from "../providers/ai-provider-configurations.service";
+import {
+  AI_PROVIDER_RUNTIME_CONFIG,
+  loadAiProviderRuntimeConfig,
+} from "../providers/ai-provider.config";
+import {
+  AI_SECRET_VAULT,
+  PlatformAiSecretVault,
+} from "../providers/ai-secret-vault";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -31,6 +43,8 @@ const aiAnalysisEntities = [
   AnalysisRequestEntity,
   AnalysisRequestSourceEntity,
   AnalysisExecutionEntity,
+  AiProviderConfigurationEntity,
+  AiProviderAuditEntity,
 ];
 
 @Module({
@@ -45,7 +59,9 @@ const aiAnalysisEntities = [
   ],
   controllers: [
     AppController,
-    ...(databaseConfig.enabled ? [AiAnalysisController] : []),
+    ...(databaseConfig.enabled
+      ? [AiAnalysisController, AiProviderConfigurationsController]
+      : []),
   ],
   providers: [
     AppService,
@@ -60,6 +76,16 @@ const aiAnalysisEntities = [
           AiAnalysisDocumentsAccessClient,
           AiAnalysisSourcesAccessClient,
           AiAnalysisService,
+          {
+            provide: AI_PROVIDER_RUNTIME_CONFIG,
+            useFactory: loadAiProviderRuntimeConfig,
+          },
+          PlatformAiSecretVault,
+          {
+            provide: AI_SECRET_VAULT,
+            useExisting: PlatformAiSecretVault,
+          },
+          AiProviderConfigurationsService,
         ]
       : []),
   ],
