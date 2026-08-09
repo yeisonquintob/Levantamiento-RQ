@@ -186,6 +186,7 @@ export class ExportProcessingService {
           format: request.format,
           fileName,
           sizeBytes: rendered.buffer.length,
+          requestedByUserId: request.requestedByUserId,
         },
       });
     } catch {
@@ -230,6 +231,7 @@ export class ExportProcessingService {
             projectId: request.projectId,
             documentId: request.documentId,
             format: request.format,
+            requestedByUserId: request.requestedByUserId,
             errorCode: "EXPORT_GENERATION_FAILED",
           },
         });

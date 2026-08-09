@@ -7,6 +7,7 @@ export const INTEGRATION_EVENT_NAMES = [
   "analysis.completed",
   "analysis.failed",
   "review.requested",
+  "review.changes-requested",
   "document.approved",
   "document.rejected",
   "export.requested",

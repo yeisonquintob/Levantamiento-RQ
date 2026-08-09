@@ -518,6 +518,9 @@ importers:
       '@nestjs/typeorm':
         specifier: 11.0.3
         version: 11.0.3(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@7.2.0))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.1)(typeorm@0.3.31(babel-plugin-macros@3.1.0)(ioredis@5.8.2(supports-color@7.2.0))(mssql@12.7.0(supports-color@7.2.0))(supports-color@7.2.0))
+      amqplib:
+        specifier: 0.10.9
+        version: 0.10.9
       bullmq:
         specifier: 5.61.2
         version: 5.61.2(supports-color@7.2.0)

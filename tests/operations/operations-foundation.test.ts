@@ -4,6 +4,8 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 
 import {
+  INTEGRATION_EVENT_NAMES,
+  NOTIFICATION_TYPES,
   DOCUMENT_SECTION_DEFINITIONS,
   EXPORT_FORMATS,
   EXPORT_STATUSES,
@@ -20,7 +22,9 @@ import {
   parseCreateExport,
   parseVersionNumber,
 } from "../../apps/operations-service/src/operations/operations-input.js";
+import { parseIntegrationEvent } from "../../apps/operations-service/src/operations/integration-events.consumer.js";
 import { loadOperationsAuthConfig } from "../../apps/operations-service/src/operations/operations-auth.config.js";
+import { loadOperationsNotificationsConfig } from "../../apps/operations-service/src/operations/operations-notifications.config.js";
 import { loadOperationsProcessingConfig } from "../../apps/operations-service/src/operations/operations-processing.config.js";
 import { loadOperationsStorageConfig } from "../../apps/operations-service/src/operations/operations-storage.config.js";
 
@@ -37,6 +41,33 @@ test("el contrato define formatos y estados de exportación", () => {
   assert.throws(() => parseCreateExport({ format: "XLSX" }), /PDF o DOCX/i);
   assert.equal(parseVersionNumber("3"), 3);
   assert.throws(() => parseVersionNumber("0"), /versionNumber/i);
+});
+
+test("los contratos incluyen notificaciones y correcciones de revisión", () => {
+  assert.ok(INTEGRATION_EVENT_NAMES.includes("review.changes-requested"));
+  assert.deepEqual(NOTIFICATION_TYPES, [
+    "REVIEW_ASSIGNED",
+    "CHANGES_REQUESTED",
+    "DOCUMENT_APPROVED",
+    "DOCUMENT_REJECTED",
+    "EXPORT_READY",
+    "EXPORT_FAILED",
+    "ANALYSIS_FAILED",
+  ]);
+  const event = parseIntegrationEvent({
+    eventId: "00000000-0000-4000-8000-000000000001",
+    eventName: "review.changes-requested",
+    eventVersion: 1,
+    occurredAtUtc: "2026-08-08T12:00:00.000Z",
+    producer: "workflow-service",
+    correlationId: "00000000-0000-4000-8000-000000000002",
+    data: { projectId: "00000000-0000-4000-8000-000000000003" },
+  });
+  assert.equal(event.eventName, "review.changes-requested");
+  assert.throws(
+    () => parseIntegrationEvent({ ...event, eventVersion: 2 }),
+    /versión del evento/i,
+  );
 });
 
 test("Operations valida autenticación, servicios y Redis", () => {
@@ -63,6 +94,16 @@ test("Operations valida autenticación, servicios y Redis", () => {
         OPERATIONS_STORAGE_CONTAINER: "Contenedor Inválido",
       }),
     /contenedor Blob/i,
+  );
+  const notifications = loadOperationsNotificationsConfig({});
+  assert.equal(notifications.emailEnabled, false);
+  assert.equal(notifications.maxAttempts, 5);
+  assert.throws(
+    () =>
+      loadOperationsNotificationsConfig({
+        OPERATIONS_EMAIL_ENABLED: "quizá",
+      }),
+    /true o false/i,
   );
 });
 
@@ -128,6 +169,34 @@ test("Operations y Gateway publican las rutas de exportación", async () => {
     assert.match(controller, new RegExp(fragment.replaceAll("/", "\\/")));
     assert.match(gateway, new RegExp(fragment.replaceAll("/", "\\/")));
   }
+});
+
+test("Operations y Gateway publican notificaciones y auditoría", async () => {
+  const [controller, gateway, consumer] = await Promise.all([
+    readFile(
+      "apps/operations-service/src/operations/notifications-audit.controller.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/gateway/src/operations/operations-gateway.controller.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/operations-service/src/operations/integration-events.consumer.ts",
+      "utf8",
+    ),
+  ]);
+  for (const fragment of [
+    '"notifications"',
+    '"notifications/:notificationId/read"',
+    '"projects/:projectId/audit-events"',
+  ]) {
+    assert.match(controller, new RegExp(fragment));
+    assert.match(gateway, new RegExp(fragment));
+  }
+  assert.match(consumer, /noAck: false/);
+  assert.match(consumer, /waitForConfirms/);
+  assert.match(consumer, /retryQueueName/);
 });
 
 test("los generadores producen PDF y DOCX reales con las 13 secciones", async () => {

@@ -289,6 +289,7 @@ export class AiAnalysisExecutionService {
             projectId: request.projectId,
             analysisRequestId,
             executionId: execution.id,
+            requestedByUserId: request.requestedByUserId,
             errorCode: failure.code,
           },
         });

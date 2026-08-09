@@ -501,10 +501,18 @@ export class WorkflowReviewsService {
       );
     });
 
-    if (status === "APPROVED" || status === "REJECTED") {
+    if (
+      status === "CHANGES_REQUESTED" ||
+      status === "APPROVED" ||
+      status === "REJECTED"
+    ) {
       await this.events.publish({
         eventName:
-          status === "APPROVED" ? "document.approved" : "document.rejected",
+          status === "CHANGES_REQUESTED"
+            ? "review.changes-requested"
+            : status === "APPROVED"
+              ? "document.approved"
+              : "document.rejected",
         correlationId: context.correlationId,
         causationId: context.idempotencyKey ?? undefined,
         data: {
@@ -513,6 +521,7 @@ export class WorkflowReviewsService {
           documentId: review.documentId,
           documentVersionId: review.documentVersionId,
           versionNumber: review.versionNumber,
+          requestedByUserId: review.requestedByUserId,
           decidedByUserId: context.actor.id,
         },
       });

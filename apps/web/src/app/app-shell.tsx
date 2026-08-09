@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { AppearanceControls } from "./appearance-controls";
+import { NotificationsIndicator } from "./notifications-indicator";
 import { SessionActivityManager } from "./session-activity-manager";
 import { SignOutButton } from "./sign-out-button";
 
@@ -74,6 +75,22 @@ function resolvePageContext(pathname: string): WorkspacePageContext {
       eyebrow: "Revisión",
       title: "Validación",
       description: "Observaciones, aprobación y cierre del documento.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/notifications")) {
+    return {
+      eyebrow: "Actividad",
+      title: "Notificaciones",
+      description: "Avisos personales de revisión, análisis y exportación.",
+    };
+  }
+
+  if (pathname.startsWith("/workspace/audit")) {
+    return {
+      eyebrow: "Trazabilidad",
+      title: "Auditoría",
+      description: "Actividad verificable y correlacionada por proyecto.",
     };
   }
 
@@ -194,6 +211,7 @@ export function AppShell({ children, user }: AppShellProps) {
         </div>
 
         <div className="rq-topbar__actions">
+          <NotificationsIndicator />
           <AppearanceControls />
 
           <div className="rq-user-menu" ref={userMenuRef}>
@@ -335,6 +353,34 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Validación</span>
           </a>
 
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/notifications")
+                ? "page"
+                : undefined
+            }
+            href="/workspace/notifications"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              N
+            </span>
+            <span>Notificaciones</span>
+          </a>
+
+          <a
+            aria-current={
+              pathname.startsWith("/workspace/audit") ? "page" : undefined
+            }
+            href="/workspace/audit"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              A
+            </span>
+            <span>Auditoría</span>
+          </a>
+
           {showAdministration ? (
             <>
               <span className="rq-nav__label">Administración</span>
@@ -410,15 +456,21 @@ export function AppShell({ children, user }: AppShellProps) {
             ? "Análisis asíncrono, trazable y sujeto a revisión humana"
             : pathname.startsWith("/workspace/validation")
               ? "Revisión, observaciones y aprobación documental · Paso 17"
-              : pathname.startsWith("/workspace/templates")
-                ? "Catálogo de plantillas configurables y versionadas · Paso 14"
-                : pathname.startsWith("/workspace/sources")
-                  ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-                  : pathname.startsWith("/workspace/projects")
-                    ? "Gestión de proyectos y participantes · Paso 12"
-                    : pathname.startsWith("/workspace/settings/ai-providers")
-                      ? "Configuración segura de proveedores de inteligencia artificial"
-                      : "Flujo documental: datos, análisis, borradores y aprobación"}
+              : pathname.startsWith("/workspace/notifications")
+                ? "Notificaciones internas generadas por eventos idempotentes"
+                : pathname.startsWith("/workspace/audit")
+                  ? "Auditoría funcional y correlación por proyecto"
+                  : pathname.startsWith("/workspace/templates")
+                    ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+                    : pathname.startsWith("/workspace/sources")
+                      ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+                      : pathname.startsWith("/workspace/projects")
+                        ? "Gestión de proyectos y participantes · Paso 12"
+                        : pathname.startsWith(
+                              "/workspace/settings/ai-providers",
+                            )
+                          ? "Configuración segura de proveedores de inteligencia artificial"
+                          : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );

@@ -6,9 +6,9 @@ COMMAND="${1:-}"
 INFRA_ENV="$ROOT/infrastructure/docker/.env"
 
 case "$COMMAND" in
-  ensure|state|verify|migration-run|migration-revert|smoke|artifacts-smoke|gateway-e2e) ;;
+  ensure|state|verify|migration-run|migration-revert|smoke|artifacts-smoke|gateway-e2e|notifications-e2e) ;;
   *)
-    echo "Uso: $0 <ensure|state|verify|migration-run|migration-revert|smoke|artifacts-smoke|gateway-e2e>"
+    echo "Uso: $0 <ensure|state|verify|migration-run|migration-revert|smoke|artifacts-smoke|gateway-e2e|notifications-e2e>"
     exit 2
     ;;
 esac
@@ -52,6 +52,7 @@ case "$COMMAND" in
   smoke) SCRIPT="$ROOT/scripts/operations-export-requests-smoke.ts" ;;
   artifacts-smoke) SCRIPT="$ROOT/scripts/operations-export-artifacts-smoke.ts" ;;
   gateway-e2e) SCRIPT="$ROOT/scripts/operations-gateway-e2e.ts" ;;
+  notifications-e2e) SCRIPT="$ROOT/scripts/operations-notifications-gateway-e2e.ts" ;;
 esac
 
 cd "$ROOT"

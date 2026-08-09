@@ -50,6 +50,7 @@
     "operations:requests:smoke": "bash scripts/operations-database-command.sh smoke",
     "operations:artifacts:smoke": "bash scripts/operations-database-command.sh artifacts-smoke",
     "operations:gateway:e2e": "bash scripts/operations-database-command.sh gateway-e2e",
+    "operations:notifications:e2e": "bash scripts/operations-database-command.sh notifications-e2e",
     "projects:db:drop": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-drop-database.ts",
     "projects:db:ensure": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-ensure-database.ts",
     "projects:db:state": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-database-state.ts",

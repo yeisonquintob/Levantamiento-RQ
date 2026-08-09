@@ -17,7 +17,7 @@ export function createTestIntegrationEvent<
 ): IntegrationEventEnvelope<TData> {
   return {
     eventId: "00000000-0000-4000-8000-000000000001",
-    eventName: "test.event",
+    eventName: "analysis.requested",
     eventVersion: 1,
     occurredAtUtc: asUtcIsoDateString("2026-08-01T00:00:00.000Z"),
     producer: "test-suite",

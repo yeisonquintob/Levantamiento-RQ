@@ -41,6 +41,8 @@ async function bootstrap(): Promise<void> {
       .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
       .addTag("exports", "Solicitudes e historial de exportaciones")
+      .addTag("notifications", "Notificaciones internas del usuario")
+      .addTag("audit", "Trazabilidad consultable por proyecto")
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);

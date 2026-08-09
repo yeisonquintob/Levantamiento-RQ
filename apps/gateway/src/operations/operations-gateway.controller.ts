@@ -4,8 +4,10 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -105,6 +107,48 @@ export class OperationsGatewayController {
       token(request),
       correlation(request),
       exportRequestId,
+    );
+  }
+
+  @ApiOperation({ summary: "Consultar notificaciones propias" })
+  @Get("notifications")
+  listNotifications(
+    @Req() request: RequestLike,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    return this.operations.listNotifications(
+      token(request),
+      correlation(request),
+      query,
+    );
+  }
+
+  @ApiOperation({ summary: "Marcar una notificación propia como leída" })
+  @Post("notifications/:notificationId/read")
+  @HttpCode(200)
+  markNotificationRead(
+    @Req() request: RequestLike,
+    @Param("notificationId") notificationId: string,
+  ) {
+    return this.operations.markNotificationRead(
+      token(request),
+      correlation(request),
+      notificationId,
+    );
+  }
+
+  @ApiOperation({ summary: "Consultar auditoría de un proyecto" })
+  @Get("projects/:projectId/audit-events")
+  listAuditEvents(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    return this.operations.listAuditEvents(
+      token(request),
+      correlation(request),
+      projectId,
+      query,
     );
   }
 

@@ -16,6 +16,10 @@ import { ExportProcessingService } from "../operations/export-processing.service
 import { ExportProcessingWorker } from "../operations/export-processing.worker";
 import { ExportRequestsController } from "../operations/export-requests.controller";
 import { ExportRequestsService } from "../operations/export-requests.service";
+import { IntegrationEventInboxService } from "../operations/integration-event-inbox.service";
+import { IntegrationEventsConsumer } from "../operations/integration-events.consumer";
+import { NotificationsAuditController } from "../operations/notifications-audit.controller";
+import { NotificationsAuditService } from "../operations/notifications-audit.service";
 import { operationEntities } from "../operations/operation.entities";
 import { OperationsAccessTokenGuard } from "../operations/operations-access-token.guard";
 import {
@@ -26,6 +30,10 @@ import {
   loadOperationsProcessingConfig,
   OPERATIONS_PROCESSING_CONFIG,
 } from "../operations/operations-processing.config";
+import {
+  loadOperationsNotificationsConfig,
+  OPERATIONS_NOTIFICATIONS_CONFIG,
+} from "../operations/operations-notifications.config";
 import { OperationsServiceToken } from "../operations/operations-service-token.service";
 import {
   loadOperationsStorageConfig,
@@ -51,7 +59,9 @@ const databaseConfig = loadSqlServerDatabaseConfig({
   ],
   controllers: [
     AppController,
-    ...(databaseConfig.enabled ? [ExportRequestsController] : []),
+    ...(databaseConfig.enabled
+      ? [ExportRequestsController, NotificationsAuditController]
+      : []),
   ],
   providers: [
     AppService,
@@ -69,6 +79,10 @@ const databaseConfig = loadSqlServerDatabaseConfig({
             provide: OPERATIONS_STORAGE_CONFIG,
             useFactory: loadOperationsStorageConfig,
           },
+          {
+            provide: OPERATIONS_NOTIFICATIONS_CONFIG,
+            useFactory: loadOperationsNotificationsConfig,
+          },
           OperationsAccessTokenGuard,
           OperationsProjectsAccessClient,
           OperationsDocumentsAccessClient,
@@ -78,6 +92,9 @@ const databaseConfig = loadSqlServerDatabaseConfig({
           ExportProcessingService,
           ExportProcessingWorker,
           ExportRequestsService,
+          IntegrationEventInboxService,
+          IntegrationEventsConsumer,
+          NotificationsAuditService,
         ]
       : []),
   ],

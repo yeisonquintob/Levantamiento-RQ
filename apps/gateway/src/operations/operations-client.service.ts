@@ -6,8 +6,11 @@ import {
 } from "@nestjs/common";
 
 import type {
+  AuditEventListResponse,
   ExportRequestDetail,
   ExportRequestListResponse,
+  NotificationDetail,
+  NotificationListResponse,
 } from "@levantamiento-rq/shared-contracts";
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
@@ -80,6 +83,49 @@ export class OperationsClientService {
   ): Promise<ExportRequestDetail> {
     return this.request(
       `/api/v1/exports/${encodeURIComponent(exportRequestId)}`,
+      "GET",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  listNotifications(
+    accessToken: string,
+    correlationId: string,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<NotificationListResponse> {
+    return this.request(
+      `/api/v1/notifications${this.query(query)}`,
+      "GET",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  markNotificationRead(
+    accessToken: string,
+    correlationId: string,
+    notificationId: string,
+  ): Promise<NotificationDetail> {
+    return this.request(
+      `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+      "POST",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  listAuditEvents(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<AuditEventListResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/audit-events${this.query(query)}`,
       "GET",
       accessToken,
       correlationId,
@@ -179,5 +225,14 @@ export class OperationsClientService {
       );
     }
     return payload as T;
+  }
+
+  private query(input: Readonly<Record<string, unknown>>): string {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(input)) {
+      if (typeof value === "string" && value.trim()) query.set(key, value);
+    }
+    const resolved = query.toString();
+    return resolved ? `?${resolved}` : "";
   }
 }
