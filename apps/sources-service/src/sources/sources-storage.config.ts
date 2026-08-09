@@ -9,10 +9,7 @@ export interface SourcesStorageConfig {
   maxExtractedTextChars: number;
 }
 
-function requiredText(
-  value: string | undefined,
-  name: string,
-): string {
+function requiredText(value: string | undefined, name: string): string {
   const resolved = value?.trim();
 
   if (!resolved) {
@@ -31,11 +28,7 @@ function readPositiveInteger(
 ): number {
   const resolved = value?.trim() ? Number(value) : fallback;
 
-  if (
-    !Number.isInteger(resolved) ||
-    resolved < minimum ||
-    resolved > maximum
-  ) {
+  if (!Number.isInteger(resolved) || resolved < minimum || resolved > maximum) {
     throw new Error(`${name} debe estar entre ${minimum} y ${maximum}.`);
   }
 
@@ -85,9 +78,7 @@ export function loadSourcesStorageConfig(
         environment.AZURE_STORAGE_CONNECTION_STRING_HOST,
       "AZURE_STORAGE_CONNECTION_STRING",
     ),
-    containerName: readContainerName(
-      environment.SOURCES_STORAGE_CONTAINER,
-    ),
+    containerName: readContainerName(environment.SOURCES_STORAGE_CONTAINER),
     maxFileBytes,
     maxFilesPerUpload,
     maxBatchBytes,

@@ -5,6 +5,7 @@ import {
   loadSqlServerDatabaseConfig,
   PersistenceModule,
 } from "@levantamiento-rq/shared-persistence";
+import { IntegrationEventsModule } from "@levantamiento-rq/shared-messaging";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -44,6 +45,7 @@ const sourceEntities = [SourceEntity];
       serviceName: "sources-service",
       defaultDatabaseName: "RqSourcesDb",
     }),
+    IntegrationEventsModule.register({ serviceName: "sources-service" }),
     ...(databaseConfig.enabled
       ? [TypeOrmModule.forFeature(sourceEntities)]
       : []),

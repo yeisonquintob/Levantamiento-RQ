@@ -71,8 +71,7 @@ export class SourcesAccessTokenGuard implements CanActivate {
         throw new UnauthorizedException("Tipo de token inválido.");
       }
 
-      const mustChangePassword =
-        result.payload.mustChangePassword === true;
+      const mustChangePassword = result.payload.mustChangePassword === true;
 
       if (mustChangePassword) {
         throw new ForbiddenException(

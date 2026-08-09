@@ -1,8 +1,6 @@
 import type { ConnectionOptions } from "bullmq";
 
-export const SOURCES_PROCESSING_CONFIG = Symbol(
-  "SOURCES_PROCESSING_CONFIG",
-);
+export const SOURCES_PROCESSING_CONFIG = Symbol("SOURCES_PROCESSING_CONFIG");
 
 export interface SourcesProcessingConfig {
   queueName: string;
@@ -31,8 +29,10 @@ function readInteger(
 export function loadSourcesProcessingConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): SourcesProcessingConfig {
-  const password = environment.SOURCES_REDIS_PASSWORD?.trim() ||
-    environment.REDIS_PASSWORD?.trim() || undefined;
+  const password =
+    environment.SOURCES_REDIS_PASSWORD?.trim() ||
+    environment.REDIS_PASSWORD?.trim() ||
+    undefined;
 
   return {
     queueName:

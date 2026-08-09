@@ -4,6 +4,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
+import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
+
 import { SourceBlobStorage } from "./source-blob-storage.service";
 import { SourceExtractionService } from "./source-extraction.service";
 import { SourceEntity } from "./source.entity";
@@ -24,6 +26,7 @@ export class SourceProcessingService {
     private readonly storage: SourceBlobStorage,
     @Inject(SourceExtractionService)
     private readonly extraction: SourceExtractionService,
+    private readonly events: IntegrationEventsPublisher,
   ) {}
 
   async process(data: SourceProcessingJobData, attempt: number): Promise<void> {
@@ -55,7 +58,10 @@ export class SourceProcessingService {
         throw new Error("El SHA-256 descargado no coincide con la fuente.");
       }
 
-      const result = await this.extraction.extract(source.fileExtension, buffer);
+      const result = await this.extraction.extract(
+        source.fileExtension,
+        buffer,
+      );
 
       source.extractedText = result.extractedText;
       source.processingStatus = "READY";
@@ -66,6 +72,16 @@ export class SourceProcessingService {
       source.updatedByUserId = data.actorId;
       source.updatedAt = new Date();
       await this.sources.save(source);
+      await this.events.publish({
+        eventName: "source.ready",
+        correlationId: data.correlationId,
+        data: {
+          projectId: source.projectId,
+          sourceId: source.id,
+          processingStatus: source.processingStatus,
+          processedAt: source.processedAt.toISOString(),
+        },
+      });
     } catch (error) {
       source.extractedText = null;
       source.processingStatus = "FAILED";

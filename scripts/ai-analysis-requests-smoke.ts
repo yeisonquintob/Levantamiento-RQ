@@ -99,6 +99,9 @@ async function main(): Promise<void> {
     {
       enqueue: async () => undefined,
     } as never,
+    {
+      publish: async () => false,
+    } as never,
   );
 
   const context = {

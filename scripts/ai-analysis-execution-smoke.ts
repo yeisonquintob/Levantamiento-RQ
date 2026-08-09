@@ -131,6 +131,9 @@ async function main(): Promise<void> {
         keychainService: "test",
         executionMode: "FAKE",
       },
+      {
+        publish: async () => false,
+      } as never,
     );
     await service.process(analysisRequestId, true);
 

@@ -10,6 +10,7 @@ export const AI_ANALYSIS_JOB = "analyze-requirement-document";
 
 export interface AiAnalysisJobData {
   analysisRequestId: string;
+  correlationId: string;
 }
 
 @Injectable()
@@ -33,11 +34,12 @@ export class AiAnalysisQueue implements OnModuleDestroy {
 
   enqueue(
     analysisRequestId: string,
+    correlationId: string,
     discriminator = "initial",
   ): Promise<Job<AiAnalysisJobData>> {
     return this.queue.add(
       AI_ANALYSIS_JOB,
-      { analysisRequestId },
+      { analysisRequestId, correlationId },
       { jobId: `${analysisRequestId}-${discriminator}` },
     );
   }

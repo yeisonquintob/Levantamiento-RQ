@@ -4,8 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PID_DIR="$ROOT/tmp/local-auth"
 LOG_DIR="$ROOT/logs/local-auth"
+INFRA_ENV="$ROOT/infrastructure/docker/.env"
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
+
+set -a
+source "$INFRA_ENV"
+set +a
+RABBITMQ_URL="$(node -e 'const u=encodeURIComponent(process.env.RABBITMQ_DEFAULT_USER);const p=encodeURIComponent(process.env.RABBITMQ_DEFAULT_PASS);const port=process.env.RQ_RABBITMQ_AMQP_PORT||"5673";process.stdout.write(`amqp://${u}:${p}@127.0.0.1:${port}`)')"
+export RABBITMQ_ENABLED=true RABBITMQ_URL
+export RABBITMQ_EXCHANGE="${RABBITMQ_EXCHANGE:-rq.integration.v1}"
 
 required_files=(
   "$ROOT/apps/identity-service/.env"

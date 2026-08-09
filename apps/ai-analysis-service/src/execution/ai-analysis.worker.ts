@@ -34,7 +34,11 @@ export class AiAnalysisWorker implements OnModuleInit, OnModuleDestroy {
         }
         const configuredAttempts = Number(job.opts.attempts ?? 1);
         const finalAttempt = job.attemptsMade + 1 >= configuredAttempts;
-        await this.execution.process(job.data.analysisRequestId, finalAttempt);
+        await this.execution.process(
+          job.data.analysisRequestId,
+          finalAttempt,
+          job.data.correlationId,
+        );
       },
       {
         connection: this.config.connection,

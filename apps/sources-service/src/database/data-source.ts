@@ -7,11 +7,7 @@ import {
 } from "@levantamiento-rq/shared-persistence";
 
 loadEnvironmentFiles({
-  paths: [
-    ".env",
-    "infrastructure/docker/.env",
-    "apps/sources-service/.env",
-  ],
+  paths: [".env", "infrastructure/docker/.env", "apps/sources-service/.env"],
 });
 
 const currentDirectory = resolve(

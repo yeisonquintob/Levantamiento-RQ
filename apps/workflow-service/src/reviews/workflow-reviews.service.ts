@@ -23,6 +23,7 @@ import type {
   WorkflowReviewStatus,
   WorkflowReviewSummary,
 } from "@levantamiento-rq/shared-contracts";
+import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
 
 import { WorkflowDocumentsAccessClient } from "./documents-access.client";
 import {
@@ -73,6 +74,7 @@ export class WorkflowReviewsService {
     private readonly activities: Repository<WorkflowReviewActivityEntity>,
     private readonly projects: WorkflowProjectsAccessClient,
     private readonly documents: WorkflowDocumentsAccessClient,
+    private readonly events: IntegrationEventsPublisher,
   ) {}
 
   async create(
@@ -198,6 +200,20 @@ export class WorkflowReviewsService {
           createdAt: now,
         }),
       );
+    });
+
+    await this.events.publish({
+      eventName: "review.requested",
+      correlationId: context.correlationId,
+      causationId: context.idempotencyKey ?? undefined,
+      data: {
+        projectId,
+        reviewId,
+        documentId,
+        documentVersionId: document.currentVersionDetail.id,
+        versionNumber,
+        requestedByUserId: context.actor.id,
+      },
     });
 
     return this.loadDetail(projectId, reviewId);
@@ -484,6 +500,23 @@ export class WorkflowReviewsService {
         }),
       );
     });
+
+    if (status === "APPROVED" || status === "REJECTED") {
+      await this.events.publish({
+        eventName:
+          status === "APPROVED" ? "document.approved" : "document.rejected",
+        correlationId: context.correlationId,
+        causationId: context.idempotencyKey ?? undefined,
+        data: {
+          projectId,
+          reviewId,
+          documentId: review.documentId,
+          documentVersionId: review.documentVersionId,
+          versionNumber: review.versionNumber,
+          decidedByUserId: context.actor.id,
+        },
+      });
+    }
 
     return this.loadDetail(projectId, reviewId);
   }

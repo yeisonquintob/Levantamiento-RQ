@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { Queue, type Job } from "bullmq";
 
@@ -11,6 +13,7 @@ export const SOURCE_PROCESSING_JOB = "extract-source-file";
 export interface SourceProcessingJobData {
   sourceId: string;
   actorId: string;
+  correlationId: string;
 }
 
 @Injectable()
@@ -35,10 +38,11 @@ export class SourceProcessingQueue implements OnModuleDestroy {
   enqueue(
     sourceId: string,
     actorId: string,
+    correlationId = randomUUID(),
   ): Promise<Job<SourceProcessingJobData>> {
     return this.queue.add(
       SOURCE_PROCESSING_JOB,
-      { sourceId, actorId },
+      { sourceId, actorId, correlationId },
       { jobId: `${sourceId}-${Date.now()}` },
     );
   }

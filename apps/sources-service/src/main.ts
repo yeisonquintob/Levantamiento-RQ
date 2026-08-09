@@ -17,11 +17,7 @@ import {
 import { loadSourcesStorageConfig } from "./sources/sources-storage.config";
 
 loadEnvironmentFiles({
-  paths: [
-    ".env",
-    "infrastructure/docker/.env",
-    "apps/sources-service/.env",
-  ],
+  paths: [".env", "infrastructure/docker/.env", "apps/sources-service/.env"],
 });
 
 async function bootstrap(): Promise<void> {
@@ -58,16 +54,10 @@ async function bootstrap(): Promise<void> {
       .setVersion("1.0.0")
       .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
-      .addTag(
-        "sources",
-        "Fuentes textuales, archivos y contenido extraído",
-      )
+      .addTag("sources", "Fuentes textuales, archivos y contenido extraído")
       .build();
 
-    const openApiDocument = SwaggerModule.createDocument(
-      app,
-      openApiConfig,
-    );
+    const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
 
     SwaggerModule.setup("api/docs", app, openApiDocument, {
       customSwaggerUiPath: resolve(
@@ -94,9 +84,7 @@ async function bootstrap(): Promise<void> {
 
 void bootstrap().catch((error: unknown) => {
   const message =
-    error instanceof Error
-      ? (error.stack ?? error.message)
-      : String(error);
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
 
   Logger.error(message, "Bootstrap");
   process.exitCode = 1;

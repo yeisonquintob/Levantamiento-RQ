@@ -59,9 +59,7 @@ async function spreadsheetText(buffer: Buffer): Promise<{
       rows.push(cells.join(","));
     });
 
-    sections.push(
-      `# Hoja: ${worksheet.name}\n${rows.join("\n")}`,
-    );
+    sections.push(`# Hoja: ${worksheet.name}\n${rows.join("\n")}`);
   });
 
   return {
@@ -122,8 +120,7 @@ export class SourceExtractionService {
         await pdf.destroy();
       }
     } else {
-      processingMessage =
-        "Imagen disponible como evidencia visual, sin OCR.";
+      processingMessage = "Imagen disponible como evidencia visual, sin OCR.";
     }
 
     const normalized = text === null ? null : normalizeText(text);
@@ -137,13 +134,9 @@ export class SourceExtractionService {
       text = normalized;
     }
 
-    if (
-      text !== null &&
-      text.length > this.config.maxExtractedTextChars
-    ) {
+    if (text !== null && text.length > this.config.maxExtractedTextChars) {
       text = text.slice(0, this.config.maxExtractedTextChars);
-      processingMessage =
-        `El texto fue limitado a ${this.config.maxExtractedTextChars} caracteres.`;
+      processingMessage = `El texto fue limitado a ${this.config.maxExtractedTextChars} caracteres.`;
     }
 
     return {

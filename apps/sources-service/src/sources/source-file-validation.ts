@@ -10,10 +10,8 @@ import {
 
 const MEDIA_TYPES: Readonly<Record<SourceFileExtension, string>> = {
   pdf: "application/pdf",
-  docx:
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  xlsx:
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   txt: "text/plain; charset=utf-8",
   csv: "text/csv; charset=utf-8",
   png: "image/png",
@@ -34,17 +32,11 @@ function normalizeFileName(value: string): string {
     .filter((character) => {
       const codePoint = character.codePointAt(0);
 
-      return (
-        codePoint !== undefined &&
-        codePoint > 0x1f &&
-        codePoint !== 0x7f
-      );
+      return codePoint !== undefined && codePoint > 0x1f && codePoint !== 0x7f;
     })
     .join("");
 
-  const resolved = withoutControlCharacters
-    .replace(/[\\/]/g, "-")
-    .trim();
+  const resolved = withoutControlCharacters.replace(/[\\/]/g, "-").trim();
 
   if (!resolved || resolved.length > 260) {
     throw new BadRequestException(
@@ -140,9 +132,7 @@ export function validateSourceFile(
   const originalFileName = normalizeFileName(fileName);
 
   if (buffer.length === 0) {
-    throw new BadRequestException(
-      `${originalFileName} está vacío.`,
-    );
+    throw new BadRequestException(`${originalFileName} está vacío.`);
   }
 
   if (buffer.length > maxFileBytes) {
@@ -164,7 +154,10 @@ export function validateSourceFile(
 
 export function titleFromFileName(fileName: string): string {
   const extension = extname(fileName);
-  const title = fileName.slice(0, Math.max(0, fileName.length - extension.length));
+  const title = fileName.slice(
+    0,
+    Math.max(0, fileName.length - extension.length),
+  );
 
   return title.trim().slice(0, 240) || fileName.slice(0, 240);
 }

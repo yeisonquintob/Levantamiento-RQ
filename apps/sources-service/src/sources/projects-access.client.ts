@@ -108,8 +108,7 @@ export class ProjectsAccessClient {
       throw new ForbiddenException("No tienes acceso a este proyecto.");
     }
 
-    const canManage =
-      administrator || role === "OWNER" || role === "EDITOR";
+    const canManage = administrator || role === "OWNER" || role === "EDITOR";
 
     if (managementRequired && !canManage) {
       throw new ForbiddenException(

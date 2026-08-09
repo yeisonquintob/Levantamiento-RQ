@@ -5,6 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 
 import type { RequirementDocumentDetail } from "@levantamiento-rq/shared-contracts";
+import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
 
 import { AnalysisExecutionEntity } from "../analysis/analysis-execution.entity";
 import { AnalysisPromptVersionEntity } from "../analysis/analysis-prompt-version.entity";
@@ -68,11 +69,13 @@ export class AiAnalysisExecutionService {
     private readonly providerConfigurations: AiProviderConfigurationsService,
     @Inject(AI_PROVIDER_RUNTIME_CONFIG)
     private readonly runtime: AiProviderRuntimeConfig,
+    private readonly events: IntegrationEventsPublisher,
   ) {}
 
   async process(
     analysisRequestId: string,
     finalAttempt: boolean,
+    correlationId = analysisRequestId,
   ): Promise<void> {
     const existingResult = await this.results.findOneBy({ analysisRequestId });
     if (existingResult) return;
@@ -123,6 +126,17 @@ export class AiAnalysisExecutionService {
       createdAt: startedAt,
     });
     await this.executions.save(execution);
+    await this.events.publish({
+      eventName: "analysis.started",
+      correlationId,
+      causationId: analysisRequestId,
+      data: {
+        projectId: request.projectId,
+        analysisRequestId,
+        executionId: execution.id,
+        attempt,
+      },
+    });
 
     try {
       const [snapshotSources, prompt] = await Promise.all([
@@ -236,6 +250,19 @@ export class AiAnalysisExecutionService {
           updatedAt: finishedAt,
         });
       });
+      await this.events.publish({
+        eventName: "analysis.completed",
+        correlationId,
+        causationId: execution.id,
+        data: {
+          projectId: request.projectId,
+          analysisRequestId,
+          executionId: execution.id,
+          durationMs: finishedAt.valueOf() - startedAt.valueOf(),
+          inputTokens: generated.inputTokens,
+          outputTokens: generated.outputTokens,
+        },
+      });
     } catch (error) {
       const failure = errorDetails(error);
       const finishedAt = new Date();
@@ -252,6 +279,20 @@ export class AiAnalysisExecutionService {
           updatedAt: finishedAt,
         });
       });
+
+      if (!failure.retryable || finalAttempt) {
+        await this.events.publish({
+          eventName: "analysis.failed",
+          correlationId,
+          causationId: execution.id,
+          data: {
+            projectId: request.projectId,
+            analysisRequestId,
+            executionId: execution.id,
+            errorCode: failure.code,
+          },
+        });
+      }
 
       if (failure.retryable && !finalAttempt) {
         throw new AiProviderError(failure.code, failure.message, true);

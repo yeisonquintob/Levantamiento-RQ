@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateAiAnalysisFoundation1786320000000
-  implements MigrationInterface
-{
+export class CreateAiAnalysisFoundation1786320000000 implements MigrationInterface {
   name = "CreateAiAnalysisFoundation1786320000000";
 
   async up(queryRunner: QueryRunner): Promise<void> {

@@ -1,8 +1,6 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddSourceFilesAndExtraction1785888000000
-  implements MigrationInterface
-{
+export class AddSourceFilesAndExtraction1785888000000 implements MigrationInterface {
   name = "AddSourceFilesAndExtraction1785888000000";
 
   async up(queryRunner: QueryRunner): Promise<void> {

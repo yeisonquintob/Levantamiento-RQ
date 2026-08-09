@@ -21,6 +21,9 @@
       "path": "../../libs/shared/persistence/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/shared/messaging/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/shared/http/tsconfig.lib.json"
     },
     {

@@ -5,6 +5,7 @@ import {
   loadSqlServerDatabaseConfig,
   PersistenceModule,
 } from "@levantamiento-rq/shared-persistence";
+import { IntegrationEventsModule } from "@levantamiento-rq/shared-messaging";
 
 import {
   AI_ANALYSIS_AUTH_CONFIG,
@@ -63,6 +64,9 @@ const aiAnalysisEntities = [
     PersistenceModule.register({
       serviceName: "ai-analysis-service",
       defaultDatabaseName: "RqAiDb",
+    }),
+    IntegrationEventsModule.register({
+      serviceName: "ai-analysis-service",
     }),
     ...(databaseConfig.enabled
       ? [TypeOrmModule.forFeature(aiAnalysisEntities)]

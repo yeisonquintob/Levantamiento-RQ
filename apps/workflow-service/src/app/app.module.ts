@@ -5,6 +5,7 @@ import {
   loadSqlServerDatabaseConfig,
   PersistenceModule,
 } from "@levantamiento-rq/shared-persistence";
+import { IntegrationEventsModule } from "@levantamiento-rq/shared-messaging";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -40,6 +41,7 @@ const workflowEntities = [
       serviceName: "workflow-service",
       defaultDatabaseName: "RqWorkflowDb",
     }),
+    IntegrationEventsModule.register({ serviceName: "workflow-service" }),
     ...(databaseConfig.enabled
       ? [TypeOrmModule.forFeature(workflowEntities)]
       : []),

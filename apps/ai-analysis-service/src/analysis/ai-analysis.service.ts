@@ -27,6 +27,7 @@ import { AnalysisRequestEntity } from "./analysis-request.entity";
 import { AnalysisResultEntity } from "./analysis-result.entity";
 import type { AiAnalysisRequestListQuery } from "./ai-analysis-input";
 import type { AiAnalysisRequest } from "./ai-analysis-request";
+import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
 import { AiAnalysisDocumentsAccessClient } from "./documents-access.client";
 import { AiAnalysisProjectsAccessClient } from "./projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "./sources-access.client";
@@ -75,6 +76,7 @@ export class AiAnalysisService {
     private readonly documentsAccess: AiAnalysisDocumentsAccessClient,
     private readonly sourcesAccess: AiAnalysisSourcesAccessClient,
     private readonly queue: AiAnalysisQueue,
+    private readonly events: IntegrationEventsPublisher,
   ) {}
 
   async create(
@@ -146,7 +148,7 @@ export class AiAnalysisService {
     });
 
     try {
-      await this.queue.enqueue(analysisRequestId);
+      await this.queue.enqueue(analysisRequestId, context.correlationId);
     } catch {
       await this.requests.update(analysisRequestId, {
         status: "FAILED",
@@ -156,6 +158,18 @@ export class AiAnalysisService {
         "La solicitud fue registrada, pero la cola de análisis no está disponible. Puedes reintentarlo.",
       );
     }
+
+    await this.events.publish({
+      eventName: "analysis.requested",
+      correlationId: context.correlationId,
+      data: {
+        projectId,
+        analysisRequestId,
+        documentId: input.documentId,
+        documentVersionId: input.documentVersionId,
+        requestedByUserId: context.actor.id,
+      },
+    });
 
     return this.loadDetail(projectId, analysisRequestId);
   }
@@ -186,7 +200,11 @@ export class AiAnalysisService {
     entity.updatedAt = new Date();
     await this.requests.save(entity);
     try {
-      await this.queue.enqueue(analysisRequestId, `retry-${Date.now()}`);
+      await this.queue.enqueue(
+        analysisRequestId,
+        context.correlationId,
+        `retry-${Date.now()}`,
+      );
     } catch {
       entity.status = "FAILED";
       entity.updatedAt = new Date();
