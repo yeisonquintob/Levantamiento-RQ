@@ -14,6 +14,7 @@ import type {
 } from "../../apps/identity-service/src/auth/identity-store";
 import { PasswordHasher } from "../../apps/identity-service/src/auth/password-hasher";
 import { TokenService } from "../../apps/identity-service/src/auth/token-service";
+import { applySignInUrlPolicy } from "../../apps/web/src/app/sign-in/sign-in-url-policy";
 
 class FakeIdentityStore implements IdentityStore {
   readonly users = new Map<string, IdentityUserRecord>();
@@ -300,4 +301,34 @@ test("el Workspace renueva solo con actividad y avisa la expiración", async () 
   assert.match(manager, /redirectToSignIn\("inactivity"\)/);
   assert.match(signIn, /30 minutos de inactividad/);
   assert.doesNotMatch(manager, /localStorage|sessionStorage/);
+});
+
+test("el acceso elimina credenciales y parámetros no permitidos de la URL", async () => {
+  const unsafe = applySignInUrlPolicy(
+    "?email=user%40example.com&password=secret&reason=expired&token=value",
+  );
+  assert.deepEqual(unsafe, {
+    changed: true,
+    reason: "expired",
+    safeSearch: "?reason=expired",
+  });
+
+  const safe = applySignInUrlPolicy("?reason=inactivity");
+  assert.deepEqual(safe, {
+    changed: false,
+    reason: "inactivity",
+    safeSearch: "?reason=inactivity",
+  });
+
+  const [proxy, form, nextConfig] = await Promise.all([
+    readFile("apps/web/src/proxy.ts", "utf8"),
+    readFile("apps/web/src/app/sign-in/sign-in-form.tsx", "utf8"),
+    readFile("apps/web/next.config.js", "utf8"),
+  ]);
+  assert.match(proxy, /matcher: \["\/sign-in"/);
+  assert.match(proxy, /Referrer-Policy", "no-referrer"/);
+  assert.match(form, /history\.replaceState/);
+  assert.match(nextConfig, /allowedDevOrigins: \["127\.0\.0\.1", "localhost"\]/);
+  assert.match(nextConfig, /logging: \{ incomingRequests: false \}/);
+  assert.match(nextConfig, /Referrer-Policy", value: "no-referrer"/);
 });

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
+import { applySignInUrlPolicy } from "./sign-in-url-policy";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -33,11 +35,23 @@ export function SignInForm() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get("reason");
+    const policy = applySignInUrlPolicy(window.location.search);
 
-    if (reason === "inactivity") {
+    if (policy.changed) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${policy.safeSearch}`,
+      );
+      setMessage(
+        "Por seguridad se eliminaron parámetros no permitidos de la URL. Ingresa las credenciales únicamente en el formulario.",
+      );
+      return;
+    }
+
+    if (policy.reason === "inactivity") {
       setMessage("La sesión se cerró después de 30 minutos de inactividad.");
-    } else if (reason === "expired") {
+    } else if (policy.reason === "expired") {
       setMessage("La sesión expiró. Inicia sesión nuevamente.");
     }
   }, []);

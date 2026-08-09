@@ -32,7 +32,7 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Referrer-Policy", value: "no-referrer" },
   {
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), payment=()",
@@ -40,12 +40,20 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   devIndicators: false,
+  logging: { incomingRequests: false },
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      {
+        source: "/sign-in",
+        headers: [
+          { key: "Cache-Control", value: "no-store, max-age=0" },
+        ],
+      },
       {
         source: "/workspace/:path*",
         headers: [
