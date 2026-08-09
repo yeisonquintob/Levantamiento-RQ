@@ -26,6 +26,7 @@ export class SourceProcessingService {
     private readonly storage: SourceBlobStorage,
     @Inject(SourceExtractionService)
     private readonly extraction: SourceExtractionService,
+    @Inject(IntegrationEventsPublisher)
     private readonly events: IntegrationEventsPublisher,
   ) {}
 
