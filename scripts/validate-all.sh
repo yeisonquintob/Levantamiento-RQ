@@ -15,6 +15,7 @@ trap cleanup EXIT INT TERM
 cleanup
 
 CI=1 pnpm install --frozen-lockfile
+pnpm audit --prod --audit-level high
 pnpm check:secrets
 pnpm check:architecture
 pnpm lint:all

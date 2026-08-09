@@ -1,6 +1,6 @@
 # Azure: base declarativa de producción
 
-Esta carpeta prepara, pero no ejecuta, el despliegue de Levantamiento RQ. `main.bicep` declara Container Apps, ACR, ocho bases Azure SQL, Storage con versionado y borrado recuperable, Azure Cache for Redis, Service Bus, Key Vault, Log Analytics y Application Insights.
+Esta carpeta prepara, pero no ejecuta, el despliegue de Levantamiento RQ. `main.bicep` declara Container Apps, ACR, ocho bases Azure SQL, Storage con versionado y borrado recuperable, Azure Cache for Redis, Service Bus, un Key Vault de plataforma, un Key Vault aislado para credenciales IA, Log Analytics y Application Insights.
 
 ## Construcción de imágenes
 
@@ -25,7 +25,7 @@ Use siempre etiquetas inmutables de commit. Los contenedores se ejecutan sin roo
 1. Crear el grupo de recursos y validar la plantilla con `az deployment group validate`.
 2. Copiar `main.bicepparam.example` fuera del repositorio y completar las diez cargas: web, Gateway y ocho servicios de dominio.
 3. Entregar `sqlAdministratorPassword` desde el almacén secreto del pipeline.
-4. Crear en Key Vault los secretos de JWT, SQL, OpenAI y servicios; referenciarlos mediante `keyVaultSecrets`, nunca como texto en Bicep.
+4. Crear en el Key Vault de plataforma los secretos de JWT, SQL y servicios; referenciarlos mediante `keyVaultSecrets`, nunca como texto en Bicep. La identidad administrada de `ai-analysis-service` recibe Secrets Officer únicamente sobre el Key Vault aislado de IA para crear y rotar la credencial OpenAI desde la pantalla administrativa; el resto de cargas no tiene acceso a ese vault.
 5. Aplicar migraciones como trabajo de despliegue, una base por servicio, antes de cambiar tráfico.
 6. Verificar `/api/v1/health/ready`, `/api/v1/metrics`, login, colas, una exportación y una ejecución Fake AI.
 7. Endurecer producción con VNet, private endpoints y Private DNS antes de deshabilitar el acceso público de SQL, Storage, Redis, Service Bus y Key Vault. La regla `AllowAzureServices` es solamente la base inicial de conectividad.

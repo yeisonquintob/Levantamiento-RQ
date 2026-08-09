@@ -212,6 +212,12 @@ importers:
 
   apps/ai-analysis-service:
     dependencies:
+      '@azure/identity':
+        specifier: 4.13.1
+        version: 4.13.1(supports-color@7.2.0)
+      '@azure/keyvault-secrets':
+        specifier: 4.11.2
+        version: 4.11.2(supports-color@7.2.0)
       '@fastify/static':
         specifier: 10.1.2
         version: 10.1.2
@@ -993,6 +999,10 @@ packages:
 
   '@azure/keyvault-keys@4.10.2':
     resolution: {integrity: sha512-VmUSLbXRAbSzDD8grXHGPaknYs0SKr3yuf6U+d4XMpX4XuVYskNqbTTwXce0zR1LyxfTZm9rWEBcvs3vdYwCmQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@azure/keyvault-secrets@4.11.2':
+    resolution: {integrity: sha512-ECj/kwZbZlQXj2kfWivSICbKwj6W3chmFhv8qUdauqYnjvZ0hWZBFSsZWux7W2nX3MP49PLUCusXk+hAg3pipg==}
     engines: {node: '>=20.0.0'}
 
   '@azure/logger@1.4.0':
@@ -9542,6 +9552,22 @@ snapshots:
       - supports-color
 
   '@azure/keyvault-keys@4.10.2(supports-color@7.2.0)':
+    dependencies:
+      '@azure-rest/core-client': 2.8.0(supports-color@7.2.0)
+      '@azure/abort-controller': 2.2.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-lro': 2.7.2(supports-color@7.2.0)
+      '@azure/core-paging': 1.7.0
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
+      '@azure/core-tracing': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/keyvault-common': 2.1.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@azure/keyvault-secrets@4.11.2(supports-color@7.2.0)':
     dependencies:
       '@azure-rest/core-client': 2.8.0(supports-color@7.2.0)
       '@azure/abort-controller': 2.2.0

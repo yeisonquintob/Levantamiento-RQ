@@ -103,7 +103,9 @@ temporales. Comprueba autenticación, autorización, asignaciones, comentarios,
 idempotencia, conflictos, aprobación e inmutabilidad, correcciones y nueva
 versión, rechazo, auditoría y cierre de rutas directas.
 
-OpenAI permanece desconectado. La publicación de los eventos catalogados
-`review.requested.v1`, `document.approved.v1` y `document.rejected.v1` continúa
-como integración futura del Punto 10; el flujo HTTP transaccional del Punto 19
-no ejecuta IA ni mensajería.
+OpenAI es configurable y permanece deshabilitado hasta que un administrador
+registre la credencial desde la aplicación. Workflow publica actualmente
+`review.requested`, `review.changes-requested`, `document.approved` y
+`document.rejected` en RabbitMQ con contrato V1. Operations los consume de
+forma idempotente para auditoría y notificaciones; el flujo transaccional HTTP
+no delega decisiones de aprobación al broker ni a la IA.

@@ -129,6 +129,7 @@ async function main(): Promise<void> {
       {
         vaultMode: "DISABLED",
         keychainService: "test",
+        keyVaultUrl: null,
         executionMode: "FAKE",
       },
       {

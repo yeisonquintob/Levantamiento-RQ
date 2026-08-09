@@ -21,7 +21,7 @@ var databaseNames = [
   'RqProjectsDb'
   'RqSourcesDb'
   'RqDocumentsDb'
-  'RqAiAnalysisDb'
+  'RqAiDb'
   'RqErpKnowledgeDb'
   'RqWorkflowDb'
   'RqOperationsDb'
@@ -72,6 +72,20 @@ resource containerEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
 
 resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: take(replace('${prefix}-${environmentName}-${suffix}-kv', '-', ''), 24)
+  location: location
+  properties: {
+    tenantId: subscription().tenantId
+    enableRbacAuthorization: true
+    enablePurgeProtection: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 90
+    publicNetworkAccess: 'Enabled'
+    sku: { family: 'A', name: 'standard' }
+  }
+}
+
+resource aiVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: take(replace('${prefix}-${environmentName}-${suffix}-aikv', '-', ''), 24)
   location: location
   properties: {
     tenantId: subscription().tenantId
@@ -235,7 +249,10 @@ resource applications 'Microsoft.App/containerApps@2024-03-01' = [for workload i
             { name: 'HOST', value: '0.0.0.0' }
             { name: 'PORT', value: string(workload.port) }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
-          ], workload.env)
+          ], workload.name == 'ai-analysis-service' ? [
+            { name: 'AI_SECRET_VAULT', value: 'AZURE_KEY_VAULT' }
+            { name: 'AI_KEY_VAULT_URL', value: aiVault.properties.vaultUri }
+          ] : [], workload.env)
           probes: [
             {
               type: 'Liveness'
@@ -286,9 +303,24 @@ resource vaultAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }]
 
+var keyVaultSecretsOfficerRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions'
+  'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+)
+resource aiVaultOfficerAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (workload, index) in workloads: if (workload.name == 'ai-analysis-service') {
+  name: guid(aiVault.id, applications[index].id, keyVaultSecretsOfficerRoleId)
+  scope: aiVault
+  properties: {
+    principalId: applications[index].identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: keyVaultSecretsOfficerRoleId
+  }
+}]
+
 output containerRegistry string = registry.properties.loginServer
 output containerEnvironmentName string = containerEnvironment.name
 output keyVaultName string = vault.name
+output aiKeyVaultName string = aiVault.name
 output sqlServerName string = sqlServer.name
 output storageAccountName string = storage.name
 output serviceBusNamespace string = serviceBus.name

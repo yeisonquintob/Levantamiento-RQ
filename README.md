@@ -1,185 +1,153 @@
 # Levantamiento RQ
 
-Plataforma distribuida para el levantamiento, análisis, edición,
-revisión y aprobación de requerimientos con apoyo de inteligencia
-artificial.
+Plataforma distribuida para levantar, analizar, editar, revisar, aprobar y
+exportar requerimientos con apoyo de inteligencia artificial y revisión humana
+obligatoria.
 
-## Objetivo
+## Estado actual
 
-Permitir que un analista cargue documentos, conversaciones, notas y
-otras fuentes para producir un borrador estructurado de requerimientos,
-revisarlo, editarlo, aprobarlo y exportarlo.
+La V1 está implementada de extremo a extremo y cuenta con una prueba E2E
+autocontenida usando `FakeAiProvider`. La validación real de OpenAI y el
+despliegue en Azure son acciones externas: requieren credenciales configuradas
+por un administrador, pero no cambios de código.
 
-La inteligencia artificial propone contenido y recomendaciones, pero
-no modifica automáticamente información aprobada.
+ERP Knowledge permanece deliberadamente como capacidad futura opcional. Su
+servicio base y su infraestructura están reservados, sin conexión directa ni
+escritura sobre Dynamics 365 productivo.
 
-## Contexto empresarial
+El detalle auditable se mantiene en
+[`docs/plans/status-application-v1.md`](docs/plans/status-application-v1.md).
 
-La plataforma podrá considerar sistemas empresariales existentes antes
-de recomendar un nuevo desarrollo. Dynamics 365 podrá incorporarse en
-una fase futura como fuente de conocimiento para análisis fit-gap.
+## Flujo funcional V1
 
-Esta capacidad no representa una integración operacional ni una
-conexión directa a producción.
+1. Iniciar sesión y administrar usuarios, roles y sesiones.
+2. Crear un proyecto con participantes y una plantilla publicada.
+3. Registrar notas o cargar TXT, CSV, XLSX, PDF, DOCX e imágenes.
+4. Almacenar los binarios en Blob y extraer contenido mediante BullMQ.
+5. Crear o editar un documento con las 13 secciones canónicas.
+6. Analizar fuentes READY de forma asíncrona con Fake u OpenAI.
+7. Revisar, editar, aceptar o descartar cada propuesta de IA.
+8. Enviar el borrador a Workflow, comentar, solicitar cambios, aprobar o
+   rechazar.
+9. Bloquear la versión aprobada y exportarla a PDF o DOCX.
+10. Descargar artefactos y consultar notificaciones, historial y auditoría.
 
-## Arquitectura prevista
+La IA nunca aprueba contenido ni escribe directamente en `RqDocumentsDb`.
 
-- Frontend responsive independiente.
-- API Gateway / BFF.
-- Identity Service.
-- Projects Service.
-- Sources Service.
-- Documents Service.
-- AI Analysis Service.
-- ERP Knowledge Service.
-- Workflow Service.
-- Operations Service.
+## Arquitectura
 
-## Stack principal
+| Componente    | Responsabilidad                                   | Persistencia                          |
+| ------------- | ------------------------------------------------- | ------------------------------------- |
+| Web           | Workspace responsive y PWA segura                 | Sin secretos ni JWT en `localStorage` |
+| Gateway       | BFF único, cookies, origen, correlación y proxies | Sin base de datos                     |
+| Identity      | Usuarios, roles, permisos y sesiones              | `RqIdentityDb`                        |
+| Projects      | Proyectos, participantes y plantilla aplicada     | `RqProjectsDb`                        |
+| Sources       | Fuentes, hash, extracción y archivos privados     | `RqSourcesDb` + Blob                  |
+| Documents     | Plantillas, documentos, versiones y contenido     | `RqDocumentsDb`                       |
+| AI Analysis   | Proveedores, prompts, ejecuciones y propuestas    | `RqAiDb`                              |
+| ERP Knowledge | Reserva segura para snapshots/fit-gap futuros     | `RqErpKnowledgeDb` futura             |
+| Workflow      | Revisión, comentarios, correcciones y aprobación  | `RqWorkflowDb`                        |
+| Operations    | Exportaciones, notificaciones, inbox y auditoría  | `RqOperationsDb` + Blob               |
 
-- NestJS y TypeScript.
-- Fastify.
-- TypeORM.
-- SQL Server / Azure SQL.
-- Passport, JWT y cookies seguras.
-- BullMQ y Redis.
-- RabbitMQ / Azure Service Bus.
-- Azurite / Azure Blob Storage.
-- OpenAI API.
-- Nx y pnpm.
-- Docker Compose.
+No existen claves foráneas entre bases de dominios. HTTP atiende operaciones
+síncronas; RabbitMQ transporta eventos; Redis/BullMQ ejecuta extracción,
+análisis y exportaciones.
+
+## Stack
+
+- Node.js 24, TypeScript, Nx y pnpm 11.
+- NestJS, Fastify, TypeORM y SQL Server/Azure SQL.
+- Next.js 16 y React 19.
+- Redis/BullMQ, RabbitMQ y Azurite/Azure Blob Storage.
+- OpenAI Responses API con salida JSON estructurada.
+- Docker Compose local y Bicep para Azure Container Apps.
+
+## Operación local
+
+Los scripts resuelven la raíz oficial a partir de su propia ubicación. No
+dependen del directorio desde el que se invoquen.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm auth:local:up
+pnpm auth:local:status
+pnpm auth:local:down
+```
+
+Antes de iniciar se requieren los archivos locales ignorados por Git descritos
+en los `.env.example` y la infraestructura Docker configurada. El entorno de
+desarrollo puede usar `AI_EXECUTION_MODE=FAKE`; producción rechaza ese modo.
+
+Puertos:
+
+| Aplicación                                 | Puerto |
+| ------------------------------------------ | -----: |
+| Gateway                                    |   3000 |
+| Identity                                   |   3001 |
+| Projects                                   |   3002 |
+| Sources                                    |   3003 |
+| Documents                                  |   3004 |
+| AI Analysis                                |   3005 |
+| ERP Knowledge (futuro, no iniciado por V1) |   3006 |
+| Workflow                                   |   3007 |
+| Operations                                 |   3008 |
+| Web                                        |   4200 |
+
+## Configuración segura de IA
+
+Un ADMIN configura OpenAI desde:
+
+`Configuración > Inteligencia artificial > Proveedores`
+
+La API Key nunca regresa al navegador ni se guarda en SQL. Desarrollo macOS
+usa Keychain; Azure usa Key Vault con identidad administrada. Solo se conserva
+una referencia opaca en `RqAiDb`. El endpoint OpenAI está restringido al host
+oficial para impedir SSRF.
+
+## Validación
+
+```bash
+pnpm validate:all
+pnpm test:e2e:v1
+```
+
+`validate:all` ejecuta instalación congelada, auditoría de dependencias de
+producción, detección de secretos, límites arquitectónicos, lint, typecheck,
+build, pruebas unitarias, eventos, infraestructura, migraciones, bases, Blob,
+Redis/BullMQ, Swagger y smokes. El E2E crea fixtures temporales y los elimina al
+terminar.
+
+Comandos focalizados:
+
+```bash
+pnpm test:unit
+pnpm test:events
+pnpm test:integration
+pnpm swagger:validate
+pnpm lint:all
+pnpm typecheck:all
+pnpm build:all
+```
+
+## CI, despliegue y operación
+
+- [Pipeline CI](.github/workflows/ci.yml)
+- [Infraestructura Azure](infrastructure/azure/README.md)
+- [Observabilidad](docs/operations/observability.md)
+- [Respaldo y recuperación](docs/operations/backup-recovery.md)
+
+El repositorio prepara imágenes, Container Apps, ocho Azure SQL, Storage,
+Redis, Service Bus, vault de plataforma, vault aislado de IA y Application
+Insights. No ejecuta despliegues ni accede a sistemas empresariales sin
+autorización y credenciales externas.
 
 ## Documentación
 
+- [Estado V1](docs/plans/status-application-v1.md)
 - [Arquitectura](docs/architecture/README.md)
-- [Infraestructura local](infrastructure/docker/README.md)
 - [Contratos HTTP](docs/api/http-contract-guidelines.md)
 - [Catálogo de eventos](docs/api/event-catalog.md)
 - [Propiedad de datos](docs/database/database-ownership.md)
 - [Modelo documental canónico](docs/document-model/README.md)
 - [Decisiones arquitectónicas](docs/decisions/README.md)
-
-## Estado
-
-Paso 4: infraestructura local preparada.
-
-Docker Compose incluye Redis, RabbitMQ y Azurite con imágenes ARM64 y
-versiones fijadas. SQL Server o Azure SQL se utilizará mediante una
-instancia remota durante el desarrollo.
-
-Todavía no se han creado aplicaciones, microservicios, bases de datos
-ni migraciones.
-
-## Estado de implementación
-
-Paso 5: aplicaciones backend NestJS creadas con Fastify.
-
-Existen nueve esqueletos técnicos compilables. Todavía no se han
-implementado lógica empresarial, persistencia, mensajería, seguridad,
-inteligencia artificial ni frontend.
-
-## Librerías compartidas
-
-El Paso 6 incorporó contratos técnicos, configuración, errores, soporte HTTP,
-observabilidad y utilidades de pruebas bajo `libs/shared`.
-
-Los límites entre scopes y tipos se validan mediante ESLint y etiquetas Nx.
-
-## Paso 7: variables de entorno y Gateway
-
-Las nueve aplicaciones validan su configuración técnica mediante `shared-config`. El Gateway registra correlación HTTP, Problem Details, health check tipado y registro estructurado de inicio.
-
-## Paso 8: base de persistencia
-
-Los ocho servicios propietarios de datos cuentan con configuración TypeORM para SQL Server o Azure SQL. La persistencia permanece deshabilitada hasta disponer de credenciales reales.
-
-## Paso 9: frontend responsive
-
-Existe una aplicación Next.js llamada `web` y una librería `shared-ui` con temas, escalas de accesibilidad y componentes base.
-
-## Paso 10: identidad, autenticación y autorización
-
-Identity Service contiene el modelo de usuarios, roles, permisos y sesiones.
-El Gateway expone inicio, renovación, consulta y cierre de sesión mediante
-cookies HttpOnly. La autenticación permanece deshabilitada hasta configurar
-RqIdentityDb y los secretos JWT; no se incluyen usuarios predeterminados.
-
-## Paso 11: activación real de identidad
-
-La autenticación local puede conectarse a RqIdentityDb mediante archivos
-de entorno ignorados por Git. El proceso controlado confirma o crea la base,
-aplica la migración, prepara el primer administrador y valida la sesión real
-a través de Identity Service, Gateway y frontend.
-
-## Swagger y OpenAPI
-
-Los nueve servicios backend publican Swagger UI únicamente en desarrollo.
-El Gateway está disponible en `http://127.0.0.1:3000/api/docs`.
-
-La validación completa se ejecuta con:
-
-```bash
-pnpm swagger:validate
-```
-
-## Paso 12: Projects Service y Workspace
-
-`RqProjectsDb` almacena proyectos y participantes sin relaciones entre bases.
-Projects Service valida access tokens, el Gateway publica la API de proyectos
-y el Workspace permite crear, consultar, filtrar y actualizar registros reales.
-
-## Paso 13: Sources Service completo
-
-`RqSourcesDb` almacena notas, conversaciones, transcripciones y archivos sin
-relaciones entre bases. Sources Service valida el access token y consulta
-Projects Service para confirmar el acceso al proyecto.
-
-El botón `Nueva fuente` permite registrar contenido textual o seleccionar
-varios archivos PDF, DOCX, XLSX, TXT, CSV, PNG, JPG, JPEG y WEBP. Los archivos
-se validan por extensión, tamaño y firma, se identifican mediante SHA-256 y se
-guardan en el contenedor privado `rq-sources` de Azurite/Azure Blob Storage.
-
-PDF, Word, Excel, CSV y TXT se procesan para obtener texto utilizable por el
-análisis posterior. Las imágenes se conservan como evidencia visual sin OCR.
-El Workspace permite consultar el procesamiento, ver el texto extraído,
-descargar, reprocesar y archivar cada fuente.
-
-## Paso 14: catálogo de plantillas documentales
-
-`RqDocumentsDb` conserva el catálogo versionado de plantillas. Se incluyen
-versiones iniciales publicadas para requerimientos pequeños, medianos, grandes
-y FDD de necesidades puntuales ERP.
-
-Las plantillas mantienen las trece secciones canónicas del estándar compacto.
-Pequeño, mediano y grande incluyen Epic, Feature, historia de usuario y
-criterios de aceptación. El FDD ERP no agrega Scrum automáticamente, aunque
-puede habilitarse de forma expresa al crear una nueva versión.
-
-Cada versión publicada cumple dos funciones: define la estructura del documento
-y aporta a la IA las instrucciones de análisis, tratamiento seguro de fuentes,
-manejo de vacíos y contradicciones, y el contrato JSON de salida. Las fuentes se
-tratan como datos y no pueden reemplazar instrucciones de la plantilla.
-
-Una versión publicada es inmutable. Los cambios se realizan clonando una
-versión publicada o retirada hacia un nuevo borrador SemVer.
-
-## Punto 19: versionamiento, revisión y aprobaciones
-
-`RqWorkflowDb` y Workflow Service implementan solicitudes de revisión,
-asignaciones, comentarios, correcciones, aprobaciones, rechazos e historial
-correlacionado. Documents conserva el contenido y bloquea toda versión
-aprobada; modificarla exige crear una versión nueva.
-
-El Gateway publica únicamente el flujo formal de Workflow y el editor permite
-enviar a validación, comentar, solicitar correcciones, aprobar o rechazar. Las
-mutaciones requieren `x-idempotency-key` y revisiones optimistas.
-
-Validación específica:
-
-```bash
-pnpm validate:workflow
-pnpm workflow:gateway:e2e
-pnpm swagger:validate
-```
-
-Detalle: [Workflow funcional, revisión y aprobación](docs/architecture/workflow-review-approval.md).
+- [Infraestructura local](infrastructure/docker/README.md)

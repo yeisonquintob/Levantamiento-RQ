@@ -4,35 +4,35 @@ services:
   - id: web
     kind: frontend
     scope: web
-    implementation_stage: planned
+    implementation_stage: implemented
     database: null
     externally_exposed: true
 
   - id: gateway
     kind: bff
     scope: gateway
-    implementation_stage: planned
+    implementation_stage: implemented
     database: null
     externally_exposed: true
 
   - id: identity-service
     kind: service
     scope: identity
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqIdentityDb
     externally_exposed: false
 
   - id: projects-service
     kind: service
     scope: projects
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqProjectsDb
     externally_exposed: false
 
   - id: sources-service
     kind: service
     scope: sources
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqSourcesDb
     object_storage: true
     bullmq: true
@@ -48,7 +48,7 @@ services:
   - id: ai-analysis-service
     kind: worker-service
     scope: ai
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqAiDb
     bullmq: true
     externally_exposed: false
@@ -58,21 +58,20 @@ services:
     scope: erp-knowledge
     implementation_stage: future
     database: RqErpKnowledgeDb
-    bullmq: true
     operational_integration: false
     externally_exposed: false
 
   - id: workflow-service
     kind: service
     scope: workflow
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqWorkflowDb
     externally_exposed: false
 
   - id: operations-service
     kind: worker-service
     scope: operations
-    implementation_stage: planned
+    implementation_stage: implemented
     database: RqOperationsDb
     bullmq: true
     externally_exposed: false

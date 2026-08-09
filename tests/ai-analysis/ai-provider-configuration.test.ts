@@ -10,7 +10,10 @@ import {
   parseUpdateAiProviderConfiguration,
 } from "../../apps/ai-analysis-service/src/providers/ai-provider-input.js";
 import { loadAiProviderRuntimeConfig } from "../../apps/ai-analysis-service/src/providers/ai-provider.config.js";
-import { MemoryAiSecretVault } from "../../apps/ai-analysis-service/src/providers/ai-secret-vault.js";
+import {
+  AzureKeyVaultAiSecretVault,
+  MemoryAiSecretVault,
+} from "../../apps/ai-analysis-service/src/providers/ai-secret-vault.js";
 
 const ADMIN: AuthenticatedUser = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -56,10 +59,43 @@ test("la bóveda de pruebas soporta ciclo de vida sin exponer almacenamiento", a
   assert.equal(await vault.has("provider-test"), false);
 });
 
+test("Azure Key Vault soporta alta, consulta, rotación y borrado idempotente", async () => {
+  const secrets = new Map<string, string>();
+  const client = {
+    setSecret: async (name: string, value: string) => {
+      secrets.set(name, value);
+      return { name, value };
+    },
+    getSecret: async (name: string) => {
+      const value = secrets.get(name);
+      if (!value) {
+        throw Object.assign(new Error("not found"), { statusCode: 404 });
+      }
+      return { name, value };
+    },
+    beginDeleteSecret: async (name: string) => {
+      if (!secrets.delete(name)) {
+        throw Object.assign(new Error("not found"), { statusCode: 404 });
+      }
+      return {};
+    },
+  };
+  const vault = new AzureKeyVaultAiSecretVault(client as never);
+
+  assert.equal(await vault.has("provider-test"), false);
+  await vault.put("provider-test", "first-secret");
+  assert.equal(await vault.resolve("provider-test"), "first-secret");
+  await vault.put("provider-test", "rotated-secret");
+  assert.equal(await vault.resolve("provider-test"), "rotated-secret");
+  await vault.delete("provider-test");
+  await vault.delete("provider-test");
+  assert.equal(await vault.has("provider-test"), false);
+});
+
 test("la configuración de runtime rechaza bóvedas inseguras o desconocidas", () => {
   assert.throws(
     () => loadAiProviderRuntimeConfig({ AI_SECRET_VAULT: "PLAINTEXT" }),
-    /MACOS_KEYCHAIN o DISABLED/,
+    /MACOS_KEYCHAIN, AZURE_KEY_VAULT o DISABLED/,
   );
   assert.deepEqual(
     loadAiProviderRuntimeConfig({
@@ -70,8 +106,24 @@ test("la configuración de runtime rechaza bóvedas inseguras o desconocidas", (
     {
       vaultMode: "MACOS_KEYCHAIN",
       keychainService: "com.example.ai",
+      keyVaultUrl: null,
       executionMode: "OPENAI",
     },
+  );
+  assert.equal(
+    loadAiProviderRuntimeConfig({
+      AI_SECRET_VAULT: "AZURE_KEY_VAULT",
+      AI_KEY_VAULT_URL: "https://rq-prod.vault.azure.net",
+    }).keyVaultUrl,
+    "https://rq-prod.vault.azure.net",
+  );
+  assert.throws(
+    () =>
+      loadAiProviderRuntimeConfig({
+        AI_SECRET_VAULT: "AZURE_KEY_VAULT",
+        AI_KEY_VAULT_URL: "http://127.0.0.1/secrets",
+      }),
+    /endpoint oficial HTTPS de Azure Key Vault/,
   );
 });
 
@@ -145,4 +197,28 @@ test("persistencia, auditoría y UI no definen una columna o almacén local para
   );
   assert.doesNotMatch(workspace, /localStorage|sessionStorage/);
   assert.match(workspace, /type="password"/);
+});
+
+test("Azure prepara Key Vault con identidad administrada y la base correcta", async () => {
+  const [bicep, dependencies, environment] = await Promise.all([
+    readFile("infrastructure/azure/main.bicep", "utf8"),
+    readFile("apps/ai-analysis-service/package.json", "utf8"),
+    readFile("apps/ai-analysis-service/.env.example", "utf8"),
+  ]);
+
+  assert.match(bicep, /'RqAiDb'/);
+  assert.doesNotMatch(bicep, /RqAiAnalysisDb/);
+  assert.match(bicep, /AI_SECRET_VAULT', value: 'AZURE_KEY_VAULT'/);
+  assert.match(
+    bicep,
+    /AI_KEY_VAULT_URL', value: aiVault\.properties\.vaultUri/,
+  );
+  assert.match(bicep, /keyVaultSecretsOfficerRoleId/);
+  assert.match(bicep, /scope: aiVault/);
+  assert.match(dependencies, /"@azure\/identity": "4\.13\.1"/);
+  assert.match(dependencies, /"@azure\/keyvault-secrets": "4\.11\.2"/);
+  assert.match(
+    environment,
+    /AI_KEY_VAULT_URL=https:\/\/<vault>\.vault\.azure\.net/,
+  );
 });

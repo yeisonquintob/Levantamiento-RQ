@@ -1,55 +1,59 @@
-# Catálogo inicial de eventos
+# Catálogo de eventos de integración V1
 
 ## Sobre estándar
 
 ```json
 {
   "eventId": "uuid",
-  "eventName": "source.processed",
+  "eventName": "source.ready",
   "eventVersion": 1,
-  "occurredAtUtc": "2026-08-01T00:00:00Z",
+  "occurredAtUtc": "2026-08-09T00:00:00Z",
   "producer": "sources-service",
   "correlationId": "uuid",
-  "causationId": "uuid",
-  "organizationId": "uuid",
+  "causationId": "uuid-opcional",
+  "organizationId": "uuid-opcional",
   "data": {}
 }
 ```
 
-## Eventos iniciales
+`eventName` también es la routing key. La versión viaja en
+`eventVersion`; no se agrega el sufijo `.v1` al nombre. RabbitMQ usa el
+exchange durable `rq.integration.v1`.
 
-- `user.created.v1`
-- `user.disabled.v1`
-- `project.created.v1`
-- `project.updated.v1`
-- `source.uploaded.v1`
-- `source.processed.v1`
-- `analysis.requested.v1`
-- `analysis.completed.v1`
-- `analysis.failed.v1`
-- `erp-knowledge.snapshot-imported.v1`
-- `erp-knowledge.snapshot-validated.v1`
-- `erp-knowledge.fit-gap-completed.v1`
-- `document.draft-created.v1`
-- `document.version-created.v1`
-- `review.requested.v1`
-- `document.approved.v1`
-- `document.rejected.v1`
-- `export.requested.v1`
-- `pdf.generated.v1`
-- `notification.delivered.v1`
+## Eventos implementados
+
+| Evento                     | Productor   | Propósito                             |
+| -------------------------- | ----------- | ------------------------------------- |
+| `source.ready`             | Sources     | fuente extraída y lista para análisis |
+| `analysis.requested`       | AI Analysis | solicitud persistida y encolada       |
+| `analysis.started`         | AI Analysis | intento real iniciado por el worker   |
+| `analysis.completed`       | AI Analysis | resultado estructurado persistido     |
+| `analysis.failed`          | AI Analysis | intento final fallido y sanitizado    |
+| `review.requested`         | Workflow    | documento enviado a revisión          |
+| `review.changes-requested` | Workflow    | revisor solicitó correcciones         |
+| `document.approved`        | Workflow    | versión aprobada e inmutable          |
+| `document.rejected`        | Workflow    | revisión rechazada                    |
+| `export.requested`         | Operations  | solicitud de exportación encolada     |
+| `export.completed`         | Operations  | artefacto PDF/DOCX disponible         |
+| `export.failed`            | Operations  | generación agotó sus reintentos       |
+
+Operations consume los eventos que generan notificaciones o auditoría. Su
+inbox tiene unicidad por `eventId`, valida la pareja productor/evento y mueve
+errores temporales a una cola de retry con intentos acotados.
 
 ## Reglas
 
-- El nombre describe un hecho ocurrido.
-- El contrato se versiona.
-- El payload es mínimo.
-- No se envían archivos completos ni secretos.
-- Cada consumidor debe ser idempotente.
+- El nombre describe un hecho ya ocurrido.
+- El contrato y el sobre se versionan.
+- El payload es mínimo y usa referencias externas, no entidades compartidas.
+- No se publican archivos, secretos, JWT, cookies, prompts o contenido completo.
+- Publicación y consumo conservan `correlationId` y `causationId` cuando aplica.
+- Los consumidores son idempotentes; RabbitMQ no contiene reglas de negocio.
+- La desactivación local del broker no cambia la transacción del dominio.
 
-## Estado de implementación
+## Eventos futuros
 
-El Punto 19 implementa revisión y aprobación mediante HTTP autenticado e
-idempotente. Los eventos `review.requested.v1`, `document.approved.v1` y
-`document.rejected.v1` continúan catalogados, pero su publicación en RabbitMQ o
-Azure Service Bus pertenece al alcance pendiente del Punto 10.
+ERP Knowledge podrá agregar eventos de snapshot y fit-gap únicamente cuando
+exista un alcance empresarial aprobado. No forman parte del contrato V1 activo.
+Azure Service Bus conservará semántica y versión al reemplazar el transporte
+RabbitMQ durante el despliegue.

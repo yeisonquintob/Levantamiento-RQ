@@ -3,6 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@azure/identity": "4.13.1",
+    "@azure/keyvault-secrets": "4.11.2",
     "@fastify/static": "10.1.2",
     "@levantamiento-rq/shared-config": "workspace:*",
     "@levantamiento-rq/shared-contracts": "workspace:*",

@@ -9,7 +9,7 @@
 | AI Analysis   | RqAiDb           | Implementada |
 | ERP Knowledge | RqErpKnowledgeDb | Futura       |
 | Workflow      | RqWorkflowDb     | Implementada |
-| Operations    | RqOperationsDb   | Planificada  |
+| Operations    | RqOperationsDb   | Implementada |
 
 ## Reglas
 
@@ -47,3 +47,20 @@ acoplar dominios.
 Proyecto, documento, versión y usuario se conservan como identificadores
 externos. Solo asignaciones y actividades tienen claves foráneas internas hacia
 su solicitud de revisión.
+
+## AI Analysis Service
+
+`RqAiDb` conserva solicitudes, snapshots, ejecuciones, prompts, resultados,
+configuraciones no secretas y auditoría de proveedores. Las credenciales viven
+en Keychain o Azure Key Vault; SQL solo guarda una referencia opaca.
+
+## Operations Service
+
+`RqOperationsDb` conserva solicitudes y metadatos de exportación,
+notificaciones, entregas, auditoría e inbox de eventos. Los artefactos PDF/DOCX
+pertenecen al contenedor privado `rq-exports`.
+
+## ERP Knowledge Service
+
+`RqErpKnowledgeDb` continúa reservada para una fase futura. No se activa
+persistencia ni acceso a Dynamics productivo en la V1.
