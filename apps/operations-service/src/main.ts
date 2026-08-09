@@ -14,7 +14,7 @@ import {
 } from "@levantamiento-rq/shared-config";
 
 loadEnvironmentFiles({
-  paths: [".env", "apps/operations-service/.env"],
+  paths: [".env", "infrastructure/docker/.env", "apps/operations-service/.env"],
 });
 
 async function bootstrap(): Promise<void> {
@@ -38,7 +38,9 @@ async function bootstrap(): Promise<void> {
       .setTitle("Levantamiento RQ - Operations Service API")
       .setDescription("Auditoría, operaciones y observabilidad.")
       .setVersion("1.0.0")
+      .addBearerAuth()
       .addTag("health", "Disponibilidad técnica del servicio")
+      .addTag("exports", "Solicitudes e historial de exportaciones")
       .build();
 
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);

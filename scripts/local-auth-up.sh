@@ -40,7 +40,7 @@ bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
 cd "$ROOT"
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-for port in 3000 3001 3002 3003 3004 3005 3007 4200; do
+for port in 3000 3001 3002 3003 3004 3005 3007 3008 4200; do
   if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "ERROR: El puerto $port ya está ocupado."
     exit 1
@@ -53,7 +53,7 @@ env \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   pnpm exec nx run-many \
     --target=build \
-    --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,workflow-service,gateway \
+    --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,workflow-service,operations-service,gateway \
     --configuration=development \
     --skip-nx-cache \
   > "$LOG_DIR/local-services-build.log" 2>&1
@@ -151,6 +151,17 @@ wait_for_url \
   "http://127.0.0.1:3007/api/v1/health" \
   "$LOG_DIR/workflow-service.log"
 
+start_detached \
+  "$PID_DIR/operations-service.pid" \
+  "$LOG_DIR/operations-service.log" \
+  bash -lc \
+  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export SERVICE_NAME=operations-service PORT=3008 DB_NAME=RqOperationsDb DATABASE_ENABLED=true NODE_ENV=development; exec node '$ROOT/apps/operations-service/dist/main.js'"
+
+wait_for_url \
+  "Operations Service" \
+  "http://127.0.0.1:3008/api/v1/health" \
+  "$LOG_DIR/operations-service.log"
+
 NODE_ENV=development start_detached \
   "$PID_DIR/gateway.pid" \
   "$LOG_DIR/gateway.log" \
@@ -195,6 +206,7 @@ echo "  Sources:     http://127.0.0.1:3003/api/v1/health"
 echo "  Documents:   http://127.0.0.1:3004/api/v1/health"
 echo "  AI Analysis: http://127.0.0.1:3005/api/v1/health"
 echo "  Workflow:    http://127.0.0.1:3007/api/v1/health"
+echo "  Operations:  http://127.0.0.1:3008/api/v1/health"
 echo
 echo "Detener:"
 echo "  pnpm auth:local:down"

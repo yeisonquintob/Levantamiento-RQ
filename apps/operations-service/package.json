@@ -5,16 +5,24 @@
   "dependencies": {
     "@fastify/static": "10.1.2",
     "@levantamiento-rq/shared-config": "workspace:*",
+    "@levantamiento-rq/shared-contracts": "workspace:*",
+    "@levantamiento-rq/shared-messaging": "workspace:*",
     "@levantamiento-rq/shared-persistence": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-fastify": "11.1.28",
     "@nestjs/swagger": "11.4.4",
+    "@nestjs/typeorm": "11.0.3",
+    "bullmq": "5.61.2",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.2",
+    "ioredis": "5.8.2",
+    "jose": "6.1.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
-    "tslib": "^2.3.0"
+    "supports-color": "7.2.0",
+    "tslib": "^2.3.0",
+    "typeorm": "0.3.31"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0"

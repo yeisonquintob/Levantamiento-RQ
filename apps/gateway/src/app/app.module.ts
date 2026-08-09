@@ -16,6 +16,8 @@ import { UsersClientService } from "../users/users-client.service";
 import { UsersGatewayController } from "../users/users-gateway.controller";
 import { DocumentsClientService } from "../documents/documents-client.service";
 import { DocumentsGatewayController } from "../documents/documents-gateway.controller";
+import { OperationsClientService } from "../operations/operations-client.service";
+import { OperationsGatewayController } from "../operations/operations-gateway.controller";
 import { WorkflowClientService } from "../workflow/workflow-client.service";
 import { WorkflowGatewayController } from "../workflow/workflow-gateway.controller";
 import { AppController } from "./app.controller";
@@ -33,6 +35,7 @@ import { AppService } from "./app.service";
     AiAnalysisGatewayController,
     AiProviderConfigurationsGatewayController,
     WorkflowGatewayController,
+    OperationsGatewayController,
   ],
   providers: [
     {
@@ -48,6 +51,7 @@ import { AppService } from "./app.service";
     DocumentsClientService,
     AiAnalysisClientService,
     WorkflowClientService,
+    OperationsClientService,
   ],
 })
 export class AppModule {}

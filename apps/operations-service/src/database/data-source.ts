@@ -21,6 +21,6 @@ const config = loadSqlServerDatabaseConfig({
 });
 
 export default createSqlServerDataSource(config, {
-  entities: [join(currentDirectory, "../**/*.entity.{ts,js}")],
+  entities: [join(currentDirectory, "../**/*.{entity,entities}.{ts,js}")],
   migrations: [join(currentDirectory, "migrations/*.{ts,js}")],
 });
