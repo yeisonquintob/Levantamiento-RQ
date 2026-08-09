@@ -164,7 +164,7 @@ async function main(): Promise<void> {
     console.log("Claves foráneas internas confirmadas: 7");
     console.log("Referencias externas sin claves foráneas confirmadas: 5");
     console.log(
-      "Migraciones confirmadas: foundation y configuración segura de proveedores.",
+      "Migraciones confirmadas: foundation, proveedores seguros y ejecución asíncrona.",
     );
     console.log("Columnas de secretos en SQL confirmadas: 0");
     console.log("Prompt activo y cuatro columnas de snapshot confirmados.");

@@ -24,6 +24,7 @@ import { DocumentsAccessTokenGuard } from "../templates/documents-access-token.g
 import type { DocumentsRequest } from "../templates/documents-request";
 import {
   parseArchive,
+  parseApplyAiDraft,
   parseCreateDocument,
   parseCreateVersion,
   parseDocumentId,
@@ -65,8 +66,13 @@ export class DocumentsController {
 
   @ApiOperation({ summary: "Crear un documento para el proyecto" })
   @ApiParam({ name: "projectId", format: "uuid" })
-  @ApiBody({ schema: { type: "object", properties: { title: { type: "string" } } } })
-  @ApiResponse({ status: 201, description: "Documento y versión inicial creados." })
+  @ApiBody({
+    schema: { type: "object", properties: { title: { type: "string" } } },
+  })
+  @ApiResponse({
+    status: 201,
+    description: "Documento y versión inicial creados.",
+  })
   @Post("projects/:projectId/documents")
   create(
     @Req() request: DocumentsRequest,
@@ -95,7 +101,10 @@ export class DocumentsController {
     @Req() request: DocumentsRequest,
     @Param("documentId") documentId: string,
   ) {
-    return this.documents.getById(context(request), parseDocumentId(documentId));
+    return this.documents.getById(
+      context(request),
+      parseDocumentId(documentId),
+    );
   }
 
   @ApiOperation({ summary: "Consultar una versión específica" })
@@ -158,7 +167,9 @@ export class DocumentsController {
     );
   }
 
-  @ApiOperation({ summary: "Reemplazar campos, requisitos, criterios y evidencias" })
+  @ApiOperation({
+    summary: "Reemplazar campos, requisitos, criterios y evidencias",
+  })
   @Patch("documents/:documentId/versions/:versionNumber/fields")
   replaceFields(
     @Req() request: DocumentsRequest,
@@ -171,6 +182,24 @@ export class DocumentsController {
       parseDocumentId(documentId),
       parseVersionNumber(versionNumber),
       parseReplaceFields(body),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Aplicar de forma atómica un borrador de IA revisado",
+  })
+  @Patch("documents/:documentId/versions/:versionNumber/apply-ai-draft")
+  applyAiDraft(
+    @Req() request: DocumentsRequest,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+    @Body() body: unknown,
+  ) {
+    return this.documents.applyAiDraft(
+      context(request),
+      parseDocumentId(documentId),
+      parseVersionNumber(versionNumber),
+      parseApplyAiDraft(body),
     );
   }
 
@@ -231,7 +260,10 @@ export class DocumentsController {
     @Req() request: DocumentsRequest,
     @Param("documentId") documentId: string,
   ) {
-    return this.documents.history(context(request), parseDocumentId(documentId));
+    return this.documents.history(
+      context(request),
+      parseDocumentId(documentId),
+    );
   }
 
   @ApiOperation({ summary: "Consultar la plantilla aplicada inmutable" })

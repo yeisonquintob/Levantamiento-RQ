@@ -3,6 +3,7 @@ import { BadRequestException } from "@nestjs/common";
 import {
   DOCUMENT_SECTION_DEFINITIONS,
   type AcceptanceCriterionInput,
+  type ApplyAiAnalysisDraftRequest,
   type ArchiveRequirementDocumentRequest,
   type CreateDocumentVersionRequest,
   type CreateRequirementDocumentRequest,
@@ -66,7 +67,11 @@ function integer(
   minimum = 1,
   maximum = 1_000_000,
 ): number {
-  if (!Number.isInteger(value) || Number(value) < minimum || Number(value) > maximum) {
+  if (
+    !Number.isInteger(value) ||
+    Number(value) < minimum ||
+    Number(value) > maximum
+  ) {
     throw new BadRequestException(
       `${field} debe ser un entero entre ${minimum} y ${maximum}.`,
     );
@@ -107,7 +112,11 @@ function jsonValue(value: unknown, field: string): DocumentJsonValue {
   }
 }
 
-function array(value: unknown, field: string, maximum: number): readonly unknown[] {
+function array(
+  value: unknown,
+  field: string,
+  maximum: number,
+): readonly unknown[] {
   if (!Array.isArray(value) || value.length > maximum) {
     throw new BadRequestException(
       `${field} debe ser un arreglo de máximo ${maximum} elementos.`,
@@ -138,7 +147,11 @@ export function parseCreateDocument(
 ): CreateRequirementDocumentRequest {
   const record = asRecord(value);
 
-  if (record.title === undefined || record.title === null || record.title === "") {
+  if (
+    record.title === undefined ||
+    record.title === null ||
+    record.title === ""
+  ) {
     return {};
   }
 
@@ -297,7 +310,9 @@ export function parseReplaceFields(
   for (const requirement of requirements) {
     const code = requirement.code.toLowerCase();
     if (requirementCodes.has(code)) {
-      throw new BadRequestException(`El requisito ${requirement.code} está duplicado.`);
+      throw new BadRequestException(
+        `El requisito ${requirement.code} está duplicado.`,
+      );
     }
     requirementCodes.add(code);
     if (requirement.clientId) {
@@ -326,9 +341,48 @@ export function parseReplaceFields(
   };
 }
 
-export function parseTransition(
-  value: unknown,
-): DocumentTransitionRequest {
+export function parseApplyAiDraft(value: unknown): ApplyAiAnalysisDraftRequest {
+  const record = asRecord(value);
+  const sections = array(record.sections, "sections", 10).map(
+    (value, index) => {
+      const item = asRecord(value);
+      const key = sectionKey(item.key, `sections[${index}].key`);
+      const expected = DOCUMENT_SECTION_DEFINITIONS[index];
+      if (!expected || index >= 10 || key !== expected.key) {
+        throw new BadRequestException(
+          "sections debe contener las diez secciones editables en orden canónico.",
+        );
+      }
+      return {
+        key,
+        content: jsonValue(item.content, `sections[${index}].content`),
+      };
+    },
+  );
+  if (sections.length !== 10) {
+    throw new BadRequestException(
+      "sections debe contener exactamente las diez secciones editables.",
+    );
+  }
+
+  const structured = parseReplaceFields({
+    expectedRevision: record.expectedRevision,
+    fields: [],
+    requirements: record.requirements,
+    evidence: record.evidence,
+  });
+
+  return {
+    expectedRevision: integer(record.expectedRevision, "expectedRevision"),
+    analysisRequestId: uuid(record.analysisRequestId, "analysisRequestId"),
+    analysisResultId: uuid(record.analysisResultId, "analysisResultId"),
+    sections,
+    requirements: structured.requirements,
+    evidence: structured.evidence,
+  };
+}
+
+export function parseTransition(value: unknown): DocumentTransitionRequest {
   const record = asRecord(value);
 
   return {

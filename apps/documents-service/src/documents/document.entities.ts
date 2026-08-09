@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  PrimaryColumn,
-} from "typeorm";
+import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 
 import type {
   DocumentStatus,
@@ -39,7 +34,10 @@ export class AppliedDocumentTemplateEntity {
 }
 
 @Entity({ name: "RequirementDocuments" })
-@Index("IX_RequirementDocuments_ProjectId_UpdatedAt", ["projectId", "updatedAt"])
+@Index("IX_RequirementDocuments_ProjectId_UpdatedAt", [
+  "projectId",
+  "updatedAt",
+])
 @Index("IX_RequirementDocuments_Status", ["status"])
 export class RequirementDocumentEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
@@ -90,7 +88,11 @@ export class RequirementDocumentEntity {
 }
 
 @Entity({ name: "DocumentVersions" })
-@Index("UQ_DocumentVersions_DocumentId_Number", ["documentId", "versionNumber"], { unique: true })
+@Index(
+  "UQ_DocumentVersions_DocumentId_Number",
+  ["documentId", "versionNumber"],
+  { unique: true },
+)
 @Index("IX_DocumentVersions_DocumentId_Status", ["documentId", "status"])
 export class DocumentVersionEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
@@ -154,8 +156,14 @@ export class DocumentVersionEntity {
 }
 
 @Entity({ name: "DocumentSections" })
-@Index("UQ_DocumentSections_Version_Key", ["documentVersionId", "key"], { unique: true })
-@Index("UQ_DocumentSections_Version_Order", ["documentVersionId", "orderIndex"], { unique: true })
+@Index("UQ_DocumentSections_Version_Key", ["documentVersionId", "key"], {
+  unique: true,
+})
+@Index(
+  "UQ_DocumentSections_Version_Order",
+  ["documentVersionId", "orderIndex"],
+  { unique: true },
+)
 export class DocumentSectionEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -180,7 +188,11 @@ export class DocumentSectionEntity {
 }
 
 @Entity({ name: "DocumentFields" })
-@Index("UQ_DocumentFields_Version_Section_Key", ["documentVersionId", "sectionKey", "key"], { unique: true })
+@Index(
+  "UQ_DocumentFields_Version_Section_Key",
+  ["documentVersionId", "sectionKey", "key"],
+  { unique: true },
+)
 export class DocumentFieldEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -208,7 +220,9 @@ export class DocumentFieldEntity {
 }
 
 @Entity({ name: "DocumentRequirements" })
-@Index("UQ_DocumentRequirements_Version_Code", ["documentVersionId", "code"], { unique: true })
+@Index("UQ_DocumentRequirements_Version_Code", ["documentVersionId", "code"], {
+  unique: true,
+})
 export class DocumentRequirementEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -239,7 +253,10 @@ export class DocumentRequirementEntity {
 }
 
 @Entity({ name: "AcceptanceCriteria" })
-@Index("IX_AcceptanceCriteria_Requirement_Order", ["requirementId", "orderIndex"])
+@Index("IX_AcceptanceCriteria_Requirement_Order", [
+  "requirementId",
+  "orderIndex",
+])
 export class AcceptanceCriterionEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -309,4 +326,35 @@ export class DocumentHistoryEntity {
 
   @Column("datetime2", { name: "CreatedAt", precision: 7 })
   createdAt!: Date;
+}
+
+@Entity({ name: "AppliedAiAnalysisResults" })
+@Index("UQ_AppliedAiAnalysisResults_Result", ["analysisResultId"], {
+  unique: true,
+})
+@Index("IX_AppliedAiAnalysisResults_Version", [
+  "documentVersionId",
+  "appliedAt",
+])
+export class AppliedAiAnalysisResultEntity {
+  @PrimaryColumn("uniqueidentifier", { name: "Id" })
+  id!: string;
+
+  @Column("uniqueidentifier", { name: "AnalysisRequestId" })
+  analysisRequestId!: string;
+
+  @Column("uniqueidentifier", { name: "AnalysisResultId" })
+  analysisResultId!: string;
+
+  @Column("uniqueidentifier", { name: "DocumentId" })
+  documentId!: string;
+
+  @Column("uniqueidentifier", { name: "DocumentVersionId" })
+  documentVersionId!: string;
+
+  @Column("uniqueidentifier", { name: "AppliedByUserId" })
+  appliedByUserId!: string;
+
+  @Column("datetime2", { name: "AppliedAt", precision: 7 })
+  appliedAt!: Date;
 }

@@ -88,10 +88,8 @@ export class DocumentsProjectsAccessClient {
     return {
       project,
       role,
-      canEdit:
-        administrator || role === "OWNER" || role === "EDITOR",
-      canReview:
-        administrator || role === "OWNER" || role === "REVIEWER",
+      canEdit: administrator || role === "OWNER" || role === "EDITOR",
+      canReview: administrator || role === "OWNER" || role === "REVIEWER",
     };
   }
 

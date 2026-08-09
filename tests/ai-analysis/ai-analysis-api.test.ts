@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   parseAiAnalysisRequestListQuery,
   parseCreateAiAnalysisRequest,
+  parseReviewAiAnalysisResult,
 } from "../../apps/ai-analysis-service/src/analysis/ai-analysis-input.js";
 import {
   AI_ANALYSIS_STATUSES,
@@ -55,9 +56,7 @@ function httpError(
   );
 }
 
-function source(
-  overrides: Partial<SourceDetail> = {},
-): SourceDetail {
+function source(overrides: Partial<SourceDetail> = {}): SourceDetail {
   return {
     id: UUID_C,
     projectId: UUID_A,
@@ -135,15 +134,37 @@ test("el listado valida estado y paginación", () => {
   });
 
   for (const status of AI_ANALYSIS_STATUSES) {
-    assert.equal(
-      parseAiAnalysisRequestListQuery({ status }).status,
-      status,
-    );
+    assert.equal(parseAiAnalysisRequestListQuery({ status }).status, status);
   }
 
   assert.throws(
     () => parseAiAnalysisRequestListQuery({ pageSize: 101 }),
     /entre 1 y 100/i,
+  );
+});
+
+test("la revisión humana valida concurrencia y comentario", () => {
+  assert.deepEqual(
+    parseReviewAiAnalysisResult({
+      expectedDocumentRevision: 5,
+      comment: "  Validado con el usuario  ",
+    }),
+    {
+      expectedDocumentRevision: 5,
+      comment: "Validado con el usuario",
+    },
+  );
+  assert.deepEqual(parseReviewAiAnalysisResult({}), {
+    expectedDocumentRevision: undefined,
+    comment: null,
+  });
+  assert.throws(
+    () => parseReviewAiAnalysisResult({ expectedDocumentRevision: 0 }),
+    /expectedDocumentRevision/i,
+  );
+  assert.throws(
+    () => parseReviewAiAnalysisResult({ comment: "x".repeat(2001) }),
+    /2000/i,
   );
 });
 
@@ -196,8 +217,7 @@ test("Documents Client exige proyecto y versión actual", async () => {
         "token",
         "correlation",
       ),
-      (error: unknown) =>
-        httpError(error, 409, /versión actual/i),
+      (error: unknown) => httpError(error, 409, /versión actual/i),
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -230,12 +250,7 @@ test("Sources Client exige ACTIVE y READY", async () => {
     payload = source({ processingStatus: "FAILED" });
 
     await assert.rejects(
-      client.requireReadySources(
-        UUID_A,
-        [UUID_C],
-        "token",
-        "correlation",
-      ),
+      client.requireReadySources(UUID_A, [UUID_C], "token", "correlation"),
       (error: unknown) => httpError(error, 409, /READY/i),
     );
   } finally {
@@ -243,7 +258,7 @@ test("Sources Client exige ACTIVE y READY", async () => {
   }
 });
 
-test("REST publica crear, listar, consultar y cancelar", async () => {
+test("REST publica crear, listar, consultar, reintentar y revisar", async () => {
   const controller = await readFile(
     "apps/ai-analysis-service/src/analysis/ai-analysis.controller.ts",
     "utf8",
@@ -254,6 +269,9 @@ test("REST publica crear, listar, consultar y cancelar", async () => {
     '@Get("projects/:projectId/analysis-requests")',
     '@Get("projects/:projectId/analysis-requests/:analysisRequestId")',
     '"projects/:projectId/analysis-requests/:analysisRequestId/cancel"',
+    '"projects/:projectId/analysis-requests/:analysisRequestId/retry"',
+    '"projects/:projectId/analysis-requests/:analysisRequestId/result/accept"',
+    '"projects/:projectId/analysis-requests/:analysisRequestId/result/reject"',
   ]) {
     assert.ok(
       controller.includes(fragment),

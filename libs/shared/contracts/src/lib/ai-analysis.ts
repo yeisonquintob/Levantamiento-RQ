@@ -170,6 +170,11 @@ export interface AiAnalysisResultDetail {
   updatedAt: string;
 }
 
+export interface ReviewAiAnalysisResult {
+  expectedDocumentRevision?: number;
+  comment?: string | null;
+}
+
 export interface AiAnalysisExecutionDetail {
   id: string;
   analysisRequestId: string;

@@ -177,4 +177,42 @@ export class AiAnalysisGatewayController {
       analysisRequestId,
     );
   }
+
+  @ApiOperation({ summary: "Aceptar y aplicar el resultado de IA" })
+  @Post(":analysisRequestId/result/accept")
+  @HttpCode(200)
+  acceptResult(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+    @Body() body: unknown,
+  ) {
+    return this.analysis.reviewResult(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      analysisRequestId,
+      "accept",
+      body,
+    );
+  }
+
+  @ApiOperation({ summary: "Rechazar el resultado de IA" })
+  @Post(":analysisRequestId/result/reject")
+  @HttpCode(200)
+  rejectResult(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+    @Body() body: unknown,
+  ) {
+    return this.analysis.reviewResult(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      analysisRequestId,
+      "reject",
+      body,
+    );
+  }
 }

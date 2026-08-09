@@ -189,6 +189,22 @@ export class AiAnalysisExecutionService {
         userPrompt,
         schema: AI_ANALYSIS_OUTPUT_SCHEMA,
       });
+      const allowedSourceIds = new Set(
+        snapshotSources.map((source) => source.sourceId.toLowerCase()),
+      );
+      if (
+        generated.draft.requirements.some((requirement) =>
+          requirement.sourceIds.some(
+            (sourceId) => !allowedSourceIds.has(sourceId.toLowerCase()),
+          ),
+        )
+      ) {
+        throw new AiProviderError(
+          "AI_UNKNOWN_SOURCE_REFERENCE",
+          "La salida de IA referencia una fuente que no pertenece a la solicitud.",
+          false,
+        );
+      }
       const finishedAt = new Date();
 
       await this.dataSource.transaction(async (manager) => {

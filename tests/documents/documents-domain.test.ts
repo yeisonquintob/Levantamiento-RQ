@@ -8,6 +8,7 @@ import {
 } from "../../libs/shared/contracts/src/lib/documents.js";
 import {
   parseCreateVersion,
+  parseApplyAiDraft,
   parseReplaceFields,
   parseSectionKey,
   parseUpdateSection,
@@ -124,11 +125,64 @@ test("campos, requisitos, criterios y referencias SourceId se validan", () => {
   );
 });
 
-test("la persistencia pertenece solo a RqDocumentsDb", async () => {
-  const migration = await readFile(
-    "apps/documents-service/src/database/migrations/1786233600000-CreateRequirementDocumentsDomain.ts",
-    "utf8",
+test("la aplicación IA exige revisión, diez secciones canónicas y trazabilidad", () => {
+  const sections = DOCUMENT_SECTION_DEFINITIONS.slice(0, 10).map((section) => ({
+    key: section.key,
+    content: `Contenido de ${section.key}`,
+  }));
+  const parsed = parseApplyAiDraft({
+    expectedRevision: 7,
+    analysisRequestId: "11111111-1111-4111-8111-111111111111",
+    analysisResultId: "22222222-2222-4222-8222-222222222222",
+    sections,
+    requirements: [
+      {
+        clientId: "ai-requirement-1",
+        sectionKey: "milestones",
+        code: "RF-001",
+        title: "Registrar solicitud",
+        description: "El sistema deberá registrar la solicitud.",
+        requirementType: "FUNCTIONAL",
+        status: "PROPOSED",
+        order: 1,
+        acceptanceCriteria: [
+          { description: "La solicitud obtiene un código.", order: 1 },
+        ],
+      },
+    ],
+    evidence: [
+      {
+        sourceId: "33333333-3333-4333-8333-333333333333",
+        sectionKey: "milestones",
+        requirementClientId: "ai-requirement-1",
+      },
+    ],
+  });
+
+  assert.equal(parsed.sections.length, 10);
+  assert.equal(parsed.requirements[0]?.status, "PROPOSED");
+  assert.equal(parsed.evidence[0]?.requirementClientId, "ai-requirement-1");
+  assert.throws(
+    () => parseApplyAiDraft({ ...parsed, sections: sections.slice(0, 9) }),
+    /exactamente|diez/i,
   );
+  assert.throws(
+    () => parseApplyAiDraft({ ...parsed, sections: [...sections].reverse() }),
+    /orden canónico/i,
+  );
+});
+
+test("la persistencia pertenece solo a RqDocumentsDb", async () => {
+  const [migration, aiApplicationMigration] = await Promise.all([
+    readFile(
+      "apps/documents-service/src/database/migrations/1786233600000-CreateRequirementDocumentsDomain.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/documents-service/src/database/migrations/1786665600000-AddAppliedAiAnalysisResults.ts",
+      "utf8",
+    ),
+  ]);
   const service = await readFile(
     "apps/documents-service/src/documents/documents.service.ts",
     "utf8",
@@ -148,6 +202,13 @@ test("la persistencia pertenece solo a RqDocumentsDb", async () => {
     assert.match(migration, new RegExp(`dbo\\.${table}`));
   }
   assert.doesNotMatch(migration, /RqProjectsDb|RqSourcesDb/);
+  assert.match(aiApplicationMigration, /AppliedAiAnalysisResults/);
+  assert.match(
+    aiApplicationMigration,
+    /UQ_AppliedAiAnalysisResults_Result UNIQUE \(AnalysisResultId\)/,
+  );
+  assert.match(aiApplicationMigration, /DocumentVersionId/);
+  assert.doesNotMatch(aiApplicationMigration, /RqAiDb/);
   assert.match(service, /DocumentsProjectsAccessClient/);
   assert.match(service, /DocumentsSourcesAccessClient/);
   assert.doesNotMatch(service, /ProjectEntity|SourceEntity/);
@@ -167,6 +228,8 @@ test("aprobación, bloqueo, historial y concurrencia están protegidos", async (
   assert.match(service, /DOCUMENT_ARCHIVED/);
   assert.match(service, /assertThirteenSections/);
   assert.match(service, /templateControlled/);
+  assert.match(service, /AI_DRAFT_APPLIED/);
+  assert.match(service, /analysisResultId/);
 });
 
 test("REST publica Documents y Gateway delega las decisiones a Workflow", async () => {
@@ -195,6 +258,13 @@ test("REST publica Documents y Gateway delega las decisiones a Workflow", async 
     assert.match(controller, new RegExp(routeFragment.replaceAll("/", "\\/")));
     assert.match(gateway, new RegExp(routeFragment.replaceAll("/", "\\/")));
   }
+
+  assert.match(controller, /apply-ai-draft/);
+  assert.doesNotMatch(
+    gateway,
+    /apply-ai-draft/,
+    "La aplicación IA es una ruta interna entre servicios.",
+  );
 
   for (const internalTransition of ["submit-review", "approve", "reject"]) {
     assert.match(controller, new RegExp(internalTransition));

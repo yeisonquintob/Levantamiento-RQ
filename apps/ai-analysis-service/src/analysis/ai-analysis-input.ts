@@ -5,6 +5,7 @@ import {
   AI_ANALYSIS_TYPES,
   type AiAnalysisStatus,
   type CreateAiAnalysisRequest,
+  type ReviewAiAnalysisResult,
 } from "@levantamiento-rq/shared-contracts";
 
 export interface AiAnalysisRequestListQuery {
@@ -141,4 +142,37 @@ export function parseAiAnalysisRequestListQuery(
     page: integer(record.page, 1, 1, 100000, "page"),
     pageSize: integer(record.pageSize, 25, 1, 100, "pageSize"),
   };
+}
+
+export function parseReviewAiAnalysisResult(
+  value: unknown,
+): ReviewAiAnalysisResult {
+  const record = asRecord(value);
+  let expectedDocumentRevision: number | undefined;
+  if (record.expectedDocumentRevision !== undefined) {
+    expectedDocumentRevision = integer(
+      record.expectedDocumentRevision,
+      1,
+      1,
+      1_000_000,
+      "expectedDocumentRevision",
+    );
+  }
+  let comment: string | null = null;
+  if (
+    record.comment !== undefined &&
+    record.comment !== null &&
+    record.comment !== ""
+  ) {
+    if (
+      typeof record.comment !== "string" ||
+      record.comment.trim().length > 2000
+    ) {
+      throw new BadRequestException(
+        "comment no puede superar 2000 caracteres.",
+      );
+    }
+    comment = record.comment.trim();
+  }
+  return { expectedDocumentRevision, comment };
 }

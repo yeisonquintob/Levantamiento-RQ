@@ -145,8 +145,7 @@ export interface RequirementDocumentSummary {
   archivedAt: string | null;
 }
 
-export interface RequirementDocumentDetail
-  extends RequirementDocumentSummary {
+export interface RequirementDocumentDetail extends RequirementDocumentSummary {
   currentVersionDetail: DocumentVersionDetail;
 }
 
@@ -221,6 +220,20 @@ export interface DocumentEvidenceInput {
 export interface ReplaceDocumentFieldsRequest {
   expectedRevision: number;
   fields: readonly DocumentFieldInput[];
+  requirements: readonly DocumentRequirementInput[];
+  evidence: readonly DocumentEvidenceInput[];
+}
+
+export interface AiDraftSectionInput {
+  key: DocumentSectionKey;
+  content: DocumentJsonValue;
+}
+
+export interface ApplyAiAnalysisDraftRequest {
+  expectedRevision: number;
+  analysisRequestId: string;
+  analysisResultId: string;
+  sections: readonly AiDraftSectionInput[];
   requirements: readonly DocumentRequirementInput[];
   evidence: readonly DocumentEvidenceInput[];
 }

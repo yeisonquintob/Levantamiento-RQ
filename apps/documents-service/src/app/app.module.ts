@@ -10,6 +10,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import {
   AcceptanceCriterionEntity,
+  AppliedAiAnalysisResultEntity,
   AppliedDocumentTemplateEntity,
   DocumentEvidenceEntity,
   DocumentFieldEntity,
@@ -48,6 +49,7 @@ const documentEntities = [
   AcceptanceCriterionEntity,
   DocumentEvidenceEntity,
   DocumentHistoryEntity,
+  AppliedAiAnalysisResultEntity,
 ];
 
 @Module({

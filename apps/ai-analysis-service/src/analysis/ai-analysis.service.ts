@@ -18,6 +18,7 @@ import type {
   AiAnalysisRequestSummary,
   AiAnalysisResultDetail,
   CreateAiAnalysisRequest,
+  ReviewAiAnalysisResult,
 } from "@levantamiento-rq/shared-contracts";
 
 import { AnalysisExecutionEntity } from "./analysis-execution.entity";
@@ -194,6 +195,132 @@ export class AiAnalysisService {
         "La cola de análisis no está disponible.",
       );
     }
+    return this.loadDetail(projectId, analysisRequestId);
+  }
+
+  async acceptResult(
+    context: AiAnalysisActorContext,
+    projectId: string,
+    analysisRequestId: string,
+    input: ReviewAiAnalysisResult,
+  ): Promise<AiAnalysisRequestDetail> {
+    await this.projectsAccess.requireCreate(
+      projectId,
+      context.accessToken,
+      context.actor,
+      context.correlationId,
+    );
+    const request = await this.requireRequest(projectId, analysisRequestId);
+    const result = await this.results.findOneBy({ analysisRequestId });
+    if (!result)
+      throw new ConflictException(
+        "La solicitud no tiene un resultado para revisar.",
+      );
+    if (result.status === "ACCEPTED")
+      return this.loadDetail(projectId, analysisRequestId);
+    if (result.status !== "GENERATED") {
+      throw new ConflictException(
+        "Solo un resultado GENERATED puede aceptarse.",
+      );
+    }
+    if (!input.expectedDocumentRevision) {
+      throw new ConflictException(
+        "expectedDocumentRevision es obligatorio para aceptar.",
+      );
+    }
+
+    const document = await this.documentsAccess.requireCurrentVersion(
+      projectId,
+      request.documentId,
+      request.documentVersionId,
+      context.accessToken,
+      context.correlationId,
+    );
+    const draft = parseAiAnalysisDraft(JSON.parse(result.contentJson));
+    await this.documentsAccess.applyAiDraft(
+      request.documentId,
+      document.currentVersionNumber,
+      {
+        expectedRevision: input.expectedDocumentRevision,
+        analysisRequestId,
+        analysisResultId: result.id,
+        sections: draft.sections.slice(0, 10).map((section) => ({
+          key: section.key,
+          content: section.content,
+        })),
+        requirements: draft.requirements.map((requirement, index) => ({
+          clientId: requirement.clientId,
+          sectionKey: requirement.sectionKey,
+          code: requirement.code,
+          title: requirement.title,
+          description: requirement.description,
+          requirementType: requirement.requirementType,
+          status: "PROPOSED",
+          order: index + 1,
+          acceptanceCriteria: requirement.acceptanceCriteria.map(
+            (criterion, criterionIndex) => ({
+              description: criterion,
+              order: criterionIndex + 1,
+            }),
+          ),
+        })),
+        evidence: draft.requirements.flatMap((requirement) =>
+          requirement.sourceIds.map((sourceId) => ({
+            sourceId,
+            sectionKey: requirement.sectionKey,
+            requirementClientId: requirement.clientId,
+            note: "Trazabilidad propuesta por el análisis de IA y aceptada por un usuario.",
+          })),
+        ),
+      },
+      context.accessToken,
+      context.correlationId,
+    );
+
+    result.status = "ACCEPTED";
+    result.reviewedByUserId = context.actor.id;
+    result.reviewedAt = new Date();
+    result.reviewComment = input.comment ?? null;
+    result.updatedAt = result.reviewedAt;
+    await this.results.save(result);
+    return this.loadDetail(projectId, analysisRequestId);
+  }
+
+  async rejectResult(
+    context: AiAnalysisActorContext,
+    projectId: string,
+    analysisRequestId: string,
+    input: ReviewAiAnalysisResult,
+  ): Promise<AiAnalysisRequestDetail> {
+    await this.projectsAccess.requireCreate(
+      projectId,
+      context.accessToken,
+      context.actor,
+      context.correlationId,
+    );
+    const result = await this.results.findOneBy({ analysisRequestId });
+    if (!result)
+      throw new ConflictException(
+        "La solicitud no tiene un resultado para revisar.",
+      );
+    if (result.status === "REJECTED")
+      return this.loadDetail(projectId, analysisRequestId);
+    if (result.status !== "GENERATED") {
+      throw new ConflictException(
+        "Solo un resultado GENERATED puede rechazarse.",
+      );
+    }
+    if (!input.comment) {
+      throw new ConflictException(
+        "El comentario es obligatorio para rechazar.",
+      );
+    }
+    result.status = "REJECTED";
+    result.reviewedByUserId = context.actor.id;
+    result.reviewedAt = new Date();
+    result.reviewComment = input.comment;
+    result.updatedAt = result.reviewedAt;
+    await this.results.save(result);
     return this.loadDetail(projectId, analysisRequestId);
   }
 

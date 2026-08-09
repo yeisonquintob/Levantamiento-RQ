@@ -171,3 +171,28 @@ test("prompt, cola y migración conservan defensa e idempotencia", async () => {
   assert.match(migration, /AnalysisResults/);
   assert.match(migration, /ISJSON\(ContentJson\)/);
 });
+
+test("la revisión aplica el borrador solo después de aceptación humana", async () => {
+  const [service, documentsClient, gatewayController] = await Promise.all([
+    readFile(
+      "apps/ai-analysis-service/src/analysis/ai-analysis.service.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/ai-analysis-service/src/analysis/documents-access.client.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/gateway/src/analysis/ai-analysis-gateway.controller.ts",
+      "utf8",
+    ),
+  ]);
+
+  assert.match(service, /result\.status === "ACCEPTED"/);
+  assert.match(service, /expectedDocumentRevision es obligatorio/);
+  assert.match(service, /documentsAccess\.applyAiDraft/);
+  assert.match(service, /status = "REJECTED"/);
+  assert.match(documentsClient, /apply-ai-draft/);
+  assert.match(gatewayController, /result\/accept/);
+  assert.match(gatewayController, /result\/reject/);
+});

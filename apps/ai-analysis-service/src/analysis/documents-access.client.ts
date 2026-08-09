@@ -6,7 +6,11 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
-import type { RequirementDocumentDetail } from "@levantamiento-rq/shared-contracts";
+import type {
+  ApplyAiAnalysisDraftRequest,
+  DocumentVersionDetail,
+  RequirementDocumentDetail,
+} from "@levantamiento-rq/shared-contracts";
 
 import {
   AI_ANALYSIS_AUTH_CONFIG,
@@ -81,6 +85,44 @@ export class AiAnalysisDocumentsAccessClient {
     }
 
     return document;
+  }
+
+  async applyAiDraft(
+    documentId: string,
+    versionNumber: number,
+    input: ApplyAiAnalysisDraftRequest,
+    accessToken: string,
+    correlationId: string,
+  ): Promise<DocumentVersionDetail> {
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.config.documentsServiceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/versions/${versionNumber}/apply-ai-draft`,
+        {
+          method: "PATCH",
+          headers: {
+            accept: "application/json",
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+            "x-correlation-id": correlationId,
+          },
+          body: JSON.stringify(input),
+          signal: AbortSignal.timeout(this.config.documentsTimeoutMs),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        "Documents Service no está disponible para aplicar el borrador.",
+      );
+    }
+    const payload = await this.readPayload(response);
+    if (!response.ok) {
+      throw new HttpException(
+        payload ?? { message: "No fue posible aplicar el borrador de IA." },
+        response.status,
+      );
+    }
+    return payload as DocumentVersionDetail;
   }
 
   private async readPayload(response: Response): Promise<unknown> {

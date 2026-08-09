@@ -72,6 +72,33 @@ async function main(): Promise<void> {
         AND name = 'UQ_DocumentVersions_DocumentId_Number'
         AND is_unique = 1
     `);
+    const aiApplicationMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddAppliedAiAnalysisResults1786665600000'
+    `);
+    const aiApplicationTable = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.tables
+      WHERE name = 'AppliedAiAnalysisResults'
+        AND schema_id = SCHEMA_ID('dbo')
+    `);
+    const aiResultUniqueIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE object_id = OBJECT_ID('dbo.AppliedAiAnalysisResults')
+        AND name = 'UQ_AppliedAiAnalysisResults_Result'
+        AND is_unique = 1
+    `);
+    const aiApplicationForeignKeys = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.foreign_keys
+      WHERE parent_object_id = OBJECT_ID('dbo.AppliedAiAnalysisResults')
+        AND name IN (
+          'FK_AppliedAiAnalysisResults_Document',
+          'FK_AppliedAiAnalysisResults_Version'
+        )
+    `);
     const crossDatabaseForeignKeys = await count(`
       SELECT COUNT(1) AS countValue
       FROM sys.foreign_keys
@@ -88,10 +115,14 @@ async function main(): Promise<void> {
       domainMigration !== 1 ||
       domainTables !== 9 ||
       versionUniqueIndex !== 1 ||
+      aiApplicationMigration !== 1 ||
+      aiApplicationTable !== 1 ||
+      aiResultUniqueIndex !== 1 ||
+      aiApplicationForeignKeys !== 2 ||
       crossDatabaseForeignKeys !== 0
     ) {
       throw new Error(
-        "RqDocumentsDb no contiene el catálogo completo del Paso 14.",
+        "RqDocumentsDb no contiene el dominio documental y la aplicación IA completos.",
       );
     }
 
@@ -99,15 +130,19 @@ async function main(): Promise<void> {
     console.log("Tabla confirmada: dbo.DocumentTemplates");
     console.log("Plantillas publicadas confirmadas: 4");
     console.log("Definiciones canónicas JSON confirmadas.");
-    console.log(
-      "Índice único confirmado: UQ_DocumentTemplates_Code_Version",
-    );
+    console.log("Índice único confirmado: UQ_DocumentTemplates_Code_Version");
     console.log(
       "Migración confirmada: CreateDocumentTemplateCatalog1785974400000",
     );
     console.log("Tablas del dominio documental confirmadas: 9");
     console.log(
       "Migración confirmada: CreateRequirementDocumentsDomain1786233600000",
+    );
+    console.log(
+      "Aplicación idempotente de resultados IA confirmada: tabla, índice único y 2 claves internas.",
+    );
+    console.log(
+      "Migración confirmada: AddAppliedAiAnalysisResults1786665600000",
     );
     console.log("Versionado único y autonomía de base de datos confirmados.");
   } finally {
@@ -116,8 +151,7 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  const message =
-    error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
 
   console.error(`No se pudo verificar RqDocumentsDb: ${message}`);
   process.exitCode = 1;

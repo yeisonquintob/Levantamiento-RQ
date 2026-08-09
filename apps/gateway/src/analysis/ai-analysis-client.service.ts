@@ -110,6 +110,23 @@ export class AiAnalysisClientService {
     );
   }
 
+  reviewResult(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    analysisRequestId: string,
+    action: "accept" | "reject",
+    body: unknown,
+  ): Promise<AiAnalysisRequestDetail> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(analysisRequestId)}/result/${action}`,
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
   listProviders(
     accessToken: string,
     correlationId: string,

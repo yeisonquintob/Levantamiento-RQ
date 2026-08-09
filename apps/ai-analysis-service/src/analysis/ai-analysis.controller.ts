@@ -26,6 +26,7 @@ import {
   parseAnalysisRequestId,
   parseCreateAiAnalysisRequest,
   parseProjectId,
+  parseReviewAiAnalysisResult,
 } from "./ai-analysis-input";
 import type { AiAnalysisRequest } from "./ai-analysis-request";
 import {
@@ -156,6 +157,46 @@ export class AiAnalysisController {
       context(request),
       parseProjectId(projectId),
       parseAnalysisRequestId(analysisRequestId),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Aceptar y aplicar el resultado al borrador documental",
+  })
+  @Post(
+    "projects/:projectId/analysis-requests/:analysisRequestId/result/accept",
+  )
+  @HttpCode(200)
+  acceptResult(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+    @Body() body: unknown,
+  ) {
+    return this.analysis.acceptResult(
+      context(request),
+      parseProjectId(projectId),
+      parseAnalysisRequestId(analysisRequestId),
+      parseReviewAiAnalysisResult(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Rechazar el resultado generado" })
+  @Post(
+    "projects/:projectId/analysis-requests/:analysisRequestId/result/reject",
+  )
+  @HttpCode(200)
+  rejectResult(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+    @Body() body: unknown,
+  ) {
+    return this.analysis.rejectResult(
+      context(request),
+      parseProjectId(projectId),
+      parseAnalysisRequestId(analysisRequestId),
+      parseReviewAiAnalysisResult(body),
     );
   }
 }

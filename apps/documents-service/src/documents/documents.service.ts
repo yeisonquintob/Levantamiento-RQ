@@ -12,6 +12,7 @@ import { DataSource, In, Repository } from "typeorm";
 import {
   DOCUMENT_SECTION_DEFINITIONS,
   type AppliedDocumentTemplate,
+  type ApplyAiAnalysisDraftRequest,
   type ArchiveRequirementDocumentRequest,
   type AuthenticatedUser,
   type CreateDocumentVersionRequest,
@@ -34,6 +35,7 @@ import {
 import { DocumentTemplateEntity } from "../templates/document-template.entity";
 import {
   AcceptanceCriterionEntity,
+  AppliedAiAnalysisResultEntity,
   AppliedDocumentTemplateEntity,
   DocumentEvidenceEntity,
   DocumentFieldEntity,
@@ -83,7 +85,9 @@ function templateWithoutDefinition(
   };
 }
 
-function versionSummary(version: DocumentVersionEntity): DocumentVersionSummary {
+function versionSummary(
+  version: DocumentVersionEntity,
+): DocumentVersionSummary {
   return {
     id: version.id,
     versionNumber: version.versionNumber,
@@ -100,8 +104,14 @@ function versionSummary(version: DocumentVersionEntity): DocumentVersionSummary 
 }
 
 function assertCanonicalTemplate(definition: DocumentJsonValue): void {
-  if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
-    throw new ConflictException("La plantilla aplicada no contiene una definición válida.");
+  if (
+    !definition ||
+    typeof definition !== "object" ||
+    Array.isArray(definition)
+  ) {
+    throw new ConflictException(
+      "La plantilla aplicada no contiene una definición válida.",
+    );
   }
 
   const record = definition as Readonly<Record<string, DocumentJsonValue>>;
@@ -275,6 +285,8 @@ export class DocumentsService {
     private readonly historyRepository: Repository<DocumentHistoryEntity>,
     @InjectRepository(AppliedDocumentTemplateEntity)
     private readonly appliedTemplates: Repository<AppliedDocumentTemplateEntity>,
+    @InjectRepository(AppliedAiAnalysisResultEntity)
+    private readonly appliedAiResults: Repository<AppliedAiAnalysisResultEntity>,
     @InjectRepository(DocumentTemplateEntity)
     private readonly templates: Repository<DocumentTemplateEntity>,
     private readonly projects: DocumentsProjectsAccessClient,
@@ -370,7 +382,13 @@ export class DocumentsService {
           title: section.title,
           orderIndex: index + 1,
           contentJson: serialize(
-            initialContent(section.key, access.project, context.actor, "1.0.0", now),
+            initialContent(
+              section.key,
+              access.project,
+              context.actor,
+              "1.0.0",
+              now,
+            ),
           ),
           templateControlled: index >= 10,
         })),
@@ -496,7 +514,9 @@ export class DocumentsService {
     });
     const sourceCriteria = sourceRequirements.length
       ? await this.criteria.find({
-          where: { requirementId: In(sourceRequirements.map((item) => item.id)) },
+          where: {
+            requirementId: In(sourceRequirements.map((item) => item.id)),
+          },
         })
       : [];
     const sourceEvidence = await this.evidence.find({
@@ -618,7 +638,7 @@ export class DocumentsService {
           sourceId: item.sourceId,
           sectionKey: item.sectionKey,
           requirementId: item.requirementId
-            ? requirementIds.get(item.requirementId) ?? null
+            ? (requirementIds.get(item.requirementId) ?? null)
             : null,
           excerpt: item.excerpt,
           note: item.note,
@@ -680,7 +700,13 @@ export class DocumentsService {
       await manager.update(DocumentSectionEntity, section.id, {
         contentJson: serialize(request.content),
       });
-      await this.touchDocument(manager, document, context.actor.id, now, "DRAFT");
+      await this.touchDocument(
+        manager,
+        document,
+        context.actor.id,
+        now,
+        "DRAFT",
+      );
       await this.addHistory(manager, {
         documentId,
         versionId: version.id,
@@ -691,7 +717,9 @@ export class DocumentsService {
       });
     });
 
-    return this.loadVersionDetail(await this.requireVersion(documentId, versionNumber));
+    return this.loadVersionDetail(
+      await this.requireVersion(documentId, versionNumber),
+    );
   }
 
   async replaceFields(
@@ -708,7 +736,9 @@ export class DocumentsService {
     this.requireCurrent(document, version);
     this.requireDraft(version);
 
-    const sourceIds = [...new Set(request.evidence.map((item) => item.sourceId))];
+    const sourceIds = [
+      ...new Set(request.evidence.map((item) => item.sourceId)),
+    ];
     await Promise.all(
       sourceIds.map((sourceId) =>
         this.sources.requireSource(
@@ -765,7 +795,8 @@ export class DocumentsService {
       const clientRequirementIds = new Map<string, string>();
       const requirementRows = request.requirements.map((requirement) => {
         const id = randomUUID();
-        if (requirement.clientId) clientRequirementIds.set(requirement.clientId, id);
+        if (requirement.clientId)
+          clientRequirementIds.set(requirement.clientId, id);
         return {
           id,
           documentVersionId: version.id,
@@ -797,13 +828,19 @@ export class DocumentsService {
           sourceId: item.sourceId,
           sectionKey: item.sectionKey ?? null,
           requirementId: item.requirementClientId
-            ? clientRequirementIds.get(item.requirementClientId) as string
+            ? (clientRequirementIds.get(item.requirementClientId) as string)
             : null,
           excerpt: item.excerpt ?? null,
           note: item.note ?? null,
         })),
       );
-      await this.touchDocument(manager, document, context.actor.id, now, "DRAFT");
+      await this.touchDocument(
+        manager,
+        document,
+        context.actor.id,
+        now,
+        "DRAFT",
+      );
       await this.addHistory(manager, {
         documentId,
         versionId: version.id,
@@ -818,7 +855,181 @@ export class DocumentsService {
       });
     });
 
-    return this.loadVersionDetail(await this.requireVersion(documentId, versionNumber));
+    return this.loadVersionDetail(
+      await this.requireVersion(documentId, versionNumber),
+    );
+  }
+
+  async applyAiDraft(
+    context: DocumentsActorContext,
+    documentId: string,
+    versionNumber: number,
+    request: ApplyAiAnalysisDraftRequest,
+  ): Promise<DocumentVersionDetail> {
+    const document = await this.requireDocument(documentId);
+    const access = await this.projectAccess(context, document.projectId);
+    requireEdit(access);
+    this.requireActive(document);
+    const version = await this.requireVersion(documentId, versionNumber);
+    this.requireCurrent(document, version);
+    this.requireDraft(version);
+
+    const alreadyApplied = await this.appliedAiResults.findOneBy({
+      analysisResultId: request.analysisResultId,
+    });
+    if (alreadyApplied) {
+      if (
+        alreadyApplied.documentId.toLowerCase() !== documentId.toLowerCase() ||
+        alreadyApplied.documentVersionId.toLowerCase() !==
+          version.id.toLowerCase()
+      ) {
+        throw new ConflictException(
+          "El resultado de IA ya fue aplicado a otra versión documental.",
+        );
+      }
+      return this.loadVersionDetail(version);
+    }
+
+    const sourceIds = [
+      ...new Set(request.evidence.map((item) => item.sourceId)),
+    ];
+    await Promise.all(
+      sourceIds.map((sourceId) =>
+        this.sources.requireSource(
+          document.projectId,
+          sourceId,
+          context.accessToken,
+          context.correlationId,
+        ),
+      ),
+    );
+
+    const now = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await this.lockDraftVersion(
+        manager,
+        version,
+        request.expectedRevision,
+        context.actor.id,
+        now,
+      );
+
+      const sectionRows = await manager.find(DocumentSectionEntity, {
+        where: { documentVersionId: version.id },
+        order: { orderIndex: "ASC" },
+      });
+      for (const [index, sectionInput] of request.sections.entries()) {
+        const section = sectionRows[index];
+        if (
+          !section ||
+          section.key !== sectionInput.key ||
+          section.templateControlled
+        ) {
+          throw new ConflictException(
+            "El borrador de IA no coincide con las secciones editables del documento.",
+          );
+        }
+        await manager.update(DocumentSectionEntity, section.id, {
+          contentJson: serialize(sectionInput.content),
+        });
+      }
+
+      await manager.delete(DocumentEvidenceEntity, {
+        documentVersionId: version.id,
+      });
+      const oldRequirements = await manager.find(DocumentRequirementEntity, {
+        where: { documentVersionId: version.id },
+        select: { id: true },
+      });
+      if (oldRequirements.length) {
+        await manager.delete(AcceptanceCriterionEntity, {
+          requirementId: In(oldRequirements.map((item) => item.id)),
+        });
+      }
+      await manager.delete(DocumentRequirementEntity, {
+        documentVersionId: version.id,
+      });
+
+      const clientRequirementIds = new Map<string, string>();
+      const requirementRows = request.requirements.map((requirement) => {
+        const id = randomUUID();
+        if (requirement.clientId)
+          clientRequirementIds.set(requirement.clientId, id);
+        return {
+          id,
+          documentVersionId: version.id,
+          sectionKey: requirement.sectionKey,
+          code: requirement.code,
+          title: requirement.title,
+          description: requirement.description,
+          requirementType: requirement.requirementType,
+          status: requirement.status,
+          orderIndex: requirement.order,
+        };
+      });
+      await manager.save(DocumentRequirementEntity, requirementRows);
+      await manager.save(
+        AcceptanceCriterionEntity,
+        request.requirements.flatMap((requirement, index) =>
+          requirement.acceptanceCriteria.map((criterion) => ({
+            id: randomUUID(),
+            requirementId: requirementRows[index]?.id as string,
+            description: criterion.description,
+            orderIndex: criterion.order,
+          })),
+        ),
+      );
+      await manager.save(
+        DocumentEvidenceEntity,
+        request.evidence.map((item) => ({
+          id: randomUUID(),
+          documentVersionId: version.id,
+          sourceId: item.sourceId,
+          sectionKey: item.sectionKey ?? null,
+          requirementId: item.requirementClientId
+            ? (clientRequirementIds.get(item.requirementClientId) as string)
+            : null,
+          excerpt: item.excerpt ?? null,
+          note: item.note ?? null,
+        })),
+      );
+      await manager.save(
+        manager.create(AppliedAiAnalysisResultEntity, {
+          id: randomUUID(),
+          analysisRequestId: request.analysisRequestId,
+          analysisResultId: request.analysisResultId,
+          documentId,
+          documentVersionId: version.id,
+          appliedByUserId: context.actor.id,
+          appliedAt: now,
+        }),
+      );
+      await this.touchDocument(
+        manager,
+        document,
+        context.actor.id,
+        now,
+        "DRAFT",
+      );
+      await this.addHistory(manager, {
+        documentId,
+        versionId: version.id,
+        eventType: "AI_DRAFT_APPLIED",
+        actorUserId: context.actor.id,
+        details: {
+          analysisRequestId: request.analysisRequestId,
+          analysisResultId: request.analysisResultId,
+          sections: request.sections.length,
+          requirements: request.requirements.length,
+          evidence: request.evidence.length,
+        },
+        now,
+      });
+    });
+
+    return this.loadVersionDetail(
+      await this.requireVersion(documentId, versionNumber),
+    );
   }
 
   async submitReview(
@@ -949,7 +1160,8 @@ export class DocumentsService {
     const template = await this.appliedTemplates.findOneBy({
       id: document.appliedTemplateId,
     });
-    if (!template) throw new NotFoundException("La plantilla aplicada no existe.");
+    if (!template)
+      throw new NotFoundException("La plantilla aplicada no existe.");
 
     return {
       ...templateWithoutDefinition(template),
@@ -1012,7 +1224,8 @@ export class DocumentsService {
         documentVersionId: version.id,
         key: "header",
       });
-      if (!header) throw new ConflictException("El documento no contiene encabezado.");
+      if (!header)
+        throw new ConflictException("El documento no contiene encabezado.");
       await manager.update(DocumentSectionEntity, header.id, {
         contentJson: serialize(
           this.headerForTransition(
@@ -1033,14 +1246,17 @@ export class DocumentsService {
       });
     });
 
-    return this.loadVersionDetail(await this.requireVersion(documentId, versionNumber));
+    return this.loadVersionDetail(
+      await this.requireVersion(documentId, versionNumber),
+    );
   }
 
   private headerForNewVersion(
     content: DocumentJsonValue,
     version: string,
   ): DocumentJsonValue {
-    if (!content || typeof content !== "object" || Array.isArray(content)) return content;
+    if (!content || typeof content !== "object" || Array.isArray(content))
+      return content;
     return {
       ...content,
       documentVersion: version,
@@ -1055,7 +1271,8 @@ export class DocumentsService {
     status: DocumentStatus,
     actor: AuthenticatedUser,
   ): DocumentJsonValue {
-    if (!content || typeof content !== "object" || Array.isArray(content)) return content;
+    if (!content || typeof content !== "object" || Array.isArray(content))
+      return content;
     const visibleStatus =
       status === "IN_REVIEW"
         ? "EN VALIDACIÓN"
@@ -1064,7 +1281,9 @@ export class DocumentsService {
           : status === "REJECTED"
             ? "BORRADOR"
             : "BORRADOR";
-    const changes: Record<string, DocumentJsonValue> = { status: visibleStatus };
+    const changes: Record<string, DocumentJsonValue> = {
+      status: visibleStatus,
+    };
     if (status === "IN_REVIEW") {
       changes.reviewedBy = { name: actor.displayName, position: PENDING };
     }
@@ -1088,7 +1307,9 @@ export class DocumentsService {
 
   private requireActive(document: RequirementDocumentEntity): void {
     if (document.status === "ARCHIVED") {
-      throw new ConflictException("El documento está archivado y es inmutable.");
+      throw new ConflictException(
+        "El documento está archivado y es inmutable.",
+      );
     }
   }
 
@@ -1110,7 +1331,9 @@ export class DocumentsService {
       );
     }
     if (version.status !== "DRAFT") {
-      throw new ConflictException("Solo una versión en borrador puede editarse.");
+      throw new ConflictException(
+        "Solo una versión en borrador puede editarse.",
+      );
     }
   }
 
@@ -1120,7 +1343,9 @@ export class DocumentsService {
     );
   }
 
-  private async requireDocument(documentId: string): Promise<RequirementDocumentEntity> {
+  private async requireDocument(
+    documentId: string,
+  ): Promise<RequirementDocumentEntity> {
     const document = await this.documents.findOneBy({ id: documentId });
     if (!document) throw new NotFoundException("El documento no existe.");
     return document;
@@ -1130,8 +1355,12 @@ export class DocumentsService {
     documentId: string,
     versionNumber: number,
   ): Promise<DocumentVersionEntity> {
-    const version = await this.versions.findOneBy({ documentId, versionNumber });
-    if (!version) throw new NotFoundException("La versión del documento no existe.");
+    const version = await this.versions.findOneBy({
+      documentId,
+      versionNumber,
+    });
+    if (!version)
+      throw new NotFoundException("La versión del documento no existe.");
     return version;
   }
 
@@ -1146,7 +1375,9 @@ export class DocumentsService {
       }),
     ]);
     if (!template || !version) {
-      throw new ConflictException("El documento tiene referencias internas incompletas.");
+      throw new ConflictException(
+        "El documento tiene referencias internas incompletas.",
+      );
     }
 
     return {
@@ -1165,7 +1396,9 @@ export class DocumentsService {
     };
   }
 
-  private async loadDetail(documentId: string): Promise<RequirementDocumentDetail> {
+  private async loadDetail(
+    documentId: string,
+  ): Promise<RequirementDocumentDetail> {
     const document = await this.requireDocument(documentId);
     const [summary, version] = await Promise.all([
       this.loadSummary(document),
@@ -1250,9 +1483,13 @@ export class DocumentsService {
     };
   }
 
-  private assertThirteenSections(sections: readonly DocumentSectionEntity[]): void {
+  private assertThirteenSections(
+    sections: readonly DocumentSectionEntity[],
+  ): void {
     if (sections.length !== DOCUMENT_SECTION_DEFINITIONS.length) {
-      throw new ConflictException("El documento no contiene exactamente 13 secciones.");
+      throw new ConflictException(
+        "El documento no contiene exactamente 13 secciones.",
+      );
     }
     DOCUMENT_SECTION_DEFINITIONS.forEach((expected, index) => {
       const actual = sections[index];
