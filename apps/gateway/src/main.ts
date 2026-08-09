@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import fastifyMultipart from "@fastify/multipart";
 import { Logger } from "@nestjs/common";
@@ -18,6 +19,7 @@ import { createStructuredLogEntry } from "@levantamiento-rq/shared-observability
 
 import { AppModule } from "./app/app.module";
 import { loadGatewayConfig } from "./config/gateway-config";
+import { isBrowserMutationAllowed } from "./security/gateway-security";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/gateway/.env"],
@@ -37,6 +39,55 @@ async function bootstrap(): Promise<void> {
       fileSize: config.sourcesMaxFileBytes,
       parts: config.sourcesMaxFilesPerUpload + 5,
     },
+  });
+
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook("onRequest", async (request, reply) => {
+    reply.header("cache-control", "private, no-store, max-age=0");
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("referrer-policy", "strict-origin-when-cross-origin");
+    reply.header(
+      "permissions-policy",
+      "camera=(), microphone=(), geolocation=(), payment=()",
+    );
+
+    if (config.environment === "production" && config.cookieSecure) {
+      reply.header(
+        "strict-transport-security",
+        "max-age=31536000; includeSubDomains",
+      );
+    }
+
+    const originHeader = request.headers.origin;
+    const fetchSiteHeader = request.headers["sec-fetch-site"];
+    const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+    const secFetchSite = Array.isArray(fetchSiteHeader)
+      ? fetchSiteHeader[0]
+      : fetchSiteHeader;
+
+    if (
+      !isBrowserMutationAllowed({
+        method: request.method,
+        origin,
+        secFetchSite,
+        webOrigin: config.webOrigin,
+      })
+    ) {
+      const correlationHeader = request.headers["x-correlation-id"];
+      const correlationId =
+        (Array.isArray(correlationHeader)
+          ? correlationHeader[0]
+          : correlationHeader) ?? randomUUID();
+
+      await reply.status(403).send({
+        type: "about:blank",
+        title: "Solicitud rechazada",
+        status: 403,
+        detail: "El origen de la solicitud no está autorizado.",
+        correlationId,
+      });
+    }
   });
 
   app.setGlobalPrefix(config.globalPrefix);

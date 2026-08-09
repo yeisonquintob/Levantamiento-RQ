@@ -8,6 +8,7 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from "@nestjs/common";
 
 import {
@@ -31,6 +32,7 @@ import {
   serializeCookie,
 } from "./cookies";
 import { IdentityClientService } from "./identity-client.service";
+import { AuthRateLimitGuard } from "../security/auth-rate-limit.guard";
 
 interface RequestLike {
   headers: Readonly<Record<string, string | string[] | undefined>>;
@@ -76,6 +78,7 @@ export class AuthGatewayController {
   @ApiResponse({ status: 401, description: "Credenciales inválidas." })
   @Post("sign-in")
   @HttpCode(200)
+  @UseGuards(AuthRateLimitGuard)
   async signIn(
     @Body() body: unknown,
     @Req() request: RequestLike,
@@ -83,7 +86,7 @@ export class AuthGatewayController {
   ): Promise<GatewayAuthSessionResponse> {
     const session = await this.identity.signIn(body, {
       userAgent: firstHeader(request.headers["user-agent"]),
-      ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
+      ipAddress: request.ip,
     });
 
     this.setSessionCookies(reply, session, session.user.mustChangePassword);
@@ -115,7 +118,7 @@ export class AuthGatewayController {
 
     const session = await this.identity.refresh(refreshToken, {
       userAgent: firstHeader(request.headers["user-agent"]),
-      ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
+      ipAddress: request.ip,
     });
 
     this.setSessionCookies(reply, session, session.user.mustChangePassword);
@@ -190,7 +193,7 @@ export class AuthGatewayController {
 
     const session = await this.identity.changePassword(accessToken, body, {
       userAgent: firstHeader(request.headers["user-agent"]),
-      ipAddress: firstHeader(request.headers["x-forwarded-for"]) ?? request.ip,
+      ipAddress: request.ip,
     });
 
     this.setSessionCookies(reply, session, false);

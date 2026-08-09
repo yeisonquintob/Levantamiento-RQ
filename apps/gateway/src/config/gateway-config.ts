@@ -28,6 +28,8 @@ export interface GatewayConfig extends BaseServiceConfig {
   sourcesMaxFilesPerUpload: number;
   sourcesMaxBatchBytes: number;
   cookieSecure: boolean;
+  authSignInRateLimit: number;
+  authSignInRateWindowSeconds: number;
 }
 
 function readText(
@@ -242,6 +244,20 @@ export function loadGatewayConfig(
       environment.AUTH_COOKIE_SECURE,
       false,
       "AUTH_COOKIE_SECURE",
+    ),
+    authSignInRateLimit: readInteger(
+      environment.AUTH_SIGN_IN_RATE_LIMIT,
+      10,
+      1,
+      100,
+      "AUTH_SIGN_IN_RATE_LIMIT",
+    ),
+    authSignInRateWindowSeconds: readInteger(
+      environment.AUTH_SIGN_IN_RATE_WINDOW_SECONDS,
+      900,
+      60,
+      86_400,
+      "AUTH_SIGN_IN_RATE_WINDOW_SECONDS",
     ),
   };
 }

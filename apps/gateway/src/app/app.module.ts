@@ -20,6 +20,7 @@ import { OperationsClientService } from "../operations/operations-client.service
 import { OperationsGatewayController } from "../operations/operations-gateway.controller";
 import { WorkflowClientService } from "../workflow/workflow-client.service";
 import { WorkflowGatewayController } from "../workflow/workflow-gateway.controller";
+import { AuthRateLimitGuard } from "../security/auth-rate-limit.guard";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -52,6 +53,7 @@ import { AppService } from "./app.service";
     AiAnalysisClientService,
     WorkflowClientService,
     OperationsClientService,
+    AuthRateLimitGuard,
   ],
 })
 export class AppModule {}

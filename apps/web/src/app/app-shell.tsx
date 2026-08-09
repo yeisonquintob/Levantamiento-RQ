@@ -381,6 +381,19 @@ export function AppShell({ children, user }: AppShellProps) {
             <span>Auditoría</span>
           </a>
 
+          <a
+            aria-current={
+              pathname === "/workspace/settings" ? "page" : undefined
+            }
+            href="/workspace/settings"
+            onClick={() => setMenuOpen(false)}
+          >
+            <span aria-hidden="true" className="rq-nav__icon">
+              C
+            </span>
+            <span>Configuración</span>
+          </a>
+
           {showAdministration ? (
             <>
               <span className="rq-nav__label">Administración</span>
@@ -460,17 +473,19 @@ export function AppShell({ children, user }: AppShellProps) {
                 ? "Notificaciones internas generadas por eventos idempotentes"
                 : pathname.startsWith("/workspace/audit")
                   ? "Auditoría funcional y correlación por proyecto"
-                  : pathname.startsWith("/workspace/templates")
-                    ? "Catálogo de plantillas configurables y versionadas · Paso 14"
-                    : pathname.startsWith("/workspace/sources")
-                      ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-                      : pathname.startsWith("/workspace/projects")
-                        ? "Gestión de proyectos y participantes · Paso 12"
-                        : pathname.startsWith(
-                              "/workspace/settings/ai-providers",
-                            )
-                          ? "Configuración segura de proveedores de inteligencia artificial"
-                          : "Flujo documental: datos, análisis, borradores y aprobación"}
+                  : pathname === "/workspace/settings"
+                    ? "Preferencias personales y administración segura del sistema"
+                    : pathname.startsWith("/workspace/templates")
+                      ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+                      : pathname.startsWith("/workspace/sources")
+                        ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+                        : pathname.startsWith("/workspace/projects")
+                          ? "Gestión de proyectos y participantes · Paso 12"
+                          : pathname.startsWith(
+                                "/workspace/settings/ai-providers",
+                              )
+                            ? "Configuración segura de proveedores de inteligencia artificial"
+                            : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );
