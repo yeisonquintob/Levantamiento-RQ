@@ -41,7 +41,9 @@ async function loadUsers() {
     }
 
     if (!list.ok || !metrics.ok || !roles.ok) {
-      return { error: "No fue posible consultar la administración de usuarios." };
+      return {
+        error: "No fue posible consultar la administración de usuarios.",
+      };
     }
 
     return {

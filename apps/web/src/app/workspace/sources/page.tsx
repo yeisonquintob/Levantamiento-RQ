@@ -59,13 +59,8 @@ async function loadProjects(): Promise<{
   }
 }
 
-export default async function SourcesPage({
-  searchParams,
-}: SourcesPageProps) {
-  const [initial, query] = await Promise.all([
-    loadProjects(),
-    searchParams,
-  ]);
+export default async function SourcesPage({ searchParams }: SourcesPageProps) {
+  const [initial, query] = await Promise.all([loadProjects(), searchParams]);
 
   if (initial.unauthorized) {
     redirect("/sign-in");

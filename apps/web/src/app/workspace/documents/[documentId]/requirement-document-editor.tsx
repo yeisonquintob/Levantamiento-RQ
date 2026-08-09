@@ -19,6 +19,8 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 import { RqActionButton, RqStatusBadge } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 const PENDING = "[PENDIENTE POR DEFINIR]";
@@ -481,6 +483,26 @@ export function RequirementDocumentEditor({
   const [exportRequests, setExportRequests] = useState<
     readonly ExportRequestDetail[]
   >([]);
+  const versionDialogRef = useDialogAccessibility<HTMLElement>(
+    versionOpen,
+    () => {
+      if (!busy) setVersionOpen(false);
+    },
+  );
+  const historyDialogRef = useDialogAccessibility<HTMLElement>(
+    historyOpen,
+    () => setHistoryOpen(false),
+  );
+  const exportDialogRef = useDialogAccessibility<HTMLElement>(
+    exportOpen,
+    () => {
+      if (!exportBusy) setExportOpen(false);
+    },
+  );
+  const compareDialogRef = useDialogAccessibility<HTMLElement>(
+    compareOpen && Boolean(leftVersion) && Boolean(rightVersion),
+    () => setCompareOpen(false),
+  );
 
   const activeSection =
     version.sections.find((section) => section.key === activeKey) ??
@@ -1479,7 +1501,9 @@ export function RequirementDocumentEditor({
             aria-labelledby="new-version-title"
             aria-modal="true"
             className="rq-project-modal rq-document-version-modal"
+            ref={versionDialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>
@@ -1543,7 +1567,9 @@ export function RequirementDocumentEditor({
             aria-labelledby="history-title"
             aria-modal="true"
             className="rq-project-modal rq-document-history-modal"
+            ref={historyDialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>
@@ -1580,7 +1606,9 @@ export function RequirementDocumentEditor({
             aria-labelledby="export-title"
             aria-modal="true"
             className="rq-project-modal rq-document-export-modal"
+            ref={exportDialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>
@@ -1645,13 +1673,13 @@ export function RequirementDocumentEditor({
                   <table className="rq-document-export-table">
                     <thead>
                       <tr>
-                        <th>Formato</th>
-                        <th>Versión</th>
-                        <th>Estado</th>
-                        <th>Solicitud</th>
-                        <th>Finalización</th>
-                        <th>Tamaño</th>
-                        <th>Acción</th>
+                        <th scope="col">Formato</th>
+                        <th scope="col">Versión</th>
+                        <th scope="col">Estado</th>
+                        <th scope="col">Solicitud</th>
+                        <th scope="col">Finalización</th>
+                        <th scope="col">Tamaño</th>
+                        <th scope="col">Acción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1707,7 +1735,9 @@ export function RequirementDocumentEditor({
             aria-labelledby="compare-title"
             aria-modal="true"
             className="rq-project-modal rq-document-compare-modal"
+            ref={compareDialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>

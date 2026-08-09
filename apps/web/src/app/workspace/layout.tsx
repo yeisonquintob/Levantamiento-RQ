@@ -43,7 +43,9 @@ async function resolveUser(): Promise<SessionUser> {
       !Array.isArray(payload.roles) ||
       !payload.roles.every((role) => typeof role === "string") ||
       !Array.isArray(payload.permissions) ||
-      !payload.permissions.every((permission) => typeof permission === "string") ||
+      !payload.permissions.every(
+        (permission) => typeof permission === "string",
+      ) ||
       typeof payload.mustChangePassword !== "boolean"
     ) {
       redirect("/sign-in");

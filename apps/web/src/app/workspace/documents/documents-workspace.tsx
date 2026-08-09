@@ -16,6 +16,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -100,14 +102,22 @@ export function DocumentsWorkspace({
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const createDialogRef = useDialogAccessibility<HTMLElement>(
+    createOpen,
+    () => {
+      if (!busy) setCreateOpen(false);
+    },
+  );
 
   const selectedProject = projects.find((project) => project.id === projectId);
   const metrics = useMemo(
     () => ({
       total: documents.totalItems,
       drafts: documents.items.filter((item) => item.status === "DRAFT").length,
-      review: documents.items.filter((item) => item.status === "IN_REVIEW").length,
-      approved: documents.items.filter((item) => item.status === "APPROVED").length,
+      review: documents.items.filter((item) => item.status === "IN_REVIEW")
+        .length,
+      approved: documents.items.filter((item) => item.status === "APPROVED")
+        .length,
     }),
     [documents],
   );
@@ -159,7 +169,9 @@ export function DocumentsWorkspace({
       );
       if (!response.ok) throw new Error(await responseError(response));
       const created = (await response.json()) as { id: string };
-      window.location.assign(`/workspace/documents/${encodeURIComponent(created.id)}`);
+      window.location.assign(
+        `/workspace/documents/${encodeURIComponent(created.id)}`,
+      );
     } catch (error) {
       setAlert(error instanceof Error ? error.message : String(error));
       setAlertTone("danger");
@@ -171,10 +183,30 @@ export function DocumentsWorkspace({
     <section className="rq-documents-workspace">
       <section className="rq-module-commandbar">
         <RqKpiGrid label="Resumen de documentos">
-          <RqKpiCard description="Documentos del proyecto" icon="D" title="Total" value={String(metrics.total)} />
-          <RqKpiCard description="Versiones editables" icon="B" title="Borradores" value={String(metrics.drafts)} />
-          <RqKpiCard description="Esperan revisión" icon="V" title="En validación" value={String(metrics.review)} />
-          <RqKpiCard description="Versiones bloqueadas" icon="A" title="Aprobados" value={String(metrics.approved)} />
+          <RqKpiCard
+            description="Documentos del proyecto"
+            icon="D"
+            title="Total"
+            value={String(metrics.total)}
+          />
+          <RqKpiCard
+            description="Versiones editables"
+            icon="B"
+            title="Borradores"
+            value={String(metrics.drafts)}
+          />
+          <RqKpiCard
+            description="Esperan revisión"
+            icon="V"
+            title="En validación"
+            value={String(metrics.review)}
+          />
+          <RqKpiCard
+            description="Versiones bloqueadas"
+            icon="A"
+            title="Aprobados"
+            value={String(metrics.approved)}
+          />
         </RqKpiGrid>
         <div className="rq-module-commandbar__actions">
           <RqActionButton
@@ -193,7 +225,13 @@ export function DocumentsWorkspace({
       {alert ? (
         <div className="rq-project-alert" data-tone={alertTone} role="alert">
           <span>{alert}</span>
-          <button aria-label="Cerrar mensaje" onClick={() => setAlert(null)} type="button">×</button>
+          <button
+            aria-label="Cerrar mensaje"
+            onClick={() => setAlert(null)}
+            type="button"
+          >
+            ×
+          </button>
         </div>
       ) : null}
 
@@ -229,27 +267,49 @@ export function DocumentsWorkspace({
         title="Documentos de requerimientos"
       >
         {busy ? (
-          <div className="rq-document-loading" role="status">Cargando documentos…</div>
+          <div className="rq-document-loading" role="status">
+            Cargando documentos…
+          </div>
         ) : documents.items.length === 0 ? (
           <RqEmptyState
-            description={projectId ? "Crea el primer documento manual para comenzar el levantamiento." : "Selecciona un proyecto para consultar sus documentos."}
+            description={
+              projectId
+                ? "Crea el primer documento manual para comenzar el levantamiento."
+                : "Selecciona un proyecto para consultar sus documentos."
+            }
             title="No hay documentos"
           />
         ) : (
           <table className="rq-table rq-document-table">
             <thead>
-              <tr><th>Título</th><th>Versión</th><th>Plantilla</th><th>Estado</th><th>Última modificación</th><th>Acción</th></tr>
+              <tr>
+                <th scope="col">Título</th>
+                <th scope="col">Versión</th>
+                <th scope="col">Plantilla</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Última modificación</th>
+                <th scope="col">Acción</th>
+              </tr>
             </thead>
             <tbody>
               {documents.items.map((document) => (
                 <tr key={document.id}>
-                  <td><strong>{document.title}</strong></td>
+                  <td>
+                    <strong>{document.title}</strong>
+                  </td>
                   <td>v{document.currentVersion}</td>
                   <td>{document.template.name}</td>
-                  <td><RqStatusBadge tone={statusTone(document.status)}>{statusLabel(document.status)}</RqStatusBadge></td>
+                  <td>
+                    <RqStatusBadge tone={statusTone(document.status)}>
+                      {statusLabel(document.status)}
+                    </RqStatusBadge>
+                  </td>
                   <td>{formatDate(document.updatedAt)}</td>
                   <td>
-                    <a className="rq-document-open" href={`/workspace/documents/${encodeURIComponent(document.id)}`}>
+                    <a
+                      className="rq-document-open"
+                      href={`/workspace/documents/${encodeURIComponent(document.id)}`}
+                    >
                       Abrir editor
                     </a>
                   </td>
@@ -262,23 +322,64 @@ export function DocumentsWorkspace({
 
       {createOpen ? (
         <div className="rq-project-modal-backdrop" role="presentation">
-          <section aria-labelledby="new-document-title" aria-modal="true" className="rq-project-modal rq-document-create-modal" role="dialog">
+          <section
+            aria-labelledby="new-document-title"
+            aria-modal="true"
+            className="rq-project-modal rq-document-create-modal"
+            ref={createDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
             <header className="rq-project-modal__header">
-              <div><span>Creación manual</span><h2 id="new-document-title">Nuevo documento</h2></div>
-              <button aria-label="Cerrar" disabled={busy} onClick={() => setCreateOpen(false)} type="button">×</button>
+              <div>
+                <span>Creación manual</span>
+                <h2 id="new-document-title">Nuevo documento</h2>
+              </div>
+              <button
+                aria-label="Cerrar"
+                disabled={busy}
+                onClick={() => setCreateOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
             </header>
             <form
               className="rq-project-form"
-              onSubmit={(event) => { event.preventDefault(); void createDocument(); }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void createDocument();
+              }}
             >
               <label className="rq-field rq-document-create-title">
                 <span>Título obligatorio</span>
-                <input autoFocus maxLength={240} minLength={3} onChange={(event) => setTitle(event.target.value)} required value={title} />
-                <small>El documento copiará exactamente las 13 secciones de la plantilla aplicada.</small>
+                <input
+                  autoFocus
+                  maxLength={240}
+                  minLength={3}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                  value={title}
+                />
+                <small>
+                  El documento copiará exactamente las 13 secciones de la
+                  plantilla aplicada.
+                </small>
               </label>
               <div className="rq-project-modal__actions">
-                <RqActionButton disabled={busy} onClick={() => setCreateOpen(false)}>Cancelar</RqActionButton>
-                <RqActionButton disabled={busy} tone="affirmative" type="submit">{busy ? "Creando…" : "Crear y abrir"}</RqActionButton>
+                <RqActionButton
+                  disabled={busy}
+                  onClick={() => setCreateOpen(false)}
+                >
+                  Cancelar
+                </RqActionButton>
+                <RqActionButton
+                  disabled={busy}
+                  tone="affirmative"
+                  type="submit"
+                >
+                  {busy ? "Creando…" : "Crear y abrir"}
+                </RqActionButton>
               </div>
             </form>
           </section>

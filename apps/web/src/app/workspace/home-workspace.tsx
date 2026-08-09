@@ -277,12 +277,12 @@ export function HomeWorkspace({
           <table className="rq-table rq-home-recent-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Proyecto</th>
-                <th>Área solicitante</th>
-                <th>Estado</th>
-                <th>Actualización</th>
-                <th>Acciones</th>
+                <th scope="col">Código</th>
+                <th scope="col">Proyecto</th>
+                <th scope="col">Área solicitante</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Actualización</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody>

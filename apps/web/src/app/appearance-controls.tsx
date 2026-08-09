@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useDialogAccessibility } from "./use-dialog-accessibility";
+
 type Theme = "normal" | "cold" | "warm" | "dark";
 type FontScale = "compact" | "normal" | "large" | "extra-large";
 
@@ -40,6 +42,9 @@ export function AppearanceControls() {
   const [font, setFont] = useState<FontScale>("normal");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useDialogAccessibility<HTMLElement>(open, () =>
+    setOpen(false),
+  );
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
@@ -110,7 +115,9 @@ export function AppearanceControls() {
         <section
           aria-label="Preferencias visuales"
           className="rq-appearance__panel"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <header>
             <strong>Apariencia y texto</strong>

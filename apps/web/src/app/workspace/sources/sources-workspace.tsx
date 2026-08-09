@@ -29,6 +29,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -299,6 +301,9 @@ export function SourcesWorkspace({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const dialogRef = useDialogAccessibility<HTMLElement>(modalOpen, () => {
+    if (!saving) closeModal();
+  });
   const [editing, setEditing] = useState<SourceDetail | null>(null);
   const [creationMode, setCreationMode] = useState<CreationMode>("TEXT");
   const [form, setForm] = useState<SourceFormState>(EMPTY_FORM);
@@ -1191,7 +1196,9 @@ export function SourcesWorkspace({
             aria-labelledby="source-modal-title"
             aria-modal="true"
             className="rq-project-modal rq-source-modal"
+            ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>

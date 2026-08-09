@@ -58,11 +58,7 @@ async function loadInitialData(): Promise<{
       return { unauthorized: true };
     }
 
-    if (
-      !listResponse.ok ||
-      !metricsResponse.ok ||
-      !templatesResponse.ok
-    ) {
+    if (!listResponse.ok || !metricsResponse.ok || !templatesResponse.ok) {
       return {
         error:
           "Projects Service no respondió correctamente. Recarga la vista después de validar los servicios.",

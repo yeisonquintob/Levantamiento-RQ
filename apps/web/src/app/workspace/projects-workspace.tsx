@@ -24,6 +24,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -165,6 +167,9 @@ export function ProjectsWorkspace({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const dialogRef = useDialogAccessibility<HTMLElement>(modalOpen, () => {
+    if (!saving) closeModal();
+  });
   const [editing, setEditing] = useState<ProjectDetail | null>(null);
   const [form, setForm] = useState<ProjectFormState>(EMPTY_FORM);
   const [alert, setAlert] = useState<AlertState | null>(
@@ -542,9 +547,9 @@ export function ProjectsWorkspace({
       <aside className="rq-foundation-note" role="status">
         <strong>Estado del Paso 12</strong>
         <span>
-          Projects Service, RqProjectsDb, Gateway y Workspace están
-          integrados. Cada proyecto nuevo exige una versión publicada exacta
-          de la plantilla antes de habilitar la carga de fuentes.
+          Projects Service, RqProjectsDb, Gateway y Workspace están integrados.
+          Cada proyecto nuevo exige una versión publicada exacta de la plantilla
+          antes de habilitar la carga de fuentes.
         </span>
       </aside>
 
@@ -554,7 +559,9 @@ export function ProjectsWorkspace({
             aria-labelledby="project-modal-title"
             aria-modal="true"
             className="rq-project-modal"
+            ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>

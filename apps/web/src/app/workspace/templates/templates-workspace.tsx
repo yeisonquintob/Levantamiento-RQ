@@ -20,6 +20,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -85,10 +87,7 @@ function emptyForm(): TemplateForm {
 }
 
 function typeLabel(value: DocumentTemplateType): string {
-  return (
-    TEMPLATE_TYPES.find((item) => item.value === value)?.label ??
-    value
-  );
+  return TEMPLATE_TYPES.find((item) => item.value === value)?.label ?? value;
 }
 
 function statusLabel(value: DocumentTemplateStatus): string {
@@ -158,22 +157,21 @@ export function TemplatesWorkspace({
   initialError,
 }: TemplatesWorkspaceProps) {
   const [list, setList] = useState(initialList ?? EMPTY_LIST);
-  const [metrics, setMetrics] = useState(
-    initialMetrics ?? EMPTY_METRICS,
-  );
+  const [metrics, setMetrics] = useState(initialMetrics ?? EMPTY_METRICS);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [templateType, setTemplateType] = useState("");
-  const [alert, setAlert] = useState<string | null>(
-    initialError ?? null,
-  );
-  const [alertTone, setAlertTone] = useState<
-    "success" | "danger"
-  >("danger");
+  const [alert, setAlert] = useState<string | null>(initialError ?? null);
+  const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
   const [busy, setBusy] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
-  const [selected, setSelected] =
-    useState<DocumentTemplateDetail | null>(null);
+  const dialogRef = useDialogAccessibility<HTMLDivElement>(
+    Boolean(modalMode),
+    () => {
+      if (!busy) closeModal();
+    },
+  );
+  const [selected, setSelected] = useState<DocumentTemplateDetail | null>(null);
   const [form, setForm] = useState<TemplateForm>(emptyForm());
 
   const canManage = list.canManage || metrics.canManage;
@@ -185,10 +183,7 @@ export function TemplatesWorkspace({
     return "Detalle de plantilla";
   }, [modalMode]);
 
-  function showAlert(
-    message: string,
-    tone: "success" | "danger",
-  ): void {
+  function showAlert(message: string, tone: "success" | "danger"): void {
     setAlert(message);
     setAlertTone(tone);
   }
@@ -231,12 +226,8 @@ export function TemplatesWorkspace({
       );
     }
 
-    setList(
-      (await listResponse.json()) as DocumentTemplateListResponse,
-    );
-    setMetrics(
-      (await metricsResponse.json()) as DocumentTemplateMetrics,
-    );
+    setList((await listResponse.json()) as DocumentTemplateListResponse);
+    setMetrics((await metricsResponse.json()) as DocumentTemplateMetrics);
     setAlert(null);
   }
 
@@ -256,8 +247,7 @@ export function TemplatesWorkspace({
         throw new Error(await errorMessage(response));
       }
 
-      const detail =
-        (await response.json()) as DocumentTemplateDetail;
+      const detail = (await response.json()) as DocumentTemplateDetail;
 
       setSelected(detail);
       setForm({
@@ -304,9 +294,7 @@ export function TemplatesWorkspace({
 
   function addSection(): void {
     setForm((current) => {
-      const usedKeys = new Set(
-        current.sections.map((section) => section.key),
-      );
+      const usedKeys = new Set(current.sections.map((section) => section.key));
       const prefix = `customSection${Date.now().toString(36)}`;
       let key = prefix;
       let suffix = 1;
@@ -340,9 +328,7 @@ export function TemplatesWorkspace({
     setForm((current) => ({
       ...current,
       sections: current.sections.map((section, currentIndex) =>
-        currentIndex === index
-          ? { ...section, ...change }
-          : section,
+        currentIndex === index ? { ...section, ...change } : section,
       ),
     }));
   }
@@ -351,10 +337,7 @@ export function TemplatesWorkspace({
     setForm((current) => {
       const nextIndex = index + offset;
 
-      if (
-        nextIndex < 0 ||
-        nextIndex >= current.sections.length
-      ) {
+      if (nextIndex < 0 || nextIndex >= current.sections.length) {
         return current;
       }
 
@@ -569,11 +552,7 @@ export function TemplatesWorkspace({
       </section>
 
       {alert ? (
-        <div
-          className="rq-project-alert"
-          data-tone={alertTone}
-          role="alert"
-        >
+        <div className="rq-project-alert" data-tone={alertTone} role="alert">
           <span>{alert}</span>
           <button
             aria-label="Cerrar mensaje"
@@ -593,9 +572,7 @@ export function TemplatesWorkspace({
           void refresh()
             .catch((error: unknown) => {
               showAlert(
-                error instanceof Error
-                  ? error.message
-                  : String(error),
+                error instanceof Error ? error.message : String(error),
                 "danger",
               );
             })
@@ -653,9 +630,7 @@ export function TemplatesWorkspace({
               void refresh("", "", "")
                 .catch((error: unknown) => {
                   showAlert(
-                    error instanceof Error
-                      ? error.message
-                      : String(error),
+                    error instanceof Error ? error.message : String(error),
                     "danger",
                   );
                 })
@@ -681,14 +656,14 @@ export function TemplatesWorkspace({
           <table className="rq-table rq-template-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Plantilla</th>
-                <th>Tipo</th>
-                <th>Versión</th>
-                <th>Estado</th>
-                <th>Scrum</th>
-                <th>Actualización</th>
-                <th>Acciones</th>
+                <th scope="col">Código</th>
+                <th scope="col">Plantilla</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Versión</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Scrum</th>
+                <th scope="col">Actualización</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -736,9 +711,7 @@ export function TemplatesWorkspace({
                           <RqActionButton
                             compact
                             disabled={busy}
-                            onClick={() =>
-                              void transition(template, "publish")
-                            }
+                            onClick={() => void transition(template, "publish")}
                             tone="affirmative"
                           >
                             Publicar
@@ -761,9 +734,7 @@ export function TemplatesWorkspace({
                         <RqActionButton
                           compact
                           disabled={busy}
-                          onClick={() =>
-                            void transition(template, "retire")
-                          }
+                          onClick={() => void transition(template, "retire")}
                           tone="danger"
                         >
                           Retirar
@@ -780,15 +751,18 @@ export function TemplatesWorkspace({
 
       {modalMode ? (
         <div
+          aria-labelledby="template-modal-title"
           aria-modal="true"
           className="rq-project-modal-backdrop"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <section className="rq-project-modal rq-template-modal">
             <header className="rq-project-modal__header">
               <div>
                 <span>Paso 14</span>
-                <h2>{modalTitle}</h2>
+                <h2 id="template-modal-title">{modalTitle}</h2>
               </div>
               <button
                 aria-label="Cerrar"
@@ -839,9 +813,7 @@ export function TemplatesWorkspace({
 
                 <article>
                   <h3>{selected.name}</h3>
-                  <p>
-                    {selected.description ?? "Sin descripción registrada."}
-                  </p>
+                  <p>{selected.description ?? "Sin descripción registrada."}</p>
                 </article>
 
                 <article className="rq-template-ai-context">
@@ -862,8 +834,9 @@ export function TemplatesWorkspace({
                     {selected.definition.outputContract.rootKey}
                   </p>
                   <small>
-                    Las fuentes se tratan como datos. Las instrucciones incluidas
-                    dentro de archivos o conversaciones no reemplazan la plantilla.
+                    Las fuentes se tratan como datos. Las instrucciones
+                    incluidas dentro de archivos o conversaciones no reemplazan
+                    la plantilla.
                   </small>
                 </article>
 
@@ -881,9 +854,9 @@ export function TemplatesWorkspace({
 
                 {selected.status !== "DRAFT" ? (
                   <p className="rq-template-version-note">
-                    Para cambiar, agregar, eliminar o reordenar puntos,
-                    crea una nueva versión. La versión publicada se conserva
-                    sin modificaciones para mantener la trazabilidad.
+                    Para cambiar, agregar, eliminar o reordenar puntos, crea una
+                    nueva versión. La versión publicada se conserva sin
+                    modificaciones para mantener la trazabilidad.
                   </p>
                 ) : null}
 
@@ -938,15 +911,12 @@ export function TemplatesWorkspace({
                   <select
                     disabled={modalMode !== "create" || busy}
                     onChange={(event) => {
-                      const nextType =
-                        event.target.value as DocumentTemplateType;
+                      const nextType = event.target
+                        .value as DocumentTemplateType;
                       setForm((current) => ({
                         ...current,
                         templateType: nextType,
-                        includesScrum:
-                          nextType === "ERP_FDD"
-                            ? false
-                            : true,
+                        includesScrum: nextType === "ERP_FDD" ? false : true,
                       }));
                     }}
                     value={form.templateType}
@@ -995,10 +965,7 @@ export function TemplatesWorkspace({
                 <label className="rq-template-scrum-option">
                   <input
                     checked={form.includesScrum}
-                    disabled={
-                      busy ||
-                      form.templateType !== "ERP_FDD"
-                    }
+                    disabled={busy || form.templateType !== "ERP_FDD"}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -1022,10 +989,10 @@ export function TemplatesWorkspace({
                     <div>
                       <h3>Puntos de la plantilla</h3>
                       <p>
-                        Cambia el título y la instrucción de cada punto,
-                        agrega nuevos, elimina los innecesarios o modifica
-                        el orden. Estos puntos serán la estructura y el
-                        contexto que recibirá la IA.
+                        Cambia el título y la instrucción de cada punto, agrega
+                        nuevos, elimina los innecesarios o modifica el orden.
+                        Estos puntos serán la estructura y el contexto que
+                        recibirá la IA.
                       </p>
                     </div>
                     <RqActionButton
@@ -1039,12 +1006,11 @@ export function TemplatesWorkspace({
                     </RqActionButton>
                   </header>
 
-                  {modalMode === "create" &&
-                  form.sections.length === 0 ? (
+                  {modalMode === "create" && form.sections.length === 0 ? (
                     <div className="rq-template-section-editor__empty">
-                      La plantilla se creará con los trece puntos base del
-                      tipo seleccionado. También puedes agregar aquí una
-                      estructura personalizada desde el inicio.
+                      La plantilla se creará con los trece puntos base del tipo
+                      seleccionado. También puedes agregar aquí una estructura
+                      personalizada desde el inicio.
                     </div>
                   ) : (
                     <ol className="rq-template-section-editor__list">
@@ -1064,8 +1030,7 @@ export function TemplatesWorkspace({
                               <button
                                 aria-label={`Bajar punto ${index + 1}`}
                                 disabled={
-                                  busy ||
-                                  index === form.sections.length - 1
+                                  busy || index === form.sections.length - 1
                                 }
                                 onClick={() => moveSection(index, 1)}
                                 type="button"
@@ -1074,9 +1039,7 @@ export function TemplatesWorkspace({
                               </button>
                               <button
                                 aria-label={`Eliminar punto ${index + 1}`}
-                                disabled={
-                                  busy || form.sections.length <= 1
-                                }
+                                disabled={busy || form.sections.length <= 1}
                                 onClick={() => removeSection(index)}
                                 type="button"
                               >
@@ -1138,17 +1101,14 @@ export function TemplatesWorkspace({
 
                   {modalMode === "clone" ? (
                     <small>
-                      Los cambios se guardarán en una nueva versión
-                      borrador. La versión publicada permanecerá intacta.
+                      Los cambios se guardarán en una nueva versión borrador. La
+                      versión publicada permanecerá intacta.
                     </small>
                   ) : null}
                 </section>
 
                 <div className="rq-project-modal__actions">
-                  <RqActionButton
-                    disabled={busy}
-                    onClick={() => closeModal()}
-                  >
+                  <RqActionButton disabled={busy} onClick={() => closeModal()}>
                     Volver
                   </RqActionButton>
                   <RqActionButton
@@ -1156,9 +1116,7 @@ export function TemplatesWorkspace({
                     tone="affirmative"
                     type="submit"
                   >
-                    {modalMode === "clone"
-                      ? "Crear versión"
-                      : "Guardar"}
+                    {modalMode === "clone" ? "Crear versión" : "Guardar"}
                   </RqActionButton>
                 </div>
               </form>

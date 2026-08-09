@@ -19,6 +19,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -80,6 +82,12 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
     useState<RequirementDocumentDetail | null>(null);
   const [comment, setComment] = useState("");
   const [modal, setModal] = useState<ModalMode>(null);
+  const dialogRef = useDialogAccessibility<HTMLDivElement>(
+    Boolean(modal),
+    () => {
+      if (!busy) setModal(null);
+    },
+  );
   const [busy, setBusy] = useState(false);
   const [alert, setAlert] = useState(initialError ?? "");
   const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
@@ -391,12 +399,12 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
           <table className="rq-table rq-analysis-table">
             <thead>
               <tr>
-                <th>Solicitud</th>
-                <th>Estado</th>
-                <th>Fuentes</th>
-                <th>Intentos</th>
-                <th>Actualización</th>
-                <th>Acciones</th>
+                <th scope="col">Solicitud</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Fuentes</th>
+                <th scope="col">Intentos</th>
+                <th scope="col">Actualización</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -445,15 +453,18 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
 
       {modal ? (
         <div
+          aria-labelledby="analysis-modal-title"
           aria-modal="true"
           className="rq-project-modal-backdrop"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <section className="rq-project-modal rq-analysis-modal">
             <header className="rq-project-modal__header">
               <div>
                 <span>Análisis asistido</span>
-                <h2>
+                <h2 id="analysis-modal-title">
                   {modal === "create" ? "Nueva solicitud" : "Revisar resultado"}
                 </h2>
               </div>

@@ -190,12 +190,12 @@ export function ValidationWorkspace({
           <table className="rq-table rq-document-table">
             <thead>
               <tr>
-                <th>Proyecto</th>
-                <th>Documento</th>
-                <th>Versión</th>
-                <th>Estado</th>
-                <th>Actualización</th>
-                <th>Acción</th>
+                <th scope="col">Proyecto</th>
+                <th scope="col">Documento</th>
+                <th scope="col">Versión</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Actualización</th>
+                <th scope="col">Acción</th>
               </tr>
             </thead>
             <tbody>

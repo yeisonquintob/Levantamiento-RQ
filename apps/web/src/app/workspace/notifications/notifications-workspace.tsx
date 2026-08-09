@@ -200,11 +200,11 @@ export function NotificationsWorkspace({ initialList, initialError }: Props) {
           <table className="rq-table">
             <thead>
               <tr>
-                <th>Evento</th>
-                <th>Mensaje</th>
-                <th>Estado</th>
-                <th>Fecha</th>
-                <th>Acciones</th>
+                <th scope="col">Evento</th>
+                <th scope="col">Mensaje</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody>

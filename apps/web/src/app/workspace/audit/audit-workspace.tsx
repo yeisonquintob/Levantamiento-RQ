@@ -212,12 +212,12 @@ export function AuditWorkspace({ initialProjects, initialError }: Props) {
           <table className="rq-table rq-audit-table">
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Acción</th>
-                <th>Recurso</th>
-                <th>Resultado</th>
-                <th>Actor</th>
-                <th>Correlación</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Acción</th>
+                <th scope="col">Recurso</th>
+                <th scope="col">Resultado</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Correlación</th>
               </tr>
             </thead>
             <tbody>

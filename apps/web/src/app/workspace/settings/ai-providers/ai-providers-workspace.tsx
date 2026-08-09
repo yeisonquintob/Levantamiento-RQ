@@ -16,6 +16,8 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { useDialogAccessibility } from "../../../use-dialog-accessibility";
+
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
 
@@ -101,6 +103,12 @@ export function AiProvidersWorkspace({ initialList, initialError }: Props) {
   const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<ModalMode | null>(null);
+  const dialogRef = useDialogAccessibility<HTMLDivElement>(
+    Boolean(modal),
+    () => {
+      if (!busy) close();
+    },
+  );
   const [selected, setSelected] =
     useState<AiProviderConfigurationSummary | null>(null);
   const [form, setForm] = useState<ProviderForm>(emptyForm());
@@ -326,12 +334,12 @@ export function AiProvidersWorkspace({ initialList, initialError }: Props) {
           <table className="rq-table rq-ai-providers-table">
             <thead>
               <tr>
-                <th>Proveedor</th>
-                <th>Modelo</th>
-                <th>Estado</th>
-                <th>Credencial</th>
-                <th>Última prueba</th>
-                <th>Acciones</th>
+                <th scope="col">Proveedor</th>
+                <th scope="col">Modelo</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Credencial</th>
+                <th scope="col">Última prueba</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -421,15 +429,18 @@ export function AiProvidersWorkspace({ initialList, initialError }: Props) {
 
       {modal ? (
         <div
+          aria-labelledby="ai-provider-modal-title"
           aria-modal="true"
           className="rq-project-modal-backdrop"
+          ref={dialogRef}
           role="dialog"
+          tabIndex={-1}
         >
           <section className="rq-project-modal rq-ai-provider-modal">
             <header className="rq-project-modal__header">
               <div>
                 <span>Configuración · Inteligencia artificial</span>
-                <h2>{modalTitle}</h2>
+                <h2 id="ai-provider-modal-title">{modalTitle}</h2>
               </div>
               <button
                 aria-label="Cerrar"

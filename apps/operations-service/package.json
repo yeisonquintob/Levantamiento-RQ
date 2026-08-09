@@ -13,7 +13,7 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-fastify": "11.1.28",
-    "@nestjs/swagger": "11.4.4",
+    "@nestjs/swagger": "11.4.6",
     "@nestjs/typeorm": "11.0.3",
     "amqplib": "0.10.9",
     "bullmq": "5.61.2",
