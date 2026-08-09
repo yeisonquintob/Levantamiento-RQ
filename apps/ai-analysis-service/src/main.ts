@@ -12,6 +12,7 @@ import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
+import { registerRuntimeTelemetry } from "@levantamiento-rq/shared-observability";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/ai-analysis-service/.env"],
@@ -32,6 +33,10 @@ async function bootstrap(): Promise<void> {
 
   const globalPrefix = "api/v1";
 
+  registerRuntimeTelemetry(app.getHttpAdapter().getInstance(), {
+    serviceName: config.serviceName,
+    globalPrefix,
+  });
   app.setGlobalPrefix(globalPrefix);
   if (config.environment === "development") {
     const openApiConfig = new DocumentBuilder()

@@ -1,5 +1,6 @@
 import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { Queue, type Job } from "bullmq";
+import { getRuntimeMetrics } from "@levantamiento-rq/shared-observability";
 
 import {
   OPERATIONS_PROCESSING_CONFIG,
@@ -16,11 +17,13 @@ export interface ExportDocumentJobData {
 @Injectable()
 export class ExportProcessingQueue implements OnModuleDestroy {
   private readonly queue: Queue<ExportDocumentJobData>;
+  private readonly queueName: string;
 
   constructor(
     @Inject(OPERATIONS_PROCESSING_CONFIG)
     config: OperationsProcessingConfig,
   ) {
+    this.queueName = config.queueName;
     this.queue = new Queue<ExportDocumentJobData>(config.queueName, {
       connection: config.connection,
       defaultJobOptions: {
@@ -32,15 +35,20 @@ export class ExportProcessingQueue implements OnModuleDestroy {
     });
   }
 
-  enqueue(
+  async enqueue(
     exportRequestId: string,
     correlationId: string,
   ): Promise<Job<ExportDocumentJobData>> {
-    return this.queue.add(
+    const job = await this.queue.add(
       EXPORT_DOCUMENT_JOB,
       { exportRequestId, correlationId },
       { jobId: exportRequestId },
     );
+    getRuntimeMetrics("operations-service").recordQueueJob(
+      this.queueName,
+      "enqueued",
+    );
+    return job;
   }
 
   async onModuleDestroy(): Promise<void> {

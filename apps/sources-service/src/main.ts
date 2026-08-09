@@ -13,6 +13,7 @@ import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
+import { registerRuntimeTelemetry } from "@levantamiento-rq/shared-observability";
 
 import { loadSourcesStorageConfig } from "./sources/sources-storage.config";
 
@@ -43,6 +44,10 @@ async function bootstrap(): Promise<void> {
 
   const globalPrefix = "api/v1";
 
+  registerRuntimeTelemetry(app.getHttpAdapter().getInstance(), {
+    serviceName: config.serviceName,
+    globalPrefix,
+  });
   app.setGlobalPrefix(globalPrefix);
 
   if (config.environment === "development") {

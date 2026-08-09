@@ -16,6 +16,7 @@ import {
   ApplicationExceptionFilter,
   CorrelationIdInterceptor,
 } from "@levantamiento-rq/shared-http";
+import { registerRuntimeTelemetry } from "@levantamiento-rq/shared-observability";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/identity-service/.env"],
@@ -34,7 +35,12 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter(),
   );
 
-  app.setGlobalPrefix("api/v1");
+  const globalPrefix = "api/v1";
+  registerRuntimeTelemetry(app.getHttpAdapter().getInstance(), {
+    serviceName: config.serviceName,
+    globalPrefix,
+  });
+  app.setGlobalPrefix(globalPrefix);
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
   app.useGlobalFilters(new ApplicationExceptionFilter());
   if (config.environment === "development") {

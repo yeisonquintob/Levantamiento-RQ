@@ -6,6 +6,7 @@ import {
   type OnModuleInit,
 } from "@nestjs/common";
 import { Worker } from "bullmq";
+import { getRuntimeMetrics } from "@levantamiento-rq/shared-observability";
 
 import {
   EXPORT_DOCUMENT_JOB,
@@ -29,6 +30,7 @@ export class ExportProcessingWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
+    const metrics = getRuntimeMetrics("operations-service");
     this.worker = new Worker<ExportDocumentJobData>(
       this.config.queueName,
       async (job) => {
@@ -49,7 +51,22 @@ export class ExportProcessingWorker implements OnModuleInit, OnModuleDestroy {
         concurrency: this.config.concurrency,
       },
     );
-    this.worker.on("error", (error) => this.logger.error(error.message));
+    this.worker.on("ready", () =>
+      metrics.setQueueWorkerConnected(this.config.queueName, true),
+    );
+    this.worker.on("closed", () =>
+      metrics.setQueueWorkerConnected(this.config.queueName, false),
+    );
+    this.worker.on("completed", () =>
+      metrics.recordQueueJob(this.config.queueName, "completed"),
+    );
+    this.worker.on("failed", () =>
+      metrics.recordQueueJob(this.config.queueName, "failed"),
+    );
+    this.worker.on("error", (error) => {
+      metrics.setQueueWorkerConnected(this.config.queueName, false);
+      this.logger.error(error.message);
+    });
   }
 
   async onModuleDestroy(): Promise<void> {

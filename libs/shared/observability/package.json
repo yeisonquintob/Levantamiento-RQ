@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@levantamiento-rq/shared-contracts": "workspace:*",
+    "fastify": "^5.11.0",
     "tslib": "^2.3.0"
   }
 }

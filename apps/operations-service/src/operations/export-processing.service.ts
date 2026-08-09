@@ -5,6 +5,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 
 import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
+import { getRuntimeMetrics } from "@levantamiento-rq/shared-observability";
 
 import { OperationsDocumentsAccessClient } from "./documents-access.client";
 import { ExportArtifactStorage } from "./export-artifact-storage.service";
@@ -69,6 +70,8 @@ export class ExportProcessingService {
 
     const correlationId = request.correlationId || jobCorrelationId;
     const startedAt = request.startedAt ?? new Date();
+    const observedAt = Date.now();
+    const runtimeMetrics = getRuntimeMetrics("operations-service");
     await this.exports.update(request.id, {
       status: "PROCESSING",
       attemptCount: Math.max(request.attemptCount, attemptNumber),
@@ -189,7 +192,17 @@ export class ExportProcessingService {
           requestedByUserId: request.requestedByUserId,
         },
       });
+      runtimeMetrics.observeOperation(
+        "document_export",
+        "succeeded",
+        Date.now() - observedAt,
+      );
     } catch {
+      runtimeMetrics.observeOperation(
+        "document_export",
+        "failed",
+        Date.now() - observedAt,
+      );
       const now = new Date();
       const status = finalAttempt ? "FAILED" : "PENDING";
       const errorMessage = finalAttempt

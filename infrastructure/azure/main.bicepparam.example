@@ -1,0 +1,120 @@
+using './main.bicep'
+
+param prefix = 'rqdemo'
+param location = 'eastus2'
+param environmentName = 'prod'
+param sqlAdministratorLogin = 'rqsqladmin'
+param sqlAdministratorPassword = readEnvironmentVariable('RQ_SQL_ADMIN_PASSWORD')
+
+param workloads = [
+  {
+    name: 'rq-gateway'
+    image: '<registry>.azurecr.io/gateway:<immutable-tag>'
+    port: 3000
+    external: true
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 5
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'rq-web'
+    image: '<registry>.azurecr.io/web:<immutable-tag>'
+    port: 4200
+    external: true
+    healthPath: '/sign-in'
+    minReplicas: 1
+    maxReplicas: 5
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'identity-service'
+    image: '<registry>.azurecr.io/identity-service:<immutable-tag>'
+    port: 3001
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 3
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'projects-service'
+    image: '<registry>.azurecr.io/projects-service:<immutable-tag>'
+    port: 3002
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 3
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'sources-service'
+    image: '<registry>.azurecr.io/sources-service:<immutable-tag>'
+    port: 3003
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 5
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'documents-service'
+    image: '<registry>.azurecr.io/documents-service:<immutable-tag>'
+    port: 3004
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 3
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'ai-analysis-service'
+    image: '<registry>.azurecr.io/ai-analysis-service:<immutable-tag>'
+    port: 3005
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 5
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'erp-knowledge-service'
+    image: '<registry>.azurecr.io/erp-knowledge-service:<immutable-tag>'
+    port: 3006
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 0
+    maxReplicas: 2
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'workflow-service'
+    image: '<registry>.azurecr.io/workflow-service:<immutable-tag>'
+    port: 3007
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 3
+    env: []
+    keyVaultSecrets: []
+  }
+  {
+    name: 'operations-service'
+    image: '<registry>.azurecr.io/operations-service:<immutable-tag>'
+    port: 3008
+    external: false
+    healthPath: '/api/v1/health/ready'
+    minReplicas: 1
+    maxReplicas: 5
+    env: []
+    keyVaultSecrets: []
+  }
+]

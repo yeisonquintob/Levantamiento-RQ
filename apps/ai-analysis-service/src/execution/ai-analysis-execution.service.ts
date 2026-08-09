@@ -6,6 +6,7 @@ import { DataSource, Repository } from "typeorm";
 
 import type { RequirementDocumentDetail } from "@levantamiento-rq/shared-contracts";
 import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
+import { getRuntimeMetrics } from "@levantamiento-rq/shared-observability";
 
 import { AnalysisExecutionEntity } from "../analysis/analysis-execution.entity";
 import { AnalysisPromptVersionEntity } from "../analysis/analysis-prompt-version.entity";
@@ -104,6 +105,7 @@ export class AiAnalysisExecutionService {
     });
     const attempt = (previous[0]?.attempt ?? 0) + 1;
     const startedAt = new Date();
+    const runtimeMetrics = getRuntimeMetrics("ai-analysis-service");
     const execution = this.executions.create({
       id: randomUUID(),
       analysisRequestId,
@@ -263,9 +265,19 @@ export class AiAnalysisExecutionService {
           outputTokens: generated.outputTokens,
         },
       });
+      runtimeMetrics.observeOperation(
+        "ai_analysis",
+        "succeeded",
+        finishedAt.valueOf() - startedAt.valueOf(),
+      );
     } catch (error) {
       const failure = errorDetails(error);
       const finishedAt = new Date();
+      runtimeMetrics.observeOperation(
+        "ai_analysis",
+        "failed",
+        finishedAt.valueOf() - startedAt.valueOf(),
+      );
       await this.dataSource.transaction(async (manager) => {
         await manager.update(AnalysisExecutionEntity, execution.id, {
           status: "FAILED",

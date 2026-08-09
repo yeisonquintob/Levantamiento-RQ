@@ -15,23 +15,33 @@ trap cleanup EXIT INT TERM
 cleanup
 
 CI=1 pnpm install --frozen-lockfile
+pnpm check:secrets
+pnpm check:architecture
 pnpm lint:all
 pnpm typecheck:all
 pnpm build:all
 pnpm test:unit
-pnpm test:structural
+pnpm test:events
+bash scripts/infrastructure-up.sh
 pnpm test:integration
 pnpm identity:migration:run
 pnpm identity:db:verify
+pnpm projects:migration:run
+pnpm projects:db:verify
 pnpm sources:migration:run
 pnpm sources:db:verify
 pnpm documents:migration:run
 pnpm documents:db:verify
+pnpm ai:migration:run
+pnpm ai:db:verify
 pnpm workflow:migration:run
 pnpm workflow:db:verify
+pnpm operations:migration:run
+pnpm operations:db:verify
 pnpm sources:queue:verify
 pnpm sources:storage:verify
 pnpm test:smoke
+pnpm swagger:validate
 git diff --check
 
 for port in 3000 3001 3002 3003 3004 3005 3006 3007 3008 4200; do

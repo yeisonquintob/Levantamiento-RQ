@@ -15,7 +15,10 @@ import {
   ApplicationExceptionFilter,
   CorrelationIdInterceptor,
 } from "@levantamiento-rq/shared-http";
-import { createStructuredLogEntry } from "@levantamiento-rq/shared-observability";
+import {
+  createStructuredLogEntry,
+  registerRuntimeTelemetry,
+} from "@levantamiento-rq/shared-observability";
 
 import { AppModule } from "./app/app.module";
 import { loadGatewayConfig } from "./config/gateway-config";
@@ -42,6 +45,10 @@ async function bootstrap(): Promise<void> {
   });
 
   const fastify = app.getHttpAdapter().getInstance();
+  registerRuntimeTelemetry(fastify, {
+    serviceName: config.serviceName,
+    globalPrefix: config.globalPrefix,
+  });
   fastify.addHook("onRequest", async (request, reply) => {
     reply.header("cache-control", "private, no-store, max-age=0");
     reply.header("x-content-type-options", "nosniff");

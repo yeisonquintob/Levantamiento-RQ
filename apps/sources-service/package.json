@@ -10,6 +10,7 @@
     "@levantamiento-rq/shared-contracts": "workspace:*",
     "@levantamiento-rq/shared-http": "workspace:*",
     "@levantamiento-rq/shared-messaging": "workspace:*",
+    "@levantamiento-rq/shared-observability": "workspace:*",
     "@levantamiento-rq/shared-persistence": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

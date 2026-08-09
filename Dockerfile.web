@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.7
+FROM node:24-alpine AS build
+WORKDIR /workspace
+RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig*.json ./
+COPY apps ./apps
+COPY libs ./libs
+ARG NEXT_PUBLIC_GATEWAY_URL
+ENV NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
+RUN pnpm install --frozen-lockfile && pnpm nx build web --skip-nx-cache
+
+FROM node:24-alpine AS runtime
+ENV NODE_ENV=production HOSTNAME=0.0.0.0 PORT=4200
+WORKDIR /app/apps/web
+COPY --from=build /workspace/apps/web/.next/standalone /app
+COPY --from=build /workspace/apps/web/.next/static ./.next/static
+COPY --from=build /workspace/apps/web/public ./public
+USER node
+EXPOSE 4200
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/sign-in').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["node", "server.js"]

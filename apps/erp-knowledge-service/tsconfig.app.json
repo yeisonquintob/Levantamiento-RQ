@@ -18,6 +18,9 @@
   "exclude": ["eslint.config.js", "eslint.config.cjs", "eslint.config.mjs"],
   "references": [
     {
+      "path": "../../libs/shared/observability/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/shared/persistence/tsconfig.lib.json"
     },
     {

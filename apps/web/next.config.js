@@ -1,5 +1,7 @@
 //@ts-check
 
+const path = require("node:path");
+
 /** @type {import('next').NextConfig} */
 const gatewayOrigin = (() => {
   try {
@@ -39,6 +41,8 @@ const securityHeaders = [
 
 const nextConfig = {
   devIndicators: false,
+  output: "standalone",
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

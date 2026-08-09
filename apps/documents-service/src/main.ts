@@ -13,6 +13,7 @@ import {
   loadEnvironmentFiles,
 } from "@levantamiento-rq/shared-config";
 import { ApplicationExceptionFilter } from "@levantamiento-rq/shared-http";
+import { registerRuntimeTelemetry } from "@levantamiento-rq/shared-observability";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/documents-service/.env"],
@@ -33,6 +34,10 @@ async function bootstrap(): Promise<void> {
 
   const globalPrefix = "api/v1";
 
+  registerRuntimeTelemetry(app.getHttpAdapter().getInstance(), {
+    serviceName: config.serviceName,
+    globalPrefix,
+  });
   app.setGlobalPrefix(globalPrefix);
   app.useGlobalFilters(new ApplicationExceptionFilter());
 

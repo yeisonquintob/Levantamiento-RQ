@@ -5,6 +5,7 @@
   "dependencies": {
     "@fastify/static": "10.1.2",
     "@levantamiento-rq/shared-config": "workspace:*",
+    "@levantamiento-rq/shared-observability": "workspace:*",
     "@levantamiento-rq/shared-persistence": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
