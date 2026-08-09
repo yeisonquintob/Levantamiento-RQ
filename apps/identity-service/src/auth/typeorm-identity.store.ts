@@ -45,9 +45,7 @@ function mapUser(user: UserEntity): IdentityUserRecord {
   };
 }
 
-function mapSession(
-  session: RefreshSessionEntity,
-): RefreshSessionRecord {
+function mapSession(session: RefreshSessionEntity): RefreshSessionRecord {
   return {
     id: session.id,
     userId: session.userId,
@@ -55,6 +53,8 @@ function mapSession(
     expiresAt: session.expiresAt,
     revokedAt: session.revokedAt,
     replacedBySessionId: session.replacedBySessionId,
+    createdAt: session.createdAt,
+    lastUsedAt: session.lastUsedAt,
   };
 }
 
@@ -80,9 +80,7 @@ export class TypeOrmIdentityStore implements IdentityStore {
     return user ? mapUser(user) : null;
   }
 
-  async findUserById(
-    userId: string,
-  ): Promise<IdentityUserRecord | null> {
+  async findUserById(userId: string): Promise<IdentityUserRecord | null> {
     const user = await this.userQuery()
       .where("identityUser.Id = :userId", { userId })
       .getOne();
@@ -97,14 +95,12 @@ export class TypeOrmIdentityStore implements IdentityStore {
     );
   }
 
-  async createRefreshSession(
-    session: NewRefreshSession,
-  ): Promise<void> {
+  async createRefreshSession(session: NewRefreshSession): Promise<void> {
     await this.sessions.insert({
       ...session,
       revokedAt: null,
       replacedBySessionId: null,
-      createdAt: new Date(),
+      createdAt: session.createdAt,
       lastUsedAt: null,
     });
   }
@@ -144,7 +140,7 @@ export class TypeOrmIdentityStore implements IdentityStore {
         ...nextSession,
         revokedAt: null,
         replacedBySessionId: null,
-        createdAt: instant,
+        createdAt: nextSession.createdAt,
         lastUsedAt: null,
       });
 
@@ -152,10 +148,7 @@ export class TypeOrmIdentityStore implements IdentityStore {
     });
   }
 
-  async revokeRefreshSession(
-    sessionId: string,
-    instant: Date,
-  ): Promise<void> {
+  async revokeRefreshSession(sessionId: string, instant: Date): Promise<void> {
     await this.sessions
       .createQueryBuilder()
       .update(RefreshSessionEntity)

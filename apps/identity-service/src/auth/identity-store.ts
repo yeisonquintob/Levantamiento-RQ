@@ -16,6 +16,8 @@ export interface RefreshSessionRecord {
   expiresAt: Date;
   revokedAt: Date | null;
   replacedBySessionId: string | null;
+  createdAt: Date;
+  lastUsedAt: Date | null;
 }
 
 export interface NewRefreshSession {
@@ -23,6 +25,7 @@ export interface NewRefreshSession {
   userId: string;
   tokenHash: string;
   expiresAt: Date;
+  createdAt: Date;
   userAgent: string | null;
   ipAddress: string | null;
 }

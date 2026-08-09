@@ -1,3 +1,5 @@
+export const SESSION_INACTIVITY_TIMEOUT_SECONDS = 30 * 60;
+
 export interface AuthenticatedUser {
   id: string;
   email: string;

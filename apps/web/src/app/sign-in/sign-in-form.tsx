@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 const GATEWAY_URL =
@@ -32,6 +32,16 @@ export function SignInForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+
+    if (reason === "inactivity") {
+      setMessage("La sesión se cerró después de 30 minutos de inactividad.");
+    } else if (reason === "expired") {
+      setMessage("La sesión expiró. Inicia sesión nuevamente.");
+    }
+  }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSubmitting(true);
@@ -42,17 +52,14 @@ export function SignInForm() {
     const password = String(form.get("password") ?? "");
 
     try {
-      const response = await fetch(
-        `${GATEWAY_URL}/api/v1/auth/sign-in`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({ email, password }),
+      const response = await fetch(`${GATEWAY_URL}/api/v1/auth/sign-in`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
         },
-      );
+        body: JSON.stringify({ email, password }),
+      });
 
       const payload = (await response.json().catch(() => null)) as unknown;
 
@@ -63,12 +70,12 @@ export function SignInForm() {
 
       const mustChangePassword = Boolean(
         payload &&
-          typeof payload === "object" &&
-          "user" in payload &&
-          payload.user &&
-          typeof payload.user === "object" &&
-          "mustChangePassword" in payload.user &&
-          payload.user.mustChangePassword === true,
+        typeof payload === "object" &&
+        "user" in payload &&
+        payload.user &&
+        typeof payload.user === "object" &&
+        "mustChangePassword" in payload.user &&
+        payload.user.mustChangePassword === true,
       );
 
       window.location.assign(

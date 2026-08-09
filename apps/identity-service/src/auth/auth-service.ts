@@ -55,8 +55,7 @@ export class AuthService {
     this.ensureEnabled();
 
     const emailNormalized = normalizeEmail(request.email);
-    const user =
-      await this.store.findUserByEmailNormalized(emailNormalized);
+    const user = await this.store.findUserByEmailNormalized(emailNormalized);
     const passwordHash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
     const passwordValid = await this.passwordHasher.verify(
       request.password,
@@ -72,13 +71,7 @@ export class AuthService {
     const now = new Date();
 
     await this.store.createRefreshSession(
-      this.toNewSession(
-        sessionId,
-        user.id,
-        session.refreshToken,
-        now,
-        context,
-      ),
+      this.toNewSession(sessionId, user.id, session.refreshToken, now, context),
     );
     await this.store.updateLastLogin(user.id, now);
 
@@ -104,6 +97,18 @@ export class AuthService {
       stored.expiresAt.getTime() <= now.getTime()
     ) {
       throw new UnauthorizedException("Sesión de renovación inválida.");
+    }
+
+    const lastActivityAt = stored.lastUsedAt ?? stored.createdAt;
+
+    if (
+      lastActivityAt.getTime() + this.config.inactivityTtlSeconds * 1000 <=
+      now.getTime()
+    ) {
+      await this.store.revokeRefreshSession(stored.id, now);
+      throw new UnauthorizedException(
+        "La sesión expiró por 30 minutos de inactividad.",
+      );
     }
 
     const user = await this.store.findUserById(claims.userId);
@@ -158,8 +163,7 @@ export class AuthService {
     accessToken: string,
   ): Promise<AuthenticatedUser> {
     this.ensureEnabled();
-    const principal =
-      await this.tokenService.verifyAccessToken(accessToken);
+    const principal = await this.tokenService.verifyAccessToken(accessToken);
     const user = await this.store.findUserById(principal.user.id);
 
     if (
@@ -211,9 +215,7 @@ export class AuthService {
       await this.passwordHasher.hash(request.newPassword),
       now,
     );
-    const updated = changed
-      ? await this.store.findUserById(user.id)
-      : null;
+    const updated = changed ? await this.store.findUserById(user.id) : null;
 
     if (!updated) {
       throw new UnauthorizedException("La cuenta no está disponible.");
@@ -253,9 +255,8 @@ export class AuthService {
       id,
       userId,
       tokenHash: this.tokenService.hashToken(refreshToken),
-      expiresAt: new Date(
-        now.getTime() + this.config.refreshTtlSeconds * 1000,
-      ),
+      expiresAt: new Date(now.getTime() + this.config.refreshTtlSeconds * 1000),
+      createdAt: now,
       userAgent: context.userAgent?.slice(0, 512) || null,
       ipAddress: context.ipAddress?.slice(0, 64) || null,
     };

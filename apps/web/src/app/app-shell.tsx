@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { AppearanceControls } from "./appearance-controls";
+import { SessionActivityManager } from "./session-activity-manager";
 import { SignOutButton } from "./sign-out-button";
 
 interface AppShellProps {
@@ -157,6 +158,7 @@ export function AppShell({ children, user }: AppShellProps) {
 
   return (
     <div className="rq-shell">
+      <SessionActivityManager />
       <a className="rq-skip-link" href="#contenido-principal">
         Saltar al contenido
       </a>

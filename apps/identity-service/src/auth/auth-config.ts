@@ -1,4 +1,5 @@
 import { loadSqlServerDatabaseConfig } from "@levantamiento-rq/shared-persistence";
+import { SESSION_INACTIVITY_TIMEOUT_SECONDS } from "@levantamiento-rq/shared-contracts";
 
 export const AUTH_CONFIG = Symbol("AUTH_CONFIG");
 
@@ -10,6 +11,7 @@ export interface AuthConfig {
   refreshSecret: string;
   accessTtlSeconds: number;
   refreshTtlSeconds: number;
+  inactivityTtlSeconds: number;
 }
 
 function readBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -56,6 +58,7 @@ export function loadAuthConfig(
       refreshSecret: "",
       accessTtlSeconds: 900,
       refreshTtlSeconds: 604800,
+      inactivityTtlSeconds: SESSION_INACTIVITY_TIMEOUT_SECONDS,
     };
   }
 
@@ -88,8 +91,7 @@ export function loadAuthConfig(
 
   return {
     enabled: true,
-    issuer:
-      environment.JWT_ISSUER?.trim() || "levantamiento-rq-identity",
+    issuer: environment.JWT_ISSUER?.trim() || "levantamiento-rq-identity",
     audience: environment.JWT_AUDIENCE?.trim() || "levantamiento-rq",
     accessSecret,
     refreshSecret,
@@ -107,5 +109,6 @@ export function loadAuthConfig(
       2592000,
       "JWT_REFRESH_TTL_SECONDS",
     ),
+    inactivityTtlSeconds: SESSION_INACTIVITY_TIMEOUT_SECONDS,
   };
 }

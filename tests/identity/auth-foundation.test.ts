@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
@@ -41,13 +42,12 @@ class FakeIdentityStore implements IdentityStore {
       ...session,
       revokedAt: null,
       replacedBySessionId: null,
+      lastUsedAt: null,
     });
     return Promise.resolve();
   }
 
-  findRefreshSession(
-    sessionId: string,
-  ): Promise<RefreshSessionRecord | null> {
+  findRefreshSession(sessionId: string): Promise<RefreshSessionRecord | null> {
     return Promise.resolve(this.sessions.get(sessionId) ?? null);
   }
 
@@ -71,6 +71,7 @@ class FakeIdentityStore implements IdentityStore {
       ...nextSession,
       revokedAt: null,
       replacedBySessionId: null,
+      lastUsedAt: null,
     });
 
     return Promise.resolve(true);
@@ -123,6 +124,7 @@ const config: AuthConfig = {
   refreshSecret: "b".repeat(64),
   accessTtlSeconds: 300,
   refreshTtlSeconds: 3600,
+  inactivityTtlSeconds: 1800,
 };
 
 async function createFixture(active = true) {
@@ -196,6 +198,27 @@ test("inicio, consulta, renovación y cierre de sesión", async () => {
   );
 });
 
+test("la renovación rechaza y revoca sesiones con 30 minutos de inactividad", async () => {
+  const fixture = await createFixture();
+  const signedIn = await fixture.auth.signIn({
+    email: fixture.user.email,
+    password: fixture.password,
+  });
+  const stored = [...fixture.store.sessions.values()][0];
+
+  assert.ok(stored);
+  fixture.store.sessions.set(stored.id, {
+    ...stored,
+    createdAt: new Date(Date.now() - 31 * 60 * 1000),
+  });
+
+  await assert.rejects(
+    () => fixture.auth.refresh(signedIn.refreshToken),
+    /30 minutos de inactividad/,
+  );
+  assert.ok(fixture.store.sessions.get(stored.id)?.revokedAt);
+});
+
 test("la contraseña temporal obliga cambio, revoca sesiones y no se filtra", async () => {
   const fixture = await createFixture();
   fixture.store.users.set(fixture.user.id, {
@@ -210,13 +233,10 @@ test("la contraseña temporal obliga cambio, revoca sesiones y no se filtra", as
   assert.equal(signedIn.user.mustChangePassword, true);
   assert.equal("passwordHash" in signedIn.user, false);
 
-  const changed = await fixture.auth.changePassword(
-    signedIn.user,
-    {
-      currentPassword: fixture.password,
-      newPassword: "NuevaPasswordSegura123!",
-    },
-  );
+  const changed = await fixture.auth.changePassword(signedIn.user, {
+    currentPassword: fixture.password,
+    newPassword: "NuevaPasswordSegura123!",
+  });
 
   assert.equal(changed.user.mustChangePassword, false);
   await assert.rejects(
@@ -261,4 +281,23 @@ test("credenciales erróneas y usuarios inactivos son rechazados", async () => {
       }),
     /Credenciales inválidas/,
   );
+});
+
+test("el Workspace renueva solo con actividad y avisa la expiración", async () => {
+  const manager = await readFile(
+    "apps/web/src/app/session-activity-manager.tsx",
+    "utf8",
+  );
+  const signIn = await readFile(
+    "apps/web/src/app/sign-in/sign-in-form.tsx",
+    "utf8",
+  );
+
+  assert.match(manager, /SESSION_INACTIVITY_TIMEOUT_SECONDS/);
+  assert.match(manager, /ACTIVITY_WINDOW_MS/);
+  assert.match(manager, /api\/v1\/auth\/refresh/);
+  assert.match(manager, /api\/v1\/auth\/sign-out/);
+  assert.match(manager, /redirectToSignIn\("inactivity"\)/);
+  assert.match(signIn, /30 minutos de inactividad/);
+  assert.doesNotMatch(manager, /localStorage|sessionStorage/);
 });
