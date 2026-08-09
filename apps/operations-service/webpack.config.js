@@ -8,6 +8,7 @@ const classTransformerStorage = join(
 );
 
 module.exports = {
+  externals: [{ docx: "commonjs docx" }],
   resolve: {
     alias: {
       "class-transformer/storage$": classTransformerStorage,
@@ -31,6 +32,8 @@ module.exports = {
       outputHashing: "none",
       generatePackageJson: false,
       sourceMap: true,
+      externalDependencies: "all",
+      mergeExternals: true,
     }),
   ],
 };

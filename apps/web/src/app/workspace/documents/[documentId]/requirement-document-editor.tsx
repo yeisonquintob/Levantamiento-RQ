@@ -9,6 +9,9 @@ import type {
   DocumentSectionKey,
   DocumentStatus,
   DocumentVersionDetail,
+  ExportFormat,
+  ExportRequestDetail,
+  ExportRequestListResponse,
   ProjectDetail,
   RequirementDocumentDetail,
   WorkflowReviewDetail,
@@ -109,6 +112,31 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function exportStatusLabel(status: ExportRequestDetail["status"]): string {
+  if (status === "PENDING") return "Pendiente";
+  if (status === "PROCESSING") return "Procesando";
+  if (status === "COMPLETED") return "Completada";
+  if (status === "CANCELLED") return "Cancelada";
+  return "Fallida";
+}
+
+function exportStatusTone(
+  status: ExportRequestDetail["status"],
+): "success" | "process" | "pending" | "danger" | "inactive" {
+  if (status === "COMPLETED") return "success";
+  if (status === "PROCESSING") return "process";
+  if (status === "PENDING") return "pending";
+  if (status === "CANCELLED") return "inactive";
+  return "danger";
+}
+
+function formatBytes(value: string): string {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 1024) return `${bytes || 0} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function workflowActivityLabel(
@@ -447,6 +475,12 @@ export function RequirementDocumentEditor({
     useState<DocumentVersionDetail | null>(null);
   const [review, setReview] = useState<WorkflowReviewDetail | null>(null);
   const [reviewComment, setReviewComment] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("PDF");
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportRequests, setExportRequests] = useState<
+    readonly ExportRequestDetail[]
+  >([]);
 
   const activeSection =
     version.sections.find((section) => section.key === activeKey) ??
@@ -493,6 +527,35 @@ export function RequirementDocumentEditor({
     version.status,
     version.versionNumber,
   ]);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch(
+          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/documents/${encodeURIComponent(documentState.id)}/exports`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(await responseError(response));
+        const list = (await response.json()) as ExportRequestListResponse;
+        if (active) setExportRequests(list.items);
+      } catch (error) {
+        if (active) {
+          showAlert(
+            error instanceof Error ? error.message : String(error),
+            "danger",
+          );
+        }
+      }
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [documentState.id, exportOpen, project.id]);
 
   function showAlert(message: string, tone: "success" | "danger" | "warning") {
     setAlert(message);
@@ -924,6 +987,42 @@ export function RequirementDocumentEditor({
     }
   }
 
+  async function requestExport(): Promise<void> {
+    if (version.status !== "APPROVED") {
+      showAlert("Solo una versión aprobada puede exportarse.", "warning");
+      return;
+    }
+    setExportBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/exports`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": crypto.randomUUID(),
+          },
+          body: JSON.stringify({ format: exportFormat }),
+        },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const created = (await response.json()) as ExportRequestDetail;
+      setExportRequests((current) => [
+        created,
+        ...current.filter((item) => item.id !== created.id),
+      ]);
+      showAlert(`La exportación ${exportFormat} quedó programada.`, "success");
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   return (
     <section className="rq-document-editor">
       <header className="rq-document-editor__header">
@@ -962,6 +1061,13 @@ export function RequirementDocumentEditor({
             tone="operation"
           >
             Comparar versiones
+          </RqActionButton>
+          <RqActionButton
+            disabled={busy || version.status !== "APPROVED"}
+            onClick={() => setExportOpen(true)}
+            tone="operation"
+          >
+            Exportar
           </RqActionButton>
           <RqActionButton
             disabled={busy || documentState.status === "ARCHIVED"}
@@ -1464,6 +1570,133 @@ export function RequirementDocumentEditor({
                 </li>
               ))}
             </ol>
+          </section>
+        </div>
+      ) : null}
+
+      {exportOpen ? (
+        <div className="rq-project-modal-backdrop" role="presentation">
+          <section
+            aria-labelledby="export-title"
+            aria-modal="true"
+            className="rq-project-modal rq-document-export-modal"
+            role="dialog"
+          >
+            <header className="rq-project-modal__header">
+              <div>
+                <span>Entregables aprobados</span>
+                <h2 id="export-title">Exportar documento</h2>
+              </div>
+              <button
+                aria-label="Cerrar exportaciones"
+                disabled={exportBusy}
+                onClick={() => setExportOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+            <div className="rq-document-export-create">
+              <div>
+                <strong>
+                  Versión {version.version} · {statusLabel(version.status)}
+                </strong>
+                <span>
+                  El archivo conservará las 13 secciones, los requisitos,
+                  criterios y evidencias de esta versión exacta.
+                </span>
+              </div>
+              <label>
+                <span>Formato</span>
+                <select
+                  disabled={exportBusy}
+                  onChange={(event) =>
+                    setExportFormat(event.target.value as ExportFormat)
+                  }
+                  value={exportFormat}
+                >
+                  <option value="PDF">PDF · entrega final</option>
+                  <option value="DOCX">DOCX · editable</option>
+                </select>
+              </label>
+              <RqActionButton
+                disabled={exportBusy}
+                onClick={() => void requestExport()}
+                tone="affirmative"
+              >
+                {exportBusy ? "Programando…" : `Generar ${exportFormat}`}
+              </RqActionButton>
+            </div>
+            <section className="rq-document-export-history">
+              <header>
+                <div>
+                  <strong>Historial de exportaciones</strong>
+                  <span>Se actualiza automáticamente cada 3 segundos.</span>
+                </div>
+                <span>{exportRequests.length} solicitudes</span>
+              </header>
+              {exportRequests.length === 0 ? (
+                <p className="rq-document-export-empty">
+                  Todavía no se han solicitado exportaciones para este
+                  documento.
+                </p>
+              ) : (
+                <div className="rq-document-export-table-wrap">
+                  <table className="rq-document-export-table">
+                    <thead>
+                      <tr>
+                        <th>Formato</th>
+                        <th>Versión</th>
+                        <th>Estado</th>
+                        <th>Solicitud</th>
+                        <th>Finalización</th>
+                        <th>Tamaño</th>
+                        <th>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {exportRequests.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.format}</td>
+                          <td>{item.versionNumber}</td>
+                          <td>
+                            <RqStatusBadge tone={exportStatusTone(item.status)}>
+                              {exportStatusLabel(item.status)}
+                            </RqStatusBadge>
+                            {item.errorMessage ? (
+                              <small>{item.errorMessage}</small>
+                            ) : null}
+                          </td>
+                          <td>{formatDate(item.requestedAt)}</td>
+                          <td>
+                            {item.completedAt
+                              ? formatDate(item.completedAt)
+                              : "—"}
+                          </td>
+                          <td>
+                            {item.artifact
+                              ? formatBytes(item.artifact.sizeBytes)
+                              : "—"}
+                          </td>
+                          <td>
+                            {item.status === "COMPLETED" && item.artifact ? (
+                              <a
+                                className="rq-document-export-download"
+                                href={`${GATEWAY_URL}/api/v1/exports/${encodeURIComponent(item.id)}/download`}
+                              >
+                                Descargar
+                              </a>
+                            ) : (
+                              <span>En espera</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </section>
         </div>
       ) : null}

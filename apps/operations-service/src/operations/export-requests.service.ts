@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -20,6 +21,10 @@ import type {
 import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
 
 import { OperationsDocumentsAccessClient } from "./documents-access.client";
+import {
+  ExportArtifactNotFoundError,
+  ExportArtifactStorage,
+} from "./export-artifact-storage.service";
 import { ExportProcessingQueue } from "./export-processing.queue";
 import {
   AuditEventEntity,
@@ -53,6 +58,7 @@ export class ExportRequestsService {
     private readonly documents: OperationsDocumentsAccessClient,
     private readonly queue: ExportProcessingQueue,
     private readonly events: IntegrationEventsPublisher,
+    private readonly storage: ExportArtifactStorage,
   ) {}
 
   async create(
@@ -205,6 +211,73 @@ export class ExportRequestsService {
       context.correlationId,
     );
     return this.detail(row);
+  }
+
+  async download(
+    context: OperationsActorContext,
+    exportRequestId: string,
+  ): Promise<{ buffer: Buffer; mediaType: string; fileName: string }> {
+    const row = await this.requireExport(exportRequestId);
+    await this.projects.requireRead(
+      row.projectId,
+      context.accessToken,
+      context.actor,
+      context.correlationId,
+    );
+    if (row.status !== "COMPLETED") {
+      throw new ConflictException(
+        "La exportación todavía no contiene un archivo descargable.",
+      );
+    }
+    const artifact = await this.artifacts.findOneBy({
+      exportRequestId: row.id,
+    });
+    if (!artifact) {
+      throw new NotFoundException(
+        "No se encontró el artefacto asociado a la exportación.",
+      );
+    }
+    try {
+      const buffer = await this.storage.download(artifact.storagePath);
+      const sha256 = createHash("sha256").update(buffer).digest("hex");
+      if (sha256 !== artifact.sha256) {
+        throw new InternalServerErrorException(
+          "El archivo no superó la validación de integridad.",
+        );
+      }
+      await this.dataSource.getRepository(AuditEventEntity).save({
+        id: randomUUID(),
+        actorUserId: context.actor.id,
+        projectId: row.projectId,
+        action: "EXPORT_DOWNLOADED",
+        resourceType: "ExportRequest",
+        resourceId: row.id,
+        result: "SUCCEEDED",
+        correlationId: context.correlationId,
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent?.slice(0, 500) ?? null,
+        metadataJson: JSON.stringify({
+          documentId: row.documentId,
+          documentVersionId: row.documentVersionId,
+          format: row.format,
+          sizeBytes: artifact.sizeBytes,
+          sha256: artifact.sha256,
+        }),
+        occurredAt: new Date(),
+      });
+      return {
+        buffer,
+        mediaType: artifact.mediaType,
+        fileName: artifact.fileName,
+      };
+    } catch (error) {
+      if (error instanceof ExportArtifactNotFoundError) {
+        throw new NotFoundException(
+          "El archivo exportado ya no está disponible en el almacenamiento.",
+        );
+      }
+      throw error;
+    }
   }
 
   private async requireExport(id: string): Promise<ExportRequestEntity> {

@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -13,6 +14,7 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import type { FastifyReply } from "fastify";
 
 import { ExportRequestsService } from "./export-requests.service";
 import { OperationsAccessTokenGuard } from "./operations-access-token.guard";
@@ -42,6 +44,10 @@ function context(request: OperationsRequest) {
       ? request.headers["user-agent"][0]
       : request.headers["user-agent"],
   };
+}
+
+function attachmentDisposition(fileName: string): string {
+  return `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
 }
 
 @ApiTags("exports")
@@ -100,5 +106,23 @@ export class ExportRequestsController {
       context(request),
       parseExportRequestId(exportRequestId),
     );
+  }
+
+  @ApiOperation({ summary: "Descargar un artefacto exportado" })
+  @Get("exports/:exportRequestId/download")
+  async download(
+    @Req() request: OperationsRequest,
+    @Param("exportRequestId") exportRequestId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const file = await this.exports.download(
+      context(request),
+      parseExportRequestId(exportRequestId),
+    );
+    return reply
+      .header("content-type", file.mediaType)
+      .header("content-disposition", attachmentDisposition(file.fileName))
+      .header("content-length", String(file.buffer.length))
+      .send(file.buffer);
   }
 }

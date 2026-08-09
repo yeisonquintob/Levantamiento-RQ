@@ -12,6 +12,26 @@ import type {
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
+export interface GatewayExportDownload {
+  fileName: string;
+  mediaType: string;
+  buffer: Buffer;
+}
+
+function fileNameFromDisposition(value: string | null): string {
+  const utf8 = value?.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1]);
+    } catch {
+      return "documento-exportado";
+    }
+  }
+  return (
+    value?.match(/filename="?([^";]+)"?/i)?.[1]?.trim() || "documento-exportado"
+  );
+}
+
 @Injectable()
 export class OperationsClientService {
   constructor(
@@ -67,6 +87,54 @@ export class OperationsClientService {
     );
   }
 
+  async downloadExport(
+    accessToken: string,
+    correlationId: string,
+    exportRequestId: string,
+  ): Promise<GatewayExportDownload> {
+    let response: Response;
+    try {
+      response = await fetch(
+        `${this.config.operationsServiceUrl}/api/v1/exports/${encodeURIComponent(exportRequestId)}/download`,
+        {
+          headers: {
+            accept: "application/octet-stream",
+            authorization: `Bearer ${accessToken}`,
+            "x-correlation-id": correlationId,
+          },
+          signal: AbortSignal.timeout(this.config.operationsTimeoutMs),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        "Operations Service no está disponible.",
+      );
+    }
+    if (!response.ok) {
+      const text = await response.text();
+      let payload: unknown = { message: text };
+      try {
+        payload = text ? (JSON.parse(text) as unknown) : payload;
+      } catch {
+        // Conserva un mensaje seguro cuando el servicio no devuelve JSON.
+      }
+      throw new HttpException(
+        payload && typeof payload === "object"
+          ? (payload as Record<string, unknown>)
+          : { message: typeof payload === "string" ? payload : text },
+        response.status,
+      );
+    }
+    return {
+      fileName: fileNameFromDisposition(
+        response.headers.get("content-disposition"),
+      ),
+      mediaType:
+        response.headers.get("content-type") ?? "application/octet-stream",
+      buffer: Buffer.from(await response.arrayBuffer()),
+    };
+  }
+
   private async request<T>(
     path: string,
     method: "GET" | "POST",
@@ -102,7 +170,14 @@ export class OperationsClientService {
     } catch {
       payload = { message: text };
     }
-    if (!response.ok) throw new HttpException(payload, response.status);
+    if (!response.ok) {
+      throw new HttpException(
+        payload && typeof payload === "object"
+          ? (payload as Record<string, unknown>)
+          : { message: typeof payload === "string" ? payload : text },
+        response.status,
+      );
+    }
     return payload as T;
   }
 }

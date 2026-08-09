@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Req,
+  Res,
   UnauthorizedException,
 } from "@nestjs/common";
 import {
@@ -16,6 +17,7 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import type { FastifyReply } from "fastify";
 
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
 import { OperationsClientService } from "./operations-client.service";
@@ -39,6 +41,10 @@ const correlation = (request: RequestLike) =>
   first(request.headers["x-correlation-id"])?.trim() || randomUUID();
 const idempotency = (request: RequestLike) =>
   first(request.headers["x-idempotency-key"])?.trim() || null;
+
+function attachmentDisposition(fileName: string): string {
+  return `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
 
 @ApiTags("exports")
 @ApiCookieAuth("rq_access")
@@ -100,5 +106,24 @@ export class OperationsGatewayController {
       correlation(request),
       exportRequestId,
     );
+  }
+
+  @ApiOperation({ summary: "Descargar artefacto exportado" })
+  @Get("exports/:exportRequestId/download")
+  async download(
+    @Req() request: RequestLike,
+    @Param("exportRequestId") exportRequestId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const file = await this.operations.downloadExport(
+      token(request),
+      correlation(request),
+      exportRequestId,
+    );
+    return reply
+      .header("content-type", file.mediaType)
+      .header("content-disposition", attachmentDisposition(file.fileName))
+      .header("content-length", String(file.buffer.length))
+      .send(file.buffer);
   }
 }

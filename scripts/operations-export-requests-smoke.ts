@@ -40,6 +40,7 @@ async function main(): Promise<void> {
         return false;
       },
     } as never,
+    {} as never,
   );
   const context = {
     actor: {

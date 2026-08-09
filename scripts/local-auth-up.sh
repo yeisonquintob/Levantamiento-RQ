@@ -11,6 +11,8 @@ mkdir -p "$PID_DIR" "$LOG_DIR"
 set -a
 source "$INFRA_ENV"
 set +a
+export REDIS_PORT="${RQ_REDIS_PORT:-6381}"
+export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=http;AccountName=${AZURITE_ACCOUNT_NAME};AccountKey=${AZURITE_ACCOUNT_KEY};BlobEndpoint=http://127.0.0.1:${RQ_AZURITE_BLOB_PORT}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:${RQ_AZURITE_QUEUE_PORT}/devstoreaccount1;TableEndpoint=http://127.0.0.1:${RQ_AZURITE_TABLE_PORT}/devstoreaccount1;"
 RABBITMQ_URL="$(node -e 'const u=encodeURIComponent(process.env.RABBITMQ_DEFAULT_USER);const p=encodeURIComponent(process.env.RABBITMQ_DEFAULT_PASS);const port=process.env.RQ_RABBITMQ_AMQP_PORT||"5673";process.stdout.write(`amqp://${u}:${p}@127.0.0.1:${port}`)')"
 export RABBITMQ_ENABLED=true RABBITMQ_URL
 export RABBITMQ_EXCHANGE="${RABBITMQ_EXCHANGE:-rq.integration.v1}"
@@ -155,7 +157,7 @@ start_detached \
   "$PID_DIR/operations-service.pid" \
   "$LOG_DIR/operations-service.log" \
   bash -lc \
-  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export SERVICE_NAME=operations-service PORT=3008 DB_NAME=RqOperationsDb DATABASE_ENABLED=true NODE_ENV=development; exec node '$ROOT/apps/operations-service/dist/main.js'"
+  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export SERVICE_NAME=operations-service PORT=3008 DB_NAME=RqOperationsDb DATABASE_ENABLED=true NODE_ENV=development REDIS_PORT=\"\${RQ_REDIS_PORT:-6381}\" AZURE_STORAGE_CONNECTION_STRING=\"DefaultEndpointsProtocol=http;AccountName=\${AZURITE_ACCOUNT_NAME};AccountKey=\${AZURITE_ACCOUNT_KEY};BlobEndpoint=http://127.0.0.1:\${RQ_AZURITE_BLOB_PORT}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:\${RQ_AZURITE_QUEUE_PORT}/devstoreaccount1;TableEndpoint=http://127.0.0.1:\${RQ_AZURITE_TABLE_PORT}/devstoreaccount1;\"; exec node '$ROOT/apps/operations-service/dist/main.js'"
 
 wait_for_url \
   "Operations Service" \
