@@ -72,6 +72,25 @@ export class AiAnalysisGatewayController {
           type: "string",
           enum: ["REQUIREMENT_DOCUMENT"],
         },
+        purpose: {
+          type: "string",
+          enum: ["INITIAL_DRAFT", "AI_VERSION"],
+          default: "INITIAL_DRAFT",
+          description:
+            "Borrador inicial o nueva versión solicitada explícitamente con IA.",
+        },
+        instruction: {
+          type: "string",
+          maxLength: 2_000,
+        },
+        idempotencyKey: {
+          type: "string",
+          minLength: 8,
+          maxLength: 120,
+          pattern: "^[A-Za-z0-9._:-]+$",
+          description:
+            "Clave estable que evita llamadas y versiones duplicadas.",
+        },
         documentId: { type: "string", format: "uuid" },
         documentVersionId: {
           type: "string",
@@ -89,7 +108,8 @@ export class AiAnalysisGatewayController {
   })
   @ApiResponse({
     status: 201,
-    description: "Solicitud registrada en estado PENDING.",
+    description:
+      "Solicitud idempotente registrada en PENDING; AI Analysis aplica el resultado al DRAFT.",
   })
   @Post()
   create(

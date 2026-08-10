@@ -504,11 +504,29 @@ async function main(): Promise<void> {
         await request(`/projects/${projectId}/documents`, access, {
           method: "POST",
           expected: 201,
-          body: { title: `Documento de aceptación V1 ${suffix}` },
+          body: {
+            title: `Documento de aceptación V1 ${suffix}`,
+            changeSummary: "Borrador inicial generado desde el E2E",
+            idempotencyKey: `v1-document-${suffix}`,
+          },
         })
       ).payload,
     );
     documentId = string(document.id, "document.id");
+    const repeatedDocument = object(
+      (
+        await request(`/projects/${projectId}/documents`, access, {
+          method: "POST",
+          expected: 201,
+          body: {
+            title: `Documento de aceptación V1 ${suffix}`,
+            changeSummary: "Borrador inicial generado desde el E2E",
+            idempotencyKey: `v1-document-${suffix}`,
+          },
+        })
+      ).payload,
+    );
+    assert.equal(repeatedDocument.id, documentId);
     const initialVersion = object(document.currentVersionDetail);
     const documentVersionId = string(initialVersion.id, "document.version.id");
     const appliedRows = (await documentsDb.query(
@@ -526,11 +544,30 @@ async function main(): Promise<void> {
             documentId,
             documentVersionId,
             sourceIds: [sourceId],
+            purpose: "INITIAL_DRAFT",
+            idempotencyKey: `v1-initial-draft-${suffix}`,
           },
         })
       ).payload,
     );
     analysisRequestId = string(analysis.id, "analysis.id");
+    const repeatedAnalysis = object(
+      (
+        await request(`/projects/${projectId}/analysis-requests`, access, {
+          method: "POST",
+          expected: 201,
+          body: {
+            analysisType: "REQUIREMENT_DOCUMENT",
+            documentId,
+            documentVersionId,
+            sourceIds: [sourceId],
+            purpose: "INITIAL_DRAFT",
+            idempotencyKey: `v1-initial-draft-${suffix}`,
+          },
+        })
+      ).payload,
+    );
+    assert.equal(repeatedAnalysis.id, analysisRequestId);
     const completedAnalysis = await waitForAnalysis(
       projectId,
       analysisRequestId,
@@ -539,39 +576,17 @@ async function main(): Promise<void> {
     const executions = Array.isArray(completedAnalysis.executions)
       ? completedAnalysis.executions.map(object)
       : [];
+    assert.equal(executions.length, 1);
     assert.equal(executions.at(-1)?.provider, "FAKE");
     const generatedResult = object(completedAnalysis.result);
-    assert.equal(generatedResult.status, "GENERATED");
+    assert.equal(generatedResult.status, "ACCEPTED");
     const draft = object(generatedResult.draft);
     assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 13);
     assert.ok(
       Array.isArray(draft.requirements) && draft.requirements.length > 0,
     );
 
-    stage = "aceptar humanamente y aplicar la propuesta de IA";
-    const beforeAccept = object(
-      (await request(`/documents/${documentId}`, access)).payload,
-    );
-    const beforeAcceptVersion = object(beforeAccept.currentVersionDetail);
-    const accepted = object(
-      (
-        await request(
-          `/projects/${projectId}/analysis-requests/${analysisRequestId}/result/accept`,
-          access,
-          {
-            method: "POST",
-            body: {
-              expectedDocumentRevision: integer(
-                beforeAcceptVersion.revision,
-                "document.revision",
-              ),
-              comment: "Propuesta Fake AI revisada y aceptada por el E2E V1.",
-            },
-          },
-        )
-      ).payload,
-    );
-    assert.equal(object(accepted.result).status, "ACCEPTED");
+    stage = "validar aplicación automática sujeta a revisión humana";
     const withAi = object(
       (await request(`/documents/${documentId}`, access)).payload,
     );
@@ -741,9 +756,8 @@ async function main(): Promise<void> {
       "/workspace",
       "/workspace/sources",
       "/workspace/documents",
-      "/workspace/analysis",
       "/workspace/validation",
-      "/workspace/audit",
+      "/workspace/settings/audit",
       "/workspace/notifications",
       "/workspace/settings",
     ]) {
@@ -754,6 +768,16 @@ async function main(): Promise<void> {
       });
       assert.equal(page.status, 200, `${route} no respondió HTTP 200.`);
     }
+    const legacyAudit = await fetch(`${WEB}/workspace/audit`, {
+      headers: { cookie: access },
+      redirect: "manual",
+      signal: AbortSignal.timeout(30_000),
+    });
+    assert.equal(legacyAudit.status, 308);
+    assert.match(
+      legacyAudit.headers.get("location") ?? "",
+      /\/workspace\/settings\/audit/,
+    );
 
     const inboxRows = (await operationsDb.query(
       "SELECT COUNT(1) AS Total FROM dbo.IntegrationEventInbox WHERE CorrelationId = @0 AND Status = N'PROCESSED'",

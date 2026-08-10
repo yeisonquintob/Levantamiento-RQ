@@ -3,7 +3,10 @@
 ## Principio
 
 La IA es un asistente del analista y nunca la autoridad final. No aprueba, no
-escribe directamente en Documents y no convierte inferencias en hechos.
+accede a la base de Documents y no convierte inferencias en hechos. El worker
+puede aplicar automáticamente su salida a una versión `DRAFT` por medio de la
+API interna autorizada de Documents; ese resultado continúa sujeto a revisión
+humana y Workflow.
 
 ## Requirement Analyst V1
 
@@ -26,6 +29,8 @@ sequenceDiagram
     participant D as Documents
     participant W as Workflow
 
+    U->>G: Procesar y generar borrador
+    G->>D: Crear documento o nueva versión DRAFT idempotente
     U->>G: Crear AnalysisRequest con fuentes READY
     G->>A: HTTP autenticado y correlacionado
     A->>A: Validar proyecto, documento y snapshots
@@ -34,20 +39,41 @@ sequenceDiagram
     A-->>G: Respuesta inmediata
     R->>A: Worker inicia intento PROCESSING
     A->>A: Construir prompt y contrato JSON
-    A->>P: Ejecutar proveedor configurado
+    A->>P: Ejecutar proveedor configurado una sola vez
     P-->>A: JSON estructurado
-    A->>A: Validar y persistir COMPLETED
-    U->>G: Consultar resultado y decidir por propuesta
-    G->>A: Aceptar, editar/aceptar o descartar
-    A->>D: Aplicar únicamente decisión humana a DRAFT
+    A->>A: Validar y persistir resultado
+    A->>D: Aplicar resultado a la versión DRAFT exacta
+    D-->>A: Versión actualizada e historial AI_DRAFT_APPLIED
+    A->>A: Marcar COMPLETED y resultado ACCEPTED
+    U->>G: Abrir borrador, revisar y editar humanamente
     U->>G: Solicitar revisión
     G->>W: Workflow formal
 ```
 
 Los estados son `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` y `CANCELLED`.
-Cada intento conserva proveedor, modelo, tiempos, tokens, request id,
-correlación, versión de prompt y error sanitizado. Los reintentos fallidos no
-se eliminan.
+Cada intento conserva propósito (`INITIAL_DRAFT` o `AI_VERSION`), proveedor,
+modelo, fuentes, tiempos, tokens, request id, correlación, versión de prompt y
+error sanitizado. Los reintentos fallidos no se eliminan.
+
+## Idempotencia y recuperación
+
+La operación funcional usa una clave estable desde la creación del documento
+o versión hasta `AnalysisRequest`. La combinación proyecto/clave es única en
+AI Analysis y la clave de creación/versionado es única en Documents.
+
+El resultado se persiste antes de aplicarlo. Si la llamada a Documents falla,
+el job puede reintentarse usando ese resultado ya persistido: no vuelve a
+invocar el proveedor. `COMPLETED` significa que la salida también quedó
+aplicada a la versión `DRAFT` exacta. Una versión `IN_REVIEW` o `APPROVED` se
+rechaza y nunca se sobrescribe.
+
+## Fronteras de llamada
+
+La IA se invoca solamente desde **Procesar y generar borrador** o **Nueva
+versión con IA**. No se invoca al seleccionar fuentes, reprocesarlas
+técnicamente, guardar, crear una versión manual, abrir historial, comparar,
+revisar, aprobar o exportar. La exportación pertenece a Validación y opera
+únicamente sobre la versión `APPROVED` exacta.
 
 ## Construcción del prompt
 
@@ -72,5 +98,6 @@ revisión experta.
 ## Restricciones
 
 La IA no inventa información, no resuelve contradicciones sin reportarlas, no
-modifica contenido aprobado, no aplica cambios silenciosamente, no crea
-referencias inexistentes y no afirma cobertura ERP sin evidencia.
+modifica contenido en revisión o aprobado, no crea referencias inexistentes y
+no afirma cobertura ERP sin evidencia. Toda aplicación automática queda
+identificada como generada con IA y pendiente de revisión humana.

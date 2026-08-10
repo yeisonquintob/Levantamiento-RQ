@@ -22,17 +22,23 @@ El detalle auditable se mantiene en
 
 1. Iniciar sesión y administrar usuarios, roles y sesiones.
 2. Crear un proyecto con participantes y una plantilla publicada.
-3. Registrar notas o cargar TXT, CSV, XLSX, PDF, DOCX e imágenes.
-4. Almacenar los binarios en Blob y extraer contenido mediante BullMQ.
-5. Crear o editar un documento con las 13 secciones canónicas.
-6. Analizar fuentes READY de forma asíncrona con Fake u OpenAI.
-7. Revisar, editar, aceptar o descartar cada propuesta de IA.
-8. Enviar el borrador a Workflow, comentar, solicitar cambios, aprobar o
+3. Registrar notas o cargar TXT, CSV, XLSX, PDF, DOCX e imágenes y seleccionar
+   las fuentes útiles.
+4. Ejecutar **Procesar y generar borrador**: Sources deja las fuentes en
+   `READY`, crea el documento o una nueva versión `DRAFT` y solicita exactamente
+   una generación asíncrona con Fake u OpenAI.
+5. Abrir el borrador ya aplicado, revisar y editar sus 13 secciones canónicas.
+6. Crear versiones manuales sin IA o solicitar explícitamente una **Nueva
+   versión con IA**; ambas conservan el historial anterior.
+7. Enviar el borrador a Workflow, comentar, solicitar cambios, aprobar o
    rechazar.
-9. Bloquear la versión aprobada y exportarla a PDF o DOCX.
-10. Descargar artefactos y consultar notificaciones, historial y auditoría.
+8. Desde Validación, exportar la versión `APPROVED` exacta a PDF o DOCX.
+9. Descargar artefactos y consultar notificaciones, historial documental,
+   historial IA y auditoría técnica.
 
-La IA nunca aprueba contenido ni escribe directamente en `RqDocumentsDb`.
+La IA nunca aprueba contenido. AI Analysis no accede a `RqDocumentsDb`: aplica
+el resultado exclusivamente a una versión `DRAFT` mediante la API protegida de
+Documents y siempre lo marca como contenido que requiere revisión humana.
 
 ## Arquitectura
 
@@ -52,6 +58,21 @@ La IA nunca aprueba contenido ni escribe directamente en `RqDocumentsDb`.
 No existen claves foráneas entre bases de dominios. HTTP atiende operaciones
 síncronas; RabbitMQ transporta eventos; Redis/BullMQ ejecuta extracción,
 análisis y exportaciones.
+
+## Límites de uso de IA
+
+Una llamada al proveedor solo ocurre en dos acciones explícitas:
+
+- **Procesar y generar borrador**, para el documento inicial o una nueva
+  versión generada desde Fuentes.
+- **Nueva versión con IA**, desde el editor documental.
+
+Seleccionar fuentes, reprocesar técnicamente un archivo, abrir o guardar el
+editor, crear una versión manual, consultar historiales, comparar versiones,
+revisar, aprobar y exportar no invoca IA. La clave de idempotencia compartida
+entre Web, AI Analysis y Documents evita generaciones o versiones duplicadas;
+si la aplicación documental falla después de generar, el reintento reutiliza
+el resultado persistido y no vuelve a llamar al proveedor.
 
 ## Stack
 

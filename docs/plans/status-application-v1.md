@@ -19,9 +19,9 @@ La línea base de esta fase fue `0cb20bc` (`docs: close workflow approval point
 | Identity y sesiones          | Completa                 | login, refresh rotativo, logout, revocación, cambio de contraseña e inactividad de 30 minutos |
 | Usuarios y roles             | Completa                 | administración protegida por `system.admin`                                                   |
 | Projects                     | Completa                 | proyectos, participantes, autorización y plantilla aplicada                                   |
-| Sources                      | Completa                 | texto, archivos, Blob privado, SHA-256, extracción, reproceso y archivo lógico                |
+| Sources                      | Completa                 | carga, selección, extracción y acción única para procesar y generar borrador                  |
 | Documents                    | Completa                 | plantillas, 13 secciones, editor, versiones, concurrencia e inmutabilidad                     |
-| AI Analysis                  | Completa en código       | Fake y OpenAI, worker, JSON estricto, evidencias y revisión humana                            |
+| AI Analysis                  | Completa en código       | Fake y OpenAI, aplicación automática a DRAFT, idempotencia, evidencias y revisión humana      |
 | Workflow                     | Completa                 | revisión, comentarios, cambios, aprobación, rechazo e historial                               |
 | Operations                   | Completa                 | exportaciones, artefactos, notificaciones, inbox y auditoría                                  |
 | PDF/DOCX                     | Completa                 | generación real desde versión aprobada, Blob, hash y descarga                                 |
@@ -69,15 +69,22 @@ Gateway publica bajo `/api/v1`:
 - solicitudes, artefactos, notificaciones y auditoría de Operations;
 - `/health`, `/health/ready` y `/metrics`.
 
-Cada backend publica Swagger en desarrollo. El Workspace ofrece Inicio,
-Proyectos, Fuentes, Documentos, Análisis, Validación, Plantillas,
-Notificaciones, Auditoría, Configuración, Usuarios y Proveedores de IA.
+Cada backend publica Swagger en desarrollo. El Workspace operativo ofrece
+Inicio, Proyectos, Fuentes, Documentos, Validación y Notificaciones. La
+administración se concentra en Configuración. El historial técnico de IA se
+consulta desde Documentos; la URL histórica de Análisis redirige allí.
 
 ## Fuentes y trabajos asíncronos
 
 Sources admite notas, conversaciones, transcripciones, TXT, CSV, XLSX, PDF,
 DOCX, PNG, JPG, JPEG y WEBP. Valida extensión, tamaño, firma y duplicados; Blob
 es privado y SQL solo conserva metadatos, hash y texto extraído.
+
+La selección no procesa ni llama IA. **Procesar y generar borrador** procesa
+solo los archivos que aún no están `READY`, espera el lote, crea el documento
+inicial o una nueva versión `DRAFT` y solicita una única generación. El botón
+individual **Reprocesar fuente** conserva su función técnica: no crea versiones
+ni invoca IA.
 
 BullMQ usa Redis para:
 
@@ -125,18 +132,24 @@ confianza, revisión requerida, contradicciones y metadatos de proveedor,
 modelo, prompt y ejecución. Los vacíos usan `[PENDIENTE POR DEFINIR]`.
 
 Los estados técnicos incluyen `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` y
-`CANCELLED`. Los intentos fallidos permanecen en `RqAiDb`; los errores se
-sanitizan y una solicitud no se ejecuta dos veces.
+`CANCELLED`. Cada solicitud declara `INITIAL_DRAFT` o `AI_VERSION` y conserva
+una clave idempotente única por proyecto. Los intentos fallidos permanecen en
+`RqAiDb`; los errores se sanitizan y una solicitud no se ejecuta dos veces. Si
+el proveedor ya respondió y falla la aplicación documental, el reintento
+reutiliza la salida persistida sin una segunda llamada de IA.
 
 ## Revisión humana y Documents
 
-La IA no escribe directamente en `RqDocumentsDb`. El usuario puede aceptar,
-editar y aceptar, descartar o dejar pendiente. Documents aplica únicamente
-decisiones humanas a una versión DRAFT y registra solicitud, ejecución,
-fuentes, valor original, valor final, actor y revisión optimista.
+La IA no escribe directamente en `RqDocumentsDb`. El worker usa una identidad
+interna firmada para pedir a Documents la aplicación atómica sobre la versión
+`DRAFT` exacta. El resultado queda identificado como generado con IA y requiere
+revisión humana; Documents registra solicitud, ejecución, fuentes, valor
+original, valor final, actor y revisión optimista.
 
 El documento canónico conserva exactamente 13 secciones. Una versión aprobada
-es inmutable; toda corrección posterior crea una nueva versión.
+es inmutable; toda corrección posterior crea una nueva versión. **Nueva
+versión** clona sin IA y **Nueva versión con IA** es la segunda y única frontera
+explícita de llamada al proveedor.
 
 ## Workflow
 
@@ -171,6 +184,7 @@ reintenta errores temporales y evita notificaciones duplicadas.
 PDF y DOCX se generan en servidor desde la versión aprobada exacta. Incluyen
 proyecto, versión, estado, las 13 secciones y trazabilidad; el artefacto se
 guarda en Blob con nombre, tipo, tamaño y SHA-256. No se sobrescribe historial.
+La acción de exportación vive en Validación, no en el editor, y nunca invoca IA.
 
 Las notificaciones internas cubren revisión, correcciones, aprobación,
 rechazo, fallo de análisis y exportación lista. El canal de correo permanece
@@ -219,12 +233,14 @@ RabbitMQ y Swagger.
 
 `pnpm test:e2e:v1` ejecuta con fixtures temporales:
 
-`login -> proyecto -> TXT/Blob -> READY -> documento -> Fake AI -> 13
-secciones -> revisión humana -> Workflow -> aprobación -> PDF/DOCX -> descarga
--> auditoría/notificación -> limpieza`.
+`login -> proyecto -> TXT/Blob -> READY -> documento DRAFT -> Fake AI único ->
+aplicación automática -> 13 secciones -> revisión/edición humana -> Workflow ->
+aprobación -> Validación -> PDF/DOCX -> descarga -> auditoría/notificación ->
+limpieza`.
 
 Comprueba además hash y cabeceras de archivos descargados, inmutabilidad y la
-ruta Web. No usa ni elimina datos reales.
+ruta Web. Se ejecuta dos veces para detectar duplicados o dependencia de estado
+residual y no usa ni elimina datos reales.
 
 ## CI/CD y Azure
 

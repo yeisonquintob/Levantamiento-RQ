@@ -68,6 +68,27 @@ export class AiAnalysisController {
           type: "string",
           enum: ["REQUIREMENT_DOCUMENT"],
         },
+        purpose: {
+          type: "string",
+          enum: ["INITIAL_DRAFT", "AI_VERSION"],
+          default: "INITIAL_DRAFT",
+          description:
+            "Límite funcional de la llamada: borrador inicial o nueva versión solicitada explícitamente con IA.",
+        },
+        instruction: {
+          type: "string",
+          maxLength: 2_000,
+          description:
+            "Instrucción opcional del usuario para una nueva versión con IA.",
+        },
+        idempotencyKey: {
+          type: "string",
+          minLength: 8,
+          maxLength: 120,
+          pattern: "^[A-Za-z0-9._:-]+$",
+          description:
+            "Clave estable que impide duplicar la generación y la versión documental.",
+        },
         documentId: { type: "string", format: "uuid" },
         documentVersionId: { type: "string", format: "uuid" },
         sourceIds: {
@@ -82,7 +103,8 @@ export class AiAnalysisController {
   })
   @ApiResponse({
     status: 201,
-    description: "Solicitud registrada en estado PENDING.",
+    description:
+      "Solicitud idempotente registrada en PENDING; el worker genera y aplica el DRAFT automáticamente.",
   })
   @Post("projects/:projectId/analysis-requests")
   create(
