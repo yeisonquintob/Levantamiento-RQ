@@ -155,10 +155,7 @@ export class AiAnalysisService {
             sourceSha256: source.sha256,
             sourceTitle: source.title,
             sourceClassification: source.classification,
-            snapshotText: (source.extractedText ?? source.content ?? "").slice(
-              0,
-              2_000_000,
-            ),
+            snapshotText: source.extractedText ?? source.content ?? "",
             position: index + 1,
             createdAt: now,
           })),

@@ -51,6 +51,10 @@ function sameUuid(left: unknown, right: unknown): boolean {
   );
 }
 
+async function delay(milliseconds: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function cookie(response: Response, name: string): string {
   const serialized = response.headers
     .getSetCookie()
@@ -451,9 +455,12 @@ async function main(): Promise<void> {
       "analysisRequest.id",
     );
 
-    assert.equal(created.status, "PENDING");
+    assert.ok(
+      ["PENDING", "PROCESSING", "COMPLETED"].includes(
+        string(created.status, "analysisRequest.status"),
+      ),
+    );
     assert.equal(created.sourceCount, 1);
-    assert.equal(created.executionCount, 0);
 
     const createdSources = created.sources;
 
@@ -480,12 +487,33 @@ async function main(): Promise<void> {
       );
     }
 
-    stage = "listar solicitud por Gateway";
+    stage = "esperar generación FAKE mediante Gateway";
+    let detail = created;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      detail = object(
+        (
+          await request(
+            `/projects/${projectId}/analysis-requests/` + analysisRequestId,
+            access,
+          )
+        ).payload,
+      );
+      if (detail.status === "COMPLETED") break;
+      if (detail.status === "FAILED") {
+        throw new Error(
+          `La generación falló: ${String(detail.errorCode)} — ${String(detail.errorMessage)}`,
+        );
+      }
+      await delay(250);
+    }
+    assert.equal(detail.status, "COMPLETED");
+
+    stage = "listar solicitud completada por Gateway";
     const listed = object(
       (
         await request(
           `/projects/${projectId}/analysis-requests`
-          + "?status=PENDING&page=1&pageSize=10",
+          + "?status=COMPLETED&page=1&pageSize=10",
           access,
         )
       ).payload,
@@ -512,17 +540,6 @@ async function main(): Promise<void> {
       );
     }
 
-    stage = "consultar detalle por Gateway";
-    const detail = object(
-      (
-        await request(
-          `/projects/${projectId}/analysis-requests/`
-          + analysisRequestId,
-          access,
-        )
-      ).payload,
-    );
-
     if (
       !sameUuid(detail.documentId, documentId) ||
       !sameUuid(
@@ -534,37 +551,22 @@ async function main(): Promise<void> {
         "El detalle no conserva documento y versión.",
       );
     }
-
-    stage = "cancelar solicitud por Gateway";
-    const cancelled = object(
-      (
-        await request(
-          `/projects/${projectId}/analysis-requests/`
-          + `${analysisRequestId}/cancel`,
-          access,
-          { method: "POST" },
-        )
-      ).payload,
-    );
-
-    assert.equal(cancelled.status, "CANCELLED");
-    assert.equal(
-      typeof cancelled.cancelledAt,
-      "string",
-    );
-
-    const idempotent = object(
-      (
-        await request(
-          `/projects/${projectId}/analysis-requests/`
-          + `${analysisRequestId}/cancel`,
-          access,
-          { method: "POST" },
-        )
-      ).payload,
-    );
-
-    assert.equal(idempotent.status, "CANCELLED");
+    if (!Array.isArray(detail.executions) || detail.executions.length !== 1) {
+      throw new Error("La generación no conservó una ejecución única.");
+    }
+    const execution = object(detail.executions[0]);
+    assert.equal(execution.provider, "FAKE");
+    assert.equal(execution.model, "deterministic-e2e-v1");
+    assert.equal(execution.status, "COMPLETED");
+    const result = object(detail.result);
+    assert.equal(result.status, "ACCEPTED");
+    const generatedDraft = object(result.draft);
+    if (
+      !Array.isArray(generatedDraft.sections) ||
+      generatedDraft.sections.length !== 13
+    ) {
+      throw new Error("El resultado no contiene las 13 secciones.");
+    }
 
     const rows = (
       await aiDb.query(
@@ -577,7 +579,12 @@ async function main(): Promise<void> {
            (SELECT COUNT(1)
             FROM dbo.AnalysisExecutions ae
             WHERE ae.AnalysisRequestId = ar.Id)
-             AS ExecutionCount
+             AS ExecutionCount,
+           (SELECT COUNT(1)
+            FROM dbo.AnalysisResults result
+            WHERE result.AnalysisRequestId = ar.Id
+              AND result.Status = 'ACCEPTED')
+             AS AcceptedResultCount
          FROM dbo.AnalysisRequests ar
          WHERE ar.Id = @0`,
         [analysisRequestId],
@@ -586,14 +593,13 @@ async function main(): Promise<void> {
       Status: string;
       SourceCount: number | string;
       ExecutionCount: number | string;
+      AcceptedResultCount: number | string;
     }>;
 
-    assert.equal(rows[0]?.Status, "CANCELLED");
+    assert.equal(rows[0]?.Status, "COMPLETED");
     assert.equal(Number(rows[0]?.SourceCount ?? 0), 1);
-    assert.equal(
-      Number(rows[0]?.ExecutionCount ?? 0),
-      0,
-    );
+    assert.equal(Number(rows[0]?.ExecutionCount ?? 0), 1);
+    assert.equal(Number(rows[0]?.AcceptedResultCount ?? 0), 1);
 
     console.log(
       "✓ Usuario ADMIN temporal creado sin credenciales manuales.",
@@ -605,13 +611,13 @@ async function main(): Promise<void> {
       "✓ Proyecto, fuente READY y documento creados.",
     );
     console.log(
-      "✓ Solicitud PENDING creada mediante cookie HttpOnly.",
+      "✓ Solicitud creada mediante cookie HttpOnly y procesada con FAKE.",
     );
     console.log(
-      "✓ Listado, detalle y cancelación verificados.",
+      "✓ Listado, detalle, proveedor, modelo y estado verificados.",
     );
     console.log(
-      "✓ Snapshot persistido y cero ejecuciones confirmadas.",
+      "✓ Snapshot, ejecución única y resultado estructurado confirmados.",
     );
     console.log(
       "✓ Solicitud sin sesión rechazada con HTTP 401.",
@@ -634,7 +640,9 @@ async function main(): Promise<void> {
 
     if (analysisRequestId) {
       await aiDb.query(
-        "DELETE FROM dbo.AnalysisExecutions "
+        "DELETE FROM dbo.AnalysisResults "
+        + "WHERE AnalysisRequestId = @0; "
+        + "DELETE FROM dbo.AnalysisExecutions "
         + "WHERE AnalysisRequestId = @0; "
         + "DELETE FROM dbo.AnalysisRequestSources "
         + "WHERE AnalysisRequestId = @0; "

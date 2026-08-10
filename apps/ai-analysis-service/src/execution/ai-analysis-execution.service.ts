@@ -204,6 +204,7 @@ export class AiAnalysisExecutionService {
         document,
         snapshotSources,
         request.instruction,
+        request.purpose,
       );
       execution.promptVersionId = prompt.id;
 

@@ -3968,6 +3968,11 @@ a.rq-action {
   color: var(--rq-color-muted);
 }
 
+.rq-document-ai-disclosure[data-provider="FAKE"] {
+  border-color: var(--rq-action-warning);
+  background: color-mix(in srgb, var(--rq-action-warning) 10%, transparent);
+}
+
 .rq-document-ai-version-modal,
 .rq-document-ai-history-modal {
   width: min(860px, calc(100vw - 32px));
@@ -4055,6 +4060,13 @@ a.rq-action {
   gap: 2px;
 }
 
+.rq-document-ai-history-statuses {
+  display: flex !important;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--rq-space-2) !important;
+}
+
 .rq-document-ai-history-list dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4097,6 +4109,11 @@ a.rq-action {
   .rq-validation-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .rq-document-ai-history-statuses {
+    grid-auto-flow: row;
+    justify-items: start;
   }
 
   .rq-document-ai-source-list,

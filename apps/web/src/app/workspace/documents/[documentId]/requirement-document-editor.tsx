@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type {
   AiAnalysisRequestDetail,
   AiAnalysisRequestListResponse,
+  AiProviderCode,
   DocumentHistoryEntry,
   DocumentJsonValue,
   DocumentSection,
@@ -85,6 +86,12 @@ export interface ContentStats {
   completed: number;
   pending: number;
   errors: readonly string[];
+}
+
+interface AiVersionGenerationDetails {
+  provider: AiProviderCode;
+  pendingQuestions: readonly string[];
+  contradictions: readonly string[];
 }
 
 function fieldLabel(key: string): string {
@@ -465,6 +472,9 @@ export function RequirementDocumentEditor({
   const [aiGeneratedVersionIds, setAiGeneratedVersionIds] = useState<
     Set<string>
   >(() => new Set());
+  const [aiVersionGenerationDetails, setAiVersionGenerationDetails] = useState<
+    Map<string, AiVersionGenerationDetails>
+  >(() => new Map());
   const versionDialogRef = useDialogAccessibility<HTMLElement>(
     versionOpen,
     () => {
@@ -511,6 +521,14 @@ export function RequirementDocumentEditor({
   const progress = overallStats.total
     ? Math.round((overallStats.completed / overallStats.total) * 100)
     : 0;
+  const currentAiGeneration = aiVersionGenerationDetails.get(
+    version.id.toLowerCase(),
+  );
+  const documentaryPending =
+    overallStats.pending +
+    overallStats.errors.length +
+    (currentAiGeneration?.pendingQuestions.length ?? 0) +
+    (currentAiGeneration?.contradictions.length ?? 0);
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -538,16 +556,10 @@ export function RequirementDocumentEditor({
 
   useEffect(() => {
     let active = true;
-    void loadAiRequests(false)
+    void loadAiRequests(true)
       .then((items) => {
         if (!active) return;
-        setAiGeneratedVersionIds(
-          new Set(
-            items
-              .filter((item) => item.status === "COMPLETED")
-              .map((item) => item.documentVersionId.toLowerCase()),
-          ),
-        );
+        synchronizeAiVersionDetails(items);
       })
       .catch(() => undefined);
     return () => {
@@ -558,6 +570,33 @@ export function RequirementDocumentEditor({
   function showAlert(message: string, tone: "success" | "danger" | "warning") {
     setAlert(message);
     setAlertTone(tone);
+  }
+
+  function synchronizeAiVersionDetails(
+    items: readonly AiAnalysisRequestDetail[],
+  ): void {
+    const completed = items.filter((item) => item.status === "COMPLETED");
+    setAiGeneratedVersionIds(
+      new Set(completed.map((item) => item.documentVersionId.toLowerCase())),
+    );
+    setAiVersionGenerationDetails(
+      new Map(
+        completed.flatMap((item) => {
+          const execution = item.executions.at(-1);
+          if (!execution) return [];
+          return [
+            [
+              item.documentVersionId.toLowerCase(),
+              {
+                provider: execution.provider,
+                pendingQuestions: item.result?.draft.pendingQuestions ?? [],
+                contradictions: item.result?.draft.contradictions ?? [],
+              },
+            ] as const,
+          ];
+        }),
+      ),
+    );
   }
 
   function chooseSection(section: DocumentSection): void {
@@ -1024,13 +1063,7 @@ export function RequirementDocumentEditor({
     try {
       const items = await loadAiRequests(true);
       setAiHistory(items);
-      setAiGeneratedVersionIds(
-        new Set(
-          items
-            .filter((item) => item.status === "COMPLETED")
-            .map((item) => item.documentVersionId.toLowerCase()),
-        ),
-      );
+      synchronizeAiVersionDetails(items);
       setAiHistoryOpen(true);
     } catch (error) {
       showAlert(
@@ -1313,14 +1346,14 @@ export function RequirementDocumentEditor({
           <small>Revisión {version.revision}</small>
         </article>
         <article className="rq-document-progress-card">
-          <span>Avance</span>
+          <span>Completitud estructural</span>
           <strong>{progress}%</strong>
           <progress
-            aria-label={`Avance ${progress}%`}
+            aria-label={`Completitud estructural ${progress}%`}
             max={100}
             value={progress}
           />
-          <small>{overallStats.pending} pendientes</small>
+          <small>{documentaryPending} pendientes por resolver</small>
         </article>
       </section>
 
@@ -1349,9 +1382,21 @@ export function RequirementDocumentEditor({
       ) : null}
 
       {aiGeneratedVersionIds.has(version.id.toLowerCase()) ? (
-        <div className="rq-document-ai-disclosure" role="status">
-          <strong>Generado con IA</strong>
-          <span>Requiere revisión humana antes de enviarse a validación.</span>
+        <div
+          className="rq-document-ai-disclosure"
+          data-provider={currentAiGeneration?.provider ?? "UNKNOWN"}
+          role="status"
+        >
+          <strong>
+            {currentAiGeneration?.provider === "FAKE"
+              ? "Generado en modo de prueba · contenido simulado"
+              : "Generado con IA · requiere revisión humana"}
+          </strong>
+          <span>
+            {currentAiGeneration?.provider === "FAKE"
+              ? "Este borrador valida el pipeline y no representa un análisis semántico real."
+              : "Revisa la evidencia, las contradicciones y los pendientes antes de enviarlo a validación."}
+          </span>
         </div>
       ) : null}
 
@@ -1898,17 +1943,24 @@ export function RequirementDocumentEditor({
                             Versión {item.generatedVersion} · {item.status}
                           </span>
                         </div>
-                        <RqStatusBadge
-                          tone={
-                            item.status === "COMPLETED"
-                              ? "success"
-                              : item.status === "FAILED"
-                                ? "danger"
-                                : "process"
-                          }
-                        >
-                          {item.status}
-                        </RqStatusBadge>
+                        <div className="rq-document-ai-history-statuses">
+                          {execution?.provider === "FAKE" ? (
+                            <RqStatusBadge tone="pending">
+                              SIMULACIÓN / PRUEBA
+                            </RqStatusBadge>
+                          ) : null}
+                          <RqStatusBadge
+                            tone={
+                              item.status === "COMPLETED"
+                                ? "success"
+                                : item.status === "FAILED"
+                                  ? "danger"
+                                  : "process"
+                            }
+                          >
+                            {item.status}
+                          </RqStatusBadge>
+                        </div>
                       </header>
                       <dl>
                         <div>
@@ -1920,11 +1972,12 @@ export function RequirementDocumentEditor({
                           <dd>{execution?.id ?? "Pendiente"}</dd>
                         </div>
                         <div>
-                          <dt>Proveedor / modelo</dt>
-                          <dd>
-                            {execution?.provider ?? "—"} /{" "}
-                            {execution?.model ?? "—"}
-                          </dd>
+                          <dt>Proveedor</dt>
+                          <dd>{execution?.provider ?? "—"}</dd>
+                        </div>
+                        <div>
+                          <dt>Modelo</dt>
+                          <dd>{execution?.model ?? "—"}</dd>
                         </div>
                         <div>
                           <dt>Fuentes</dt>
@@ -1945,10 +1998,13 @@ export function RequirementDocumentEditor({
                           </dd>
                         </div>
                         <div>
-                          <dt>Duración / intentos</dt>
+                          <dt>Duración</dt>
+                          <dd>{execution?.durationMs ?? "—"} ms</dd>
+                        </div>
+                        <div>
+                          <dt>Intento / ejecuciones</dt>
                           <dd>
-                            {execution?.durationMs ?? "—"} ms /{" "}
-                            {item.executionCount}
+                            {execution?.attempt ?? "—"} / {item.executionCount}
                           </dd>
                         </div>
                         <div>

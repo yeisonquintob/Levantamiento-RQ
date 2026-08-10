@@ -33,7 +33,9 @@ async function main(): Promise<void> {
       WHERE name IN (
         'CreateAiAnalysisFoundation1786320000000',
         'AddAiProviderConfiguration1786492800000',
-        'AddAiExecutionPipeline1786579200000'
+        'AddAiExecutionPipeline1786579200000',
+        'AddDraftGenerationLifecycle1786752000000',
+        'UpgradeRequirementAnalystPrompt1786924800000'
       )
     `);
     const indexes = await count(`
@@ -126,7 +128,7 @@ async function main(): Promise<void> {
       SELECT COUNT(1) AS countValue
       FROM dbo.AnalysisPromptVersions
       WHERE Code = N'REQUIREMENT_DOCUMENT'
-        AND Version = N'1.0.0'
+        AND Version = N'1.1.0'
         AND IsActive = 1
     `);
     const snapshotColumns = await count(`
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
 
     if (
       tables !== 7 ||
-      migration !== 3 ||
+      migration !== 5 ||
       indexes !== 17 ||
       internalForeignKeys !== 7 ||
       externalReferenceColumns !== 5 ||
@@ -164,10 +166,12 @@ async function main(): Promise<void> {
     console.log("Claves foráneas internas confirmadas: 7");
     console.log("Referencias externas sin claves foráneas confirmadas: 5");
     console.log(
-      "Migraciones confirmadas: foundation, proveedores seguros y ejecución asíncrona.",
+      "Migraciones confirmadas: foundation, proveedores seguros, ejecución, ciclo de borradores y prompt 1.1.0.",
     );
     console.log("Columnas de secretos en SQL confirmadas: 0");
-    console.log("Prompt activo y cuatro columnas de snapshot confirmados.");
+    console.log(
+      "Prompt 1.1.0 activo y cuatro columnas de snapshot confirmados.",
+    );
   } finally {
     await dataSource.destroy();
   }

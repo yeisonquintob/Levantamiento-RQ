@@ -131,9 +131,12 @@ export function parseAiAnalysisDraft(value: unknown): AiAnalysisDraft {
     if (!expected || section.key !== expected.key) {
       throw new Error("Las secciones no respetan el orden canónico.");
     }
+    if (section.title !== expected.title) {
+      throw new Error("Los títulos no respetan la plantilla canónica.");
+    }
     return {
       key: expected.key,
-      title: string(section.title, `sections[${index}].title`, 200),
+      title: expected.title,
       content: string(section.content, `sections[${index}].content`, 30000),
     };
   });
