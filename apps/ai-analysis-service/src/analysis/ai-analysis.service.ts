@@ -84,6 +84,15 @@ export class AiAnalysisService {
     projectId: string,
     input: CreateAiAnalysisRequest,
   ): Promise<AiAnalysisRequestDetail> {
+    const requestedIdempotencyKey = input.idempotencyKey?.trim();
+    if (requestedIdempotencyKey) {
+      const existing = await this.requests.findOneBy({
+        projectId,
+        idempotencyKey: requestedIdempotencyKey,
+      });
+      if (existing) return this.loadDetail(projectId, existing.id);
+    }
+
     await this.projectsAccess.requireCreate(
       projectId,
       context.accessToken,
@@ -106,52 +115,72 @@ export class AiAnalysisService {
 
     const now = new Date();
     const analysisRequestId = randomUUID();
+    const idempotencyKey = requestedIdempotencyKey ?? analysisRequestId;
 
-    await this.dataSource.transaction(async (manager) => {
-      await manager.save(
-        manager.create(AnalysisRequestEntity, {
-          id: analysisRequestId,
-          projectId,
-          documentId: input.documentId,
-          documentVersionId: input.documentVersionId,
-          analysisType: input.analysisType ?? "REQUIREMENT_DOCUMENT",
-          status: "PENDING",
-          requestedByUserId: context.actor.id,
-          documentSnapshotJson: JSON.stringify(document),
-          createdAt: now,
-          updatedAt: now,
-          cancelledAt: null,
-        }),
-      );
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.save(
+          manager.create(AnalysisRequestEntity, {
+            id: analysisRequestId,
+            projectId,
+            documentId: input.documentId,
+            documentVersionId: input.documentVersionId,
+            analysisType: input.analysisType ?? "REQUIREMENT_DOCUMENT",
+            purpose: input.purpose ?? "INITIAL_DRAFT",
+            instruction: input.instruction ?? null,
+            idempotencyKey,
+            generatedVersionNumber: document.currentVersionDetail.versionNumber,
+            generatedVersion: document.currentVersionDetail.version,
+            status: "PENDING",
+            requestedByUserId: context.actor.id,
+            documentSnapshotJson: JSON.stringify(document),
+            errorCode: null,
+            errorMessage: null,
+            createdAt: now,
+            updatedAt: now,
+            cancelledAt: null,
+          }),
+        );
 
-      await manager.save(
-        AnalysisRequestSourceEntity,
-        sources.map((source, index) => ({
-          id: randomUUID(),
-          analysisRequestId,
-          sourceId: source.id,
-          sourceUpdatedAt: externalDate(
-            source.updatedAt,
-            `updatedAt de la fuente ${source.id}`,
-          ),
-          sourceSha256: source.sha256,
-          sourceTitle: source.title,
-          sourceClassification: source.classification,
-          snapshotText: (source.extractedText ?? source.content ?? "").slice(
-            0,
-            2_000_000,
-          ),
-          position: index + 1,
-          createdAt: now,
-        })),
-      );
-    });
+        await manager.save(
+          AnalysisRequestSourceEntity,
+          sources.map((source, index) => ({
+            id: randomUUID(),
+            analysisRequestId,
+            sourceId: source.id,
+            sourceUpdatedAt: externalDate(
+              source.updatedAt,
+              `updatedAt de la fuente ${source.id}`,
+            ),
+            sourceSha256: source.sha256,
+            sourceTitle: source.title,
+            sourceClassification: source.classification,
+            snapshotText: (source.extractedText ?? source.content ?? "").slice(
+              0,
+              2_000_000,
+            ),
+            position: index + 1,
+            createdAt: now,
+          })),
+        );
+      });
+    } catch (error) {
+      const existing = await this.requests.findOneBy({
+        projectId,
+        idempotencyKey,
+      });
+      if (existing) return this.loadDetail(projectId, existing.id);
+      throw error;
+    }
 
     try {
       await this.queue.enqueue(analysisRequestId, context.correlationId);
     } catch {
       await this.requests.update(analysisRequestId, {
         status: "FAILED",
+        errorCode: "AI_QUEUE_UNAVAILABLE",
+        errorMessage:
+          "La cola de análisis no está disponible. Puedes reintentarlo.",
         updatedAt: new Date(),
       });
       throw new ServiceUnavailableException(
@@ -191,12 +220,18 @@ export class AiAnalysisService {
         "Solo una solicitud FAILED puede reintentarse.",
       );
     }
-    if (await this.results.existsBy({ analysisRequestId })) {
+    const existingResult = await this.results.findOneBy({ analysisRequestId });
+    if (existingResult?.status === "ACCEPTED") {
+      return this.loadDetail(projectId, analysisRequestId);
+    }
+    if (existingResult?.status === "REJECTED") {
       throw new ConflictException(
-        "La solicitud ya tiene un resultado generado.",
+        "Un resultado rechazado no puede aplicarse nuevamente.",
       );
     }
     entity.status = "PENDING";
+    entity.errorCode = null;
+    entity.errorMessage = null;
     entity.updatedAt = new Date();
     await this.requests.save(entity);
     try {
@@ -207,6 +242,8 @@ export class AiAnalysisService {
       );
     } catch {
       entity.status = "FAILED";
+      entity.errorCode = "AI_QUEUE_UNAVAILABLE";
+      entity.errorMessage = "La cola de análisis no está disponible.";
       entity.updatedAt = new Date();
       await this.requests.save(entity);
       throw new ServiceUnavailableException(
@@ -512,10 +549,15 @@ export class AiAnalysisService {
       documentId: entity.documentId,
       documentVersionId: entity.documentVersionId,
       analysisType: entity.analysisType,
+      purpose: entity.purpose,
       status: entity.status,
       requestedByUserId: entity.requestedByUserId,
+      generatedVersionNumber: entity.generatedVersionNumber,
+      generatedVersion: entity.generatedVersion,
       sourceCount,
       executionCount,
+      errorCode: entity.errorCode,
+      errorMessage: entity.errorMessage,
       createdAt: iso(entity.createdAt),
       updatedAt: iso(entity.updatedAt),
       cancelledAt: optionalIso(entity.cancelledAt),
@@ -531,6 +573,8 @@ export class AiAnalysisService {
       sourceId: entity.sourceId,
       sourceUpdatedAt: iso(entity.sourceUpdatedAt),
       sourceSha256: entity.sourceSha256,
+      sourceTitle: entity.sourceTitle,
+      sourceClassification: entity.sourceClassification,
       position: entity.position,
       createdAt: iso(entity.createdAt),
     };

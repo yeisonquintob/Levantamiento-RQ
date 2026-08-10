@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 
 import {
+  AI_DRAFT_GENERATION_PURPOSES,
   AI_ANALYSIS_STATUSES,
   AI_ANALYSIS_TYPES,
   type AiAnalysisStatus,
@@ -106,11 +107,56 @@ export function parseCreateAiAnalysisRequest(
     throw new BadRequestException("sourceIds no puede contener duplicados.");
   }
 
+  const purpose = record.purpose ?? "INITIAL_DRAFT";
+  if (
+    typeof purpose !== "string" ||
+    !AI_DRAFT_GENERATION_PURPOSES.includes(
+      purpose as (typeof AI_DRAFT_GENERATION_PURPOSES)[number],
+    )
+  ) {
+    throw new BadRequestException(
+      "purpose debe ser INITIAL_DRAFT o AI_VERSION.",
+    );
+  }
+
+  let instruction: string | null = null;
+  if (
+    record.instruction !== undefined &&
+    record.instruction !== null &&
+    record.instruction !== ""
+  ) {
+    if (
+      typeof record.instruction !== "string" ||
+      record.instruction.trim().length > 2000
+    ) {
+      throw new BadRequestException(
+        "instruction no puede superar 2000 caracteres.",
+      );
+    }
+    instruction = record.instruction.trim();
+  }
+
+  let idempotencyKey: string | undefined;
+  if (record.idempotencyKey !== undefined) {
+    if (
+      typeof record.idempotencyKey !== "string" ||
+      !/^[A-Za-z0-9._:-]{8,120}$/.test(record.idempotencyKey.trim())
+    ) {
+      throw new BadRequestException(
+        "idempotencyKey debe tener entre 8 y 120 caracteres seguros.",
+      );
+    }
+    idempotencyKey = record.idempotencyKey.trim();
+  }
+
   return {
     analysisType: "REQUIREMENT_DOCUMENT",
     documentId: uuid(record.documentId, "documentId"),
     documentVersionId: uuid(record.documentVersionId, "documentVersionId"),
     sourceIds,
+    purpose: purpose as (typeof AI_DRAFT_GENERATION_PURPOSES)[number],
+    instruction,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
   };
 }
 

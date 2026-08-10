@@ -92,11 +92,18 @@ async function main(): Promise<void> {
         documentId,
         documentVersionId: versionId,
         analysisType: "REQUIREMENT_DOCUMENT",
+        purpose: "INITIAL_DRAFT",
+        instruction: null,
+        idempotencyKey: analysisRequestId,
+        generatedVersionNumber: 1,
+        generatedVersion: "1.0.0",
         status: "PENDING",
         requestedByUserId: actorId,
         documentSnapshotJson: JSON.stringify(
           documentSnapshot(projectId, documentId, versionId, actorId),
         ),
+        errorCode: null,
+        errorMessage: null,
         createdAt: now,
         updatedAt: now,
         cancelledAt: null,
@@ -127,6 +134,14 @@ async function main(): Promise<void> {
       dataSource,
       {} as never,
       {
+        requireCurrentVersion: async () =>
+          documentSnapshot(projectId, documentId, versionId, actorId),
+        applyAiDraft: async () =>
+          documentSnapshot(projectId, documentId, versionId, actorId)
+            .currentVersionDetail,
+      } as never,
+      { issue: async () => "service-token" } as never,
+      {
         vaultMode: "DISABLED",
         keychainService: "test",
         keyVaultUrl: null,
@@ -153,7 +168,7 @@ async function main(): Promise<void> {
     assert.equal(request.status, "COMPLETED");
     assert.equal(execution.status, "COMPLETED");
     assert.equal(execution.provider, "FAKE");
-    assert.equal(result.status, "GENERATED");
+    assert.equal(result.status, "ACCEPTED");
     assert.equal(draft.sections.length, 13);
     assert.deepEqual(draft.requirements[0]?.sourceIds, [sourceId]);
     console.log("✓ Ejecución FAKE completada de PENDING a COMPLETED.");

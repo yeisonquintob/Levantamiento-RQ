@@ -100,6 +100,8 @@ test("la creación normaliza UUID, fuentes y tipo de análisis", () => {
       documentId: UUID_A,
       documentVersionId: UUID_B,
       sourceIds: [UUID_C],
+      purpose: "INITIAL_DRAFT",
+      instruction: null,
     },
   );
 });
@@ -190,6 +192,7 @@ test("Documents Client exige proyecto y versión actual", async () => {
         archivedAt: null,
         currentVersionDetail: {
           id: UUID_C.toUpperCase(),
+          status: "DRAFT",
         },
       }),
       {

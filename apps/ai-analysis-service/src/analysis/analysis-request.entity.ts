@@ -3,6 +3,7 @@ import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 import type {
   AiAnalysisStatus,
   AiAnalysisType,
+  AiDraftGenerationPurpose,
 } from "@levantamiento-rq/shared-contracts";
 
 @Entity({ name: "AnalysisRequests" })
@@ -12,6 +13,11 @@ import type {
   "status",
 ])
 @Index("IX_AnalysisRequests_Status_UpdatedAt", ["status", "updatedAt"])
+@Index(
+  "UQ_AnalysisRequests_Project_IdempotencyKey",
+  ["projectId", "idempotencyKey"],
+  { unique: true },
+)
 export class AnalysisRequestEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -33,6 +39,25 @@ export class AnalysisRequestEntity {
   analysisType!: AiAnalysisType;
 
   @Column("nvarchar", {
+    name: "Purpose",
+    length: 24,
+    default: "INITIAL_DRAFT",
+  })
+  purpose!: AiDraftGenerationPurpose;
+
+  @Column("nvarchar", { name: "Instruction", length: 2000, nullable: true })
+  instruction!: string | null;
+
+  @Column("nvarchar", { name: "IdempotencyKey", length: 120 })
+  idempotencyKey!: string;
+
+  @Column("int", { name: "GeneratedVersionNumber" })
+  generatedVersionNumber!: number;
+
+  @Column("nvarchar", { name: "GeneratedVersion", length: 32 })
+  generatedVersion!: string;
+
+  @Column("nvarchar", {
     name: "Status",
     length: 24,
     default: "PENDING",
@@ -44,6 +69,12 @@ export class AnalysisRequestEntity {
 
   @Column("nvarchar", { name: "DocumentSnapshotJson", nullable: true })
   documentSnapshotJson!: string | null;
+
+  @Column("nvarchar", { name: "ErrorCode", length: 100, nullable: true })
+  errorCode!: string | null;
+
+  @Column("nvarchar", { name: "ErrorMessage", length: 2000, nullable: true })
+  errorMessage!: string | null;
 
   @Column("datetime2", {
     name: "CreatedAt",

@@ -61,6 +61,19 @@ function nullableText(
   return text(value, field, 1, maximum);
 }
 
+function optionalIdempotencyKey(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    !/^[A-Za-z0-9._:-]{8,120}$/.test(value.trim())
+  ) {
+    throw new BadRequestException(
+      "idempotencyKey debe tener entre 8 y 120 caracteres seguros.",
+    );
+  }
+  return value.trim();
+}
+
 function integer(
   value: unknown,
   field: string,
@@ -152,10 +165,29 @@ export function parseCreateDocument(
     record.title === null ||
     record.title === ""
   ) {
-    return {};
+    return {
+      ...(record.changeSummary === undefined
+        ? {}
+        : {
+            changeSummary: text(record.changeSummary, "changeSummary", 3, 1000),
+          }),
+      ...(optionalIdempotencyKey(record.idempotencyKey)
+        ? { idempotencyKey: optionalIdempotencyKey(record.idempotencyKey) }
+        : {}),
+    };
   }
 
-  return { title: text(record.title, "title", 3, 240) };
+  return {
+    title: text(record.title, "title", 3, 240),
+    ...(record.changeSummary === undefined
+      ? {}
+      : {
+          changeSummary: text(record.changeSummary, "changeSummary", 3, 1000),
+        }),
+    ...(optionalIdempotencyKey(record.idempotencyKey)
+      ? { idempotencyKey: optionalIdempotencyKey(record.idempotencyKey) }
+      : {}),
+  };
 }
 
 export function parseUpdateDocument(
@@ -177,6 +209,9 @@ export function parseCreateVersion(
   return {
     expectedRevision: integer(record.expectedRevision, "expectedRevision"),
     changeSummary: text(record.changeSummary, "changeSummary", 3, 1000),
+    ...(optionalIdempotencyKey(record.idempotencyKey)
+      ? { idempotencyKey: optionalIdempotencyKey(record.idempotencyKey) }
+      : {}),
   };
 }
 

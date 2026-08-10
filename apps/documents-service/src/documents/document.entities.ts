@@ -39,6 +39,11 @@ export class AppliedDocumentTemplateEntity {
   "updatedAt",
 ])
 @Index("IX_RequirementDocuments_Status", ["status"])
+@Index(
+  "UQ_RequirementDocuments_Project_CreationKey",
+  ["projectId", "creationIdempotencyKey"],
+  { unique: true },
+)
 export class RequirementDocumentEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -60,6 +65,9 @@ export class RequirementDocumentEntity {
 
   @Column("int", { name: "CurrentVersionNumber" })
   currentVersionNumber!: number;
+
+  @Column("nvarchar", { name: "CreationIdempotencyKey", length: 120 })
+  creationIdempotencyKey!: string;
 
   @Column("uniqueidentifier", { name: "CreatedByUserId" })
   createdByUserId!: string;
@@ -94,6 +102,11 @@ export class RequirementDocumentEntity {
   { unique: true },
 )
 @Index("IX_DocumentVersions_DocumentId_Status", ["documentId", "status"])
+@Index(
+  "UQ_DocumentVersions_Document_IdempotencyKey",
+  ["documentId", "idempotencyKey"],
+  { unique: true },
+)
 export class DocumentVersionEntity {
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
@@ -115,6 +128,9 @@ export class DocumentVersionEntity {
 
   @Column("nvarchar", { name: "ChangeSummary", length: 1000 })
   changeSummary!: string;
+
+  @Column("nvarchar", { name: "IdempotencyKey", length: 120 })
+  idempotencyKey!: string;
 
   @Column("uniqueidentifier", { name: "CreatedByUserId" })
   createdByUserId!: string;

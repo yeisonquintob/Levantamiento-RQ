@@ -301,6 +301,14 @@ export class DocumentsService {
     const access = await this.projectAccess(context, projectId);
     requireEdit(access);
 
+    if (request.idempotencyKey) {
+      const existing = await this.documents.findOneBy({
+        projectId,
+        creationIdempotencyKey: request.idempotencyKey,
+      });
+      if (existing) return this.loadDetail(existing.id);
+    }
+
     if (!access.project.template) {
       throw new ConflictException(
         "El proyecto no tiene una versión de plantilla aplicada.",
@@ -323,6 +331,7 @@ export class DocumentsService {
     const documentId = randomUUID();
     const appliedTemplateId = randomUUID();
     const versionId = randomUUID();
+    const creationIdempotencyKey = request.idempotencyKey ?? documentId;
 
     await this.dataSource.transaction(async (manager) => {
       await manager.save(
@@ -346,6 +355,7 @@ export class DocumentsService {
           status: "DRAFT",
           revision: 1,
           currentVersionNumber: 1,
+          creationIdempotencyKey,
           createdByUserId: context.actor.id,
           updatedByUserId: context.actor.id,
           createdAt: now,
@@ -362,7 +372,8 @@ export class DocumentsService {
           version: "1.0.0",
           status: "DRAFT",
           revision: 1,
-          changeSummary: "Versión inicial",
+          changeSummary: request.changeSummary ?? "Versión inicial",
+          idempotencyKey: creationIdempotencyKey,
           createdByUserId: context.actor.id,
           updatedByUserId: context.actor.id,
           createdAt: now,
@@ -497,6 +508,13 @@ export class DocumentsService {
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
     this.requireActive(document);
+    if (request.idempotencyKey) {
+      const existing = await this.versions.findOneBy({
+        documentId,
+        idempotencyKey: request.idempotencyKey,
+      });
+      if (existing) return this.loadDetail(documentId);
+    }
     const sourceVersion = await this.requireVersion(
       documentId,
       document.currentVersionNumber,
@@ -556,6 +574,7 @@ export class DocumentsService {
           status: "DRAFT",
           revision: 1,
           changeSummary: request.changeSummary,
+          idempotencyKey: request.idempotencyKey ?? versionId,
           createdByUserId: context.actor.id,
           updatedByUserId: context.actor.id,
           createdAt: now,

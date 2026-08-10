@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import {
+  ConflictException,
+  HttpException,
+  Inject,
+  Injectable,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 
@@ -13,12 +18,15 @@ import { AnalysisPromptVersionEntity } from "../analysis/analysis-prompt-version
 import { AnalysisRequestSourceEntity } from "../analysis/analysis-request-source.entity";
 import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
 import { AnalysisResultEntity } from "../analysis/analysis-result.entity";
+import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
+import { AiAnalysisServiceToken } from "../analysis/ai-analysis-service-token.service";
 import {
   AI_PROVIDER_RUNTIME_CONFIG,
   type AiProviderRuntimeConfig,
 } from "../providers/ai-provider.config";
 import { AiProviderConfigurationsService } from "../providers/ai-provider-configurations.service";
 import { AI_ANALYSIS_OUTPUT_SCHEMA } from "./ai-analysis-draft";
+import { parseAiAnalysisDraft } from "./ai-analysis-draft";
 import { buildAiAnalysisPrompt } from "./ai-prompt-builder";
 import { AiProviderError } from "./ai-text-provider";
 import { FakeAiProvider } from "./fake-ai.provider";
@@ -41,6 +49,15 @@ function errorDetails(error: unknown): {
       code: "AI_CONFIGURATION_REQUIRED",
       message: error.message.slice(0, 2000),
       retryable: false,
+    };
+  }
+  if (error instanceof HttpException) {
+    const status = error.getStatus();
+    return {
+      code:
+        status >= 500 ? "AI_AUTO_APPLY_UNAVAILABLE" : "AI_AUTO_APPLY_CONFLICT",
+      message: error.message.slice(0, 2000),
+      retryable: status >= 500,
     };
   }
   return {
@@ -68,6 +85,8 @@ export class AiAnalysisExecutionService {
     private readonly results: Repository<AnalysisResultEntity>,
     private readonly dataSource: DataSource,
     private readonly providerConfigurations: AiProviderConfigurationsService,
+    private readonly documentsAccess: AiAnalysisDocumentsAccessClient,
+    private readonly serviceToken: AiAnalysisServiceToken,
     @Inject(AI_PROVIDER_RUNTIME_CONFIG)
     private readonly runtime: AiProviderRuntimeConfig,
     private readonly events: IntegrationEventsPublisher,
@@ -78,9 +97,6 @@ export class AiAnalysisExecutionService {
     finalAttempt: boolean,
     correlationId = analysisRequestId,
   ): Promise<void> {
-    const existingResult = await this.results.findOneBy({ analysisRequestId });
-    if (existingResult) return;
-
     const request = await this.requests.findOneBy({ id: analysisRequestId });
     if (
       !request ||
@@ -88,6 +104,26 @@ export class AiAnalysisExecutionService {
       request.status === "COMPLETED"
     )
       return;
+
+    const existingResult = await this.results.findOneBy({ analysisRequestId });
+    if (existingResult) {
+      if (existingResult.status === "ACCEPTED") {
+        await this.requests.update(analysisRequestId, {
+          status: "COMPLETED",
+          errorCode: null,
+          errorMessage: null,
+          updatedAt: new Date(),
+        });
+        return;
+      }
+      await this.applyExistingResult(
+        request,
+        existingResult,
+        finalAttempt,
+        correlationId,
+      );
+      return;
+    }
 
     const claim = await this.requests
       .createQueryBuilder()
@@ -140,6 +176,7 @@ export class AiAnalysisExecutionService {
       },
     });
 
+    let providerCompleted = false;
     try {
       const [snapshotSources, prompt] = await Promise.all([
         this.sources.find({
@@ -163,7 +200,11 @@ export class AiAnalysisExecutionService {
       const document = JSON.parse(
         request.documentSnapshotJson,
       ) as RequirementDocumentDetail;
-      const userPrompt = buildAiAnalysisPrompt(document, snapshotSources);
+      const userPrompt = buildAiAnalysisPrompt(
+        document,
+        snapshotSources,
+        request.instruction,
+      );
       execution.promptVersionId = prompt.id;
 
       let provider;
@@ -223,10 +264,11 @@ export class AiAnalysisExecutionService {
       }
       const finishedAt = new Date();
 
+      const resultId = randomUUID();
       await this.dataSource.transaction(async (manager) => {
         await manager.save(
           manager.create(AnalysisResultEntity, {
-            id: randomUUID(),
+            id: resultId,
             analysisRequestId,
             analysisExecutionId: execution.id,
             status: "GENERATED",
@@ -248,10 +290,17 @@ export class AiAnalysisExecutionService {
           providerRequestId: generated.providerRequestId,
         });
         await manager.update(AnalysisRequestEntity, analysisRequestId, {
-          status: "COMPLETED",
+          status: "PROCESSING",
+          errorCode: null,
+          errorMessage: null,
           updatedAt: finishedAt,
         });
       });
+      providerCompleted = true;
+      const generatedResult = await this.results.findOneByOrFail({
+        id: resultId,
+      });
+      await this.applyGeneratedResult(request, generatedResult, correlationId);
       await this.events.publish({
         eventName: "analysis.completed",
         correlationId,
@@ -263,6 +312,8 @@ export class AiAnalysisExecutionService {
           durationMs: finishedAt.valueOf() - startedAt.valueOf(),
           inputTokens: generated.inputTokens,
           outputTokens: generated.outputTokens,
+          purpose: request.purpose,
+          generatedVersion: request.generatedVersion,
         },
       });
       runtimeMetrics.observeOperation(
@@ -279,15 +330,19 @@ export class AiAnalysisExecutionService {
         finishedAt.valueOf() - startedAt.valueOf(),
       );
       await this.dataSource.transaction(async (manager) => {
-        await manager.update(AnalysisExecutionEntity, execution.id, {
-          status: "FAILED",
-          finishedAt,
-          durationMs: String(finishedAt.valueOf() - startedAt.valueOf()),
-          errorCode: failure.code,
-          errorMessage: failure.message,
-        });
+        if (!providerCompleted) {
+          await manager.update(AnalysisExecutionEntity, execution.id, {
+            status: "FAILED",
+            finishedAt,
+            durationMs: String(finishedAt.valueOf() - startedAt.valueOf()),
+            errorCode: failure.code,
+            errorMessage: failure.message,
+          });
+        }
         await manager.update(AnalysisRequestEntity, analysisRequestId, {
           status: failure.retryable && !finalAttempt ? "PENDING" : "FAILED",
+          errorCode: failure.code,
+          errorMessage: failure.message,
           updatedAt: finishedAt,
         });
       });
@@ -311,5 +366,114 @@ export class AiAnalysisExecutionService {
         throw new AiProviderError(failure.code, failure.message, true);
       }
     }
+  }
+
+  private async applyExistingResult(
+    request: AnalysisRequestEntity,
+    result: AnalysisResultEntity,
+    finalAttempt: boolean,
+    correlationId: string,
+  ): Promise<void> {
+    try {
+      await this.applyGeneratedResult(request, result, correlationId);
+      await this.events.publish({
+        eventName: "analysis.completed",
+        correlationId,
+        causationId: result.analysisExecutionId,
+        data: {
+          projectId: request.projectId,
+          analysisRequestId: request.id,
+          executionId: result.analysisExecutionId,
+          purpose: request.purpose,
+          generatedVersion: request.generatedVersion,
+          recoveredApplication: true,
+        },
+      });
+    } catch (error) {
+      const failure = errorDetails(error);
+      await this.requests.update(request.id, {
+        status: failure.retryable && !finalAttempt ? "PENDING" : "FAILED",
+        errorCode: failure.code,
+        errorMessage: failure.message,
+        updatedAt: new Date(),
+      });
+      if (failure.retryable && !finalAttempt) {
+        throw new AiProviderError(failure.code, failure.message, true);
+      }
+    }
+  }
+
+  private async applyGeneratedResult(
+    request: AnalysisRequestEntity,
+    result: AnalysisResultEntity,
+    correlationId: string,
+  ): Promise<void> {
+    const accessToken = await this.serviceToken.issue();
+    const document = await this.documentsAccess.requireCurrentVersion(
+      request.projectId,
+      request.documentId,
+      request.documentVersionId,
+      accessToken,
+      correlationId,
+    );
+    const draft = parseAiAnalysisDraft(JSON.parse(result.contentJson));
+
+    await this.documentsAccess.applyAiDraft(
+      request.documentId,
+      request.generatedVersionNumber,
+      {
+        expectedRevision: document.currentVersionDetail.revision,
+        analysisRequestId: request.id,
+        analysisResultId: result.id,
+        sections: draft.sections.slice(0, 10).map((section) => ({
+          key: section.key,
+          content: section.content,
+        })),
+        requirements: draft.requirements.map((requirement, index) => ({
+          clientId: requirement.clientId,
+          sectionKey: requirement.sectionKey,
+          code: requirement.code,
+          title: requirement.title,
+          description: requirement.description,
+          requirementType: requirement.requirementType,
+          status: "PROPOSED",
+          order: index + 1,
+          acceptanceCriteria: requirement.acceptanceCriteria.map(
+            (criterion, criterionIndex) => ({
+              description: criterion,
+              order: criterionIndex + 1,
+            }),
+          ),
+        })),
+        evidence: draft.requirements.flatMap((requirement) =>
+          requirement.sourceIds.map((sourceId) => ({
+            sourceId,
+            sectionKey: requirement.sectionKey,
+            requirementClientId: requirement.clientId,
+            note: "Trazabilidad propuesta por IA; requiere revisión humana.",
+          })),
+        ),
+      },
+      accessToken,
+      correlationId,
+    );
+
+    const now = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(AnalysisResultEntity, result.id, {
+        status: "ACCEPTED",
+        reviewedByUserId: request.requestedByUserId,
+        reviewedAt: now,
+        reviewComment:
+          "Aplicado automáticamente al borrador; requiere revisión humana.",
+        updatedAt: now,
+      });
+      await manager.update(AnalysisRequestEntity, request.id, {
+        status: "COMPLETED",
+        errorCode: null,
+        errorMessage: null,
+        updatedAt: now,
+      });
+    });
   }
 }

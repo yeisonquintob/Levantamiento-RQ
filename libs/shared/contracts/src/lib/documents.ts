@@ -166,6 +166,8 @@ export interface DocumentHistoryEntry {
 
 export interface CreateRequirementDocumentRequest {
   title?: string;
+  changeSummary?: string;
+  idempotencyKey?: string;
 }
 
 export interface UpdateRequirementDocumentRequest {
@@ -176,6 +178,7 @@ export interface UpdateRequirementDocumentRequest {
 export interface CreateDocumentVersionRequest {
   expectedRevision: number;
   changeSummary: string;
+  idempotencyKey?: string;
 }
 
 export interface UpdateDocumentSectionRequest {

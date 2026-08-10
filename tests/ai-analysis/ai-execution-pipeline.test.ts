@@ -172,10 +172,10 @@ test("prompt, cola y migración conservan defensa e idempotencia", async () => {
   assert.match(migration, /ISJSON\(ContentJson\)/);
 });
 
-test("la revisión aplica el borrador solo después de aceptación humana", async () => {
-  const [service, documentsClient, gatewayController] = await Promise.all([
+test("el worker aplica automáticamente el borrador sin una segunda llamada de IA", async () => {
+  const [executionService, documentsClient, serviceToken] = await Promise.all([
     readFile(
-      "apps/ai-analysis-service/src/analysis/ai-analysis.service.ts",
+      "apps/ai-analysis-service/src/execution/ai-analysis-execution.service.ts",
       "utf8",
     ),
     readFile(
@@ -183,16 +183,25 @@ test("la revisión aplica el borrador solo después de aceptación humana", asyn
       "utf8",
     ),
     readFile(
-      "apps/gateway/src/analysis/ai-analysis-gateway.controller.ts",
+      "apps/ai-analysis-service/src/analysis/ai-analysis-service-token.service.ts",
       "utf8",
     ),
   ]);
 
-  assert.match(service, /result\.status === "ACCEPTED"/);
-  assert.match(service, /expectedDocumentRevision es obligatorio/);
-  assert.match(service, /documentsAccess\.applyAiDraft/);
-  assert.match(service, /status = "REJECTED"/);
+  assert.match(executionService, /applyGeneratedResult/);
+  assert.match(executionService, /existingResult/);
+  assert.match(executionService, /documentsAccess\.applyAiDraft/);
+  assert.match(executionService, /requiere revisión humana/);
   assert.match(documentsClient, /apply-ai-draft/);
-  assert.match(gatewayController, /result\/accept/);
-  assert.match(gatewayController, /result\/reject/);
+  assert.match(serviceToken, /service: "ai-analysis-service"/);
+});
+
+test("la migración hace idempotente la generación por proyecto", async () => {
+  const migration = await readFile(
+    "apps/ai-analysis-service/src/database/migrations/1786752000000-AddDraftGenerationLifecycle.ts",
+    "utf8",
+  );
+  assert.match(migration, /UQ_AnalysisRequests_Project_IdempotencyKey/);
+  assert.match(migration, /INITIAL_DRAFT/);
+  assert.match(migration, /AI_VERSION/);
 });

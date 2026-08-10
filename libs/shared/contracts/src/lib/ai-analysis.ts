@@ -4,6 +4,14 @@ export const AI_ANALYSIS_TYPES = ["REQUIREMENT_DOCUMENT"] as const;
 
 export type AiAnalysisType = (typeof AI_ANALYSIS_TYPES)[number];
 
+export const AI_DRAFT_GENERATION_PURPOSES = [
+  "INITIAL_DRAFT",
+  "AI_VERSION",
+] as const;
+
+export type AiDraftGenerationPurpose =
+  (typeof AI_DRAFT_GENERATION_PURPOSES)[number];
+
 export const AI_ANALYSIS_STATUSES = [
   "PENDING",
   "PROCESSING",
@@ -109,6 +117,9 @@ export interface CreateAiAnalysisRequest {
   documentId: string;
   documentVersionId: string;
   sourceIds: readonly string[];
+  purpose?: AiDraftGenerationPurpose;
+  instruction?: string | null;
+  idempotencyKey?: string;
 }
 
 export interface AiAnalysisRequestSourceDetail {
@@ -117,6 +128,8 @@ export interface AiAnalysisRequestSourceDetail {
   sourceId: string;
   sourceUpdatedAt: string;
   sourceSha256: string | null;
+  sourceTitle: string | null;
+  sourceClassification: string | null;
   position: number;
   createdAt: string;
 }
@@ -200,10 +213,15 @@ export interface AiAnalysisRequestSummary {
   documentId: string;
   documentVersionId: string;
   analysisType: AiAnalysisType;
+  purpose: AiDraftGenerationPurpose;
   status: AiAnalysisStatus;
   requestedByUserId: string;
+  generatedVersionNumber: number;
+  generatedVersion: string;
   sourceCount: number;
   executionCount: number;
+  errorCode: string | null;
+  errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
   cancelledAt: string | null;

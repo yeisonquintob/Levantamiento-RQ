@@ -84,6 +84,12 @@ export class AiAnalysisDocumentsAccessClient {
       );
     }
 
+    if (document.currentVersionDetail.status !== "DRAFT") {
+      throw new ConflictException(
+        "La IA solo puede completar la versión DRAFT actual; nunca sobrescribe una versión en revisión o aprobada.",
+      );
+    }
+
     return document;
   }
 

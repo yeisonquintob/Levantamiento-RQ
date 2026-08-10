@@ -12,6 +12,7 @@ import {
   loadAiAnalysisAuthConfig,
 } from "../analysis/ai-analysis-auth.config";
 import { AiAnalysisAccessTokenGuard } from "../analysis/ai-analysis-access-token.guard";
+import { AiAnalysisServiceToken } from "../analysis/ai-analysis-service-token.service";
 import { AiAnalysisController } from "../analysis/ai-analysis.controller";
 import { AiAnalysisService } from "../analysis/ai-analysis.service";
 import { AnalysisExecutionEntity } from "../analysis/analysis-execution.entity";
@@ -90,6 +91,7 @@ const aiAnalysisEntities = [
           AiAnalysisProjectsAccessClient,
           AiAnalysisDocumentsAccessClient,
           AiAnalysisSourcesAccessClient,
+          AiAnalysisServiceToken,
           AiAnalysisService,
           {
             provide: AI_ANALYSIS_PROCESSING_CONFIG,
