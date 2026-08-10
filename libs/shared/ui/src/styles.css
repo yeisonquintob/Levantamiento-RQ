@@ -719,10 +719,9 @@ textarea {
 }
 
 .rq-audit-filter-bar {
-  grid-template-columns: minmax(260px, 1fr) minmax(190px, 0.7fr) minmax(
-      150px,
-      0.4fr
-    ) auto;
+  grid-template-columns:
+    minmax(260px, 1fr) minmax(190px, 0.7fr) minmax(150px, 0.4fr)
+    auto;
 }
 
 .rq-audit-table {
@@ -3933,3 +3932,180 @@ a.rq-action {
 }
 
 /* FIN PASO 17 */
+
+/* Flujo simplificado: Fuentes → IA → Documento → Validación */
+.rq-source-view-draft {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--rq-space-4);
+  border: 1px solid var(--rq-action-consult);
+  border-radius: var(--rq-radius-md);
+  color: var(--rq-action-consult);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rq-source-view-draft:focus-visible,
+.rq-source-view-draft:hover {
+  outline: 2px solid var(--rq-action-consult);
+  outline-offset: 2px;
+}
+
+.rq-document-ai-disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-3) var(--rq-space-4);
+  border: 1px solid var(--rq-action-operation);
+  border-left-width: 4px;
+  border-radius: var(--rq-radius-md);
+  background: color-mix(in srgb, var(--rq-action-operation) 8%, transparent);
+}
+
+.rq-document-ai-disclosure span {
+  color: var(--rq-color-muted);
+}
+
+.rq-document-ai-version-modal,
+.rq-document-ai-history-modal {
+  width: min(860px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
+  overflow: auto;
+}
+
+.rq-document-ai-version-content {
+  display: grid;
+  gap: var(--rq-space-4);
+  padding: var(--rq-space-5);
+}
+
+.rq-document-ai-version-content fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: var(--rq-space-4);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+}
+
+.rq-document-ai-version-content legend {
+  padding: 0 var(--rq-space-2);
+  font-weight: 800;
+}
+
+.rq-document-ai-source-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rq-space-2);
+}
+
+.rq-document-ai-source-list label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  cursor: pointer;
+}
+
+.rq-document-ai-source-list label > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.rq-document-ai-source-list small {
+  overflow-wrap: anywhere;
+  color: var(--rq-color-muted);
+}
+
+.rq-document-ai-history-empty {
+  margin: 0;
+  padding: var(--rq-space-6);
+  color: var(--rq-color-muted);
+}
+
+.rq-document-ai-history-list {
+  display: grid;
+  gap: var(--rq-space-3);
+  margin: 0;
+  padding: var(--rq-space-5);
+  list-style: none;
+}
+
+.rq-document-ai-history-list > li {
+  display: grid;
+  gap: var(--rq-space-3);
+  padding: var(--rq-space-4);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+}
+
+.rq-document-ai-history-list > li > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rq-space-3);
+}
+
+.rq-document-ai-history-list > li > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.rq-document-ai-history-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-border);
+}
+
+.rq-document-ai-history-list dl > div {
+  min-width: 0;
+  padding: var(--rq-space-3);
+  background: var(--rq-color-surface);
+}
+
+.rq-document-ai-history-list dt {
+  color: var(--rq-color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rq-document-ai-history-list dd {
+  margin: var(--rq-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.rq-validation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--rq-space-2);
+}
+
+@media (max-width: 700px) {
+  .rq-document-ai-disclosure,
+  .rq-document-ai-history-list > li > header,
+  .rq-validation-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rq-document-ai-source-list,
+  .rq-document-ai-history-list dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-source-view-draft,
+  .rq-validation-actions > * {
+    width: 100%;
+  }
+}

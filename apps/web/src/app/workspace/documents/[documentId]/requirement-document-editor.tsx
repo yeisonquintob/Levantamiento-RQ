@@ -3,17 +3,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import type {
+  AiAnalysisRequestDetail,
+  AiAnalysisRequestListResponse,
   DocumentHistoryEntry,
   DocumentJsonValue,
   DocumentSection,
   DocumentSectionKey,
   DocumentStatus,
   DocumentVersionDetail,
-  ExportFormat,
-  ExportRequestDetail,
-  ExportRequestListResponse,
   ProjectDetail,
   RequirementDocumentDetail,
+  SourceListResponse,
   WorkflowReviewDetail,
   WorkflowReviewListResponse,
 } from "@levantamiento-rq/shared-contracts";
@@ -114,31 +114,6 @@ function formatDate(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function exportStatusLabel(status: ExportRequestDetail["status"]): string {
-  if (status === "PENDING") return "Pendiente";
-  if (status === "PROCESSING") return "Procesando";
-  if (status === "COMPLETED") return "Completada";
-  if (status === "CANCELLED") return "Cancelada";
-  return "Fallida";
-}
-
-function exportStatusTone(
-  status: ExportRequestDetail["status"],
-): "success" | "process" | "pending" | "danger" | "inactive" {
-  if (status === "COMPLETED") return "success";
-  if (status === "PROCESSING") return "process";
-  if (status === "PENDING") return "pending";
-  if (status === "CANCELLED") return "inactive";
-  return "danger";
-}
-
-function formatBytes(value: string): string {
-  const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes < 1024) return `${bytes || 0} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function workflowActivityLabel(
@@ -477,12 +452,19 @@ export function RequirementDocumentEditor({
     useState<DocumentVersionDetail | null>(null);
   const [review, setReview] = useState<WorkflowReviewDetail | null>(null);
   const [reviewComment, setReviewComment] = useState("");
-  const [exportOpen, setExportOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("PDF");
-  const [exportBusy, setExportBusy] = useState(false);
-  const [exportRequests, setExportRequests] = useState<
-    readonly ExportRequestDetail[]
+  const [aiVersionOpen, setAiVersionOpen] = useState(false);
+  const [aiHistoryOpen, setAiHistoryOpen] = useState(false);
+  const [aiSources, setAiSources] = useState<SourceListResponse["items"]>([]);
+  const [selectedAiSourceIds, setSelectedAiSourceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [aiHistory, setAiHistory] = useState<
+    readonly AiAnalysisRequestDetail[]
   >([]);
+  const [aiGeneratedVersionIds, setAiGeneratedVersionIds] = useState<
+    Set<string>
+  >(() => new Set());
   const versionDialogRef = useDialogAccessibility<HTMLElement>(
     versionOpen,
     () => {
@@ -493,11 +475,15 @@ export function RequirementDocumentEditor({
     historyOpen,
     () => setHistoryOpen(false),
   );
-  const exportDialogRef = useDialogAccessibility<HTMLElement>(
-    exportOpen,
+  const aiVersionDialogRef = useDialogAccessibility<HTMLElement>(
+    aiVersionOpen,
     () => {
-      if (!exportBusy) setExportOpen(false);
+      if (!busy) setAiVersionOpen(false);
     },
+  );
+  const aiHistoryDialogRef = useDialogAccessibility<HTMLElement>(
+    aiHistoryOpen,
+    () => setAiHistoryOpen(false),
   );
   const compareDialogRef = useDialogAccessibility<HTMLElement>(
     compareOpen && Boolean(leftVersion) && Boolean(rightVersion),
@@ -551,33 +537,23 @@ export function RequirementDocumentEditor({
   ]);
 
   useEffect(() => {
-    if (!exportOpen) return;
     let active = true;
-    const refresh = async () => {
-      try {
-        const response = await fetch(
-          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/documents/${encodeURIComponent(documentState.id)}/exports`,
-          { credentials: "include", cache: "no-store" },
+    void loadAiRequests(false)
+      .then((items) => {
+        if (!active) return;
+        setAiGeneratedVersionIds(
+          new Set(
+            items
+              .filter((item) => item.status === "COMPLETED")
+              .map((item) => item.documentVersionId.toLowerCase()),
+          ),
         );
-        if (!response.ok) throw new Error(await responseError(response));
-        const list = (await response.json()) as ExportRequestListResponse;
-        if (active) setExportRequests(list.items);
-      } catch (error) {
-        if (active) {
-          showAlert(
-            error instanceof Error ? error.message : String(error),
-            "danger",
-          );
-        }
-      }
-    };
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 3000);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
-  }, [documentState.id, exportOpen, project.id]);
+  }, [documentState.id, project.id]);
 
   function showAlert(message: string, tone: "success" | "danger" | "warning") {
     setAlert(message);
@@ -1009,39 +985,212 @@ export function RequirementDocumentEditor({
     }
   }
 
-  async function requestExport(): Promise<void> {
-    if (version.status !== "APPROVED") {
-      showAlert("Solo una versión aprobada puede exportarse.", "warning");
-      return;
+  async function loadAiRequests(
+    includeDetails: boolean,
+  ): Promise<readonly AiAnalysisRequestDetail[]> {
+    const response = await fetch(
+      `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests?page=1&pageSize=100`,
+      { credentials: "include", cache: "no-store" },
+    );
+    if (!response.ok) throw new Error(await responseError(response));
+    const list = (await response.json()) as AiAnalysisRequestListResponse;
+    const summaries = list.items.filter(
+      (item) =>
+        item.documentId.toLowerCase() === documentState.id.toLowerCase(),
+    );
+    if (!includeDetails) {
+      return summaries.map((item) => ({
+        ...item,
+        sources: [],
+        executions: [],
+        result: null,
+      }));
     }
-    setExportBusy(true);
+    return Promise.all(
+      summaries.map(async (item) => {
+        const detailResponse = await fetch(
+          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests/${encodeURIComponent(item.id)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!detailResponse.ok)
+          throw new Error(await responseError(detailResponse));
+        return (await detailResponse.json()) as AiAnalysisRequestDetail;
+      }),
+    );
+  }
+
+  async function openAiHistory(): Promise<void> {
+    setBusy(true);
     try {
-      const response = await fetch(
-        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/exports`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "content-type": "application/json",
-            "x-idempotency-key": crypto.randomUUID(),
-          },
-          body: JSON.stringify({ format: exportFormat }),
-        },
+      const items = await loadAiRequests(true);
+      setAiHistory(items);
+      setAiGeneratedVersionIds(
+        new Set(
+          items
+            .filter((item) => item.status === "COMPLETED")
+            .map((item) => item.documentVersionId.toLowerCase()),
+        ),
       );
-      if (!response.ok) throw new Error(await responseError(response));
-      const created = (await response.json()) as ExportRequestDetail;
-      setExportRequests((current) => [
-        created,
-        ...current.filter((item) => item.id !== created.id),
-      ]);
-      showAlert(`La exportación ${exportFormat} quedó programada.`, "success");
+      setAiHistoryOpen(true);
     } catch (error) {
       showAlert(
         error instanceof Error ? error.message : String(error),
         "danger",
       );
     } finally {
-      setExportBusy(false);
+      setBusy(false);
+    }
+  }
+
+  async function openAiVersionDialog(): Promise<void> {
+    if (unsaved) {
+      showAlert(
+        "Guarda o descarta los cambios antes de generar una versión con IA.",
+        "warning",
+      );
+      return;
+    }
+    if (!currentVersion) {
+      showAlert(
+        "Abre la versión actual antes de generar una nueva versión con IA.",
+        "warning",
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const activeGeneration = (await loadAiRequests(false)).find(
+        (item) => item.status === "PENDING" || item.status === "PROCESSING",
+      );
+      if (activeGeneration) {
+        throw new Error(
+          "Ya existe una generación de IA en curso para este documento.",
+        );
+      }
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources?page=1&pageSize=100&status=ACTIVE&processingStatus=READY`,
+        { credentials: "include", cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const list = (await response.json()) as SourceListResponse;
+      setAiSources(list.items);
+      setSelectedAiSourceIds(new Set());
+      setAiInstruction("");
+      setAiVersionOpen(true);
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleAiSource(sourceId: string): void {
+    setSelectedAiSourceIds((current) => {
+      const next = new Set(current);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  }
+
+  async function createAiVersion(): Promise<void> {
+    if (selectedAiSourceIds.size === 0) {
+      showAlert("Selecciona al menos una fuente READY.", "warning");
+      return;
+    }
+    const operationKey = crypto.randomUUID();
+    setBusy(true);
+    try {
+      const versionResponse = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expectedRevision: documentState.revision,
+            changeSummary:
+              "Nueva versión generada con IA a partir de fuentes seleccionadas",
+            idempotencyKey: operationKey,
+          }),
+        },
+      );
+      if (!versionResponse.ok)
+        throw new Error(await responseError(versionResponse));
+      const next = (await versionResponse.json()) as RequirementDocumentDetail;
+      setDocumentState(next);
+      setVersion(next.currentVersionDetail);
+      const first = next.currentVersionDetail.sections[0];
+      if (first) {
+        setActiveKey(first.key);
+        setDraftContent(first.content);
+      }
+
+      const analysisResponse = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            analysisType: "REQUIREMENT_DOCUMENT",
+            documentId: next.id,
+            documentVersionId: next.currentVersionDetail.id,
+            sourceIds: [...selectedAiSourceIds],
+            purpose: "AI_VERSION",
+            instruction: aiInstruction.trim() || null,
+            idempotencyKey: operationKey,
+          }),
+        },
+      );
+      if (!analysisResponse.ok)
+        throw new Error(await responseError(analysisResponse));
+      let analysis = (await analysisResponse.json()) as AiAnalysisRequestDetail;
+      const deadline = Date.now() + 180_000;
+      while (
+        analysis.status !== "COMPLETED" &&
+        analysis.status !== "FAILED" &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const detailResponse = await fetch(
+          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests/${encodeURIComponent(analysis.id)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!detailResponse.ok)
+          throw new Error(await responseError(detailResponse));
+        analysis = (await detailResponse.json()) as AiAnalysisRequestDetail;
+      }
+      if (analysis.status === "FAILED") {
+        throw new Error(
+          analysis.errorMessage ||
+            "La IA falló. La nueva versión DRAFT se conservó sin sobrescribir la anterior.",
+        );
+      }
+      if (analysis.status !== "COMPLETED") {
+        throw new Error(
+          "La generación continúa en segundo plano. Revisa Historial IA.",
+        );
+      }
+      setAiGeneratedVersionIds((current) => {
+        const updated = new Set(current);
+        updated.add(next.currentVersionDetail.id.toLowerCase());
+        return updated;
+      });
+      setAiVersionOpen(false);
+      await reloadDocument(
+        `La versión ${next.currentVersion} fue generada con IA y requiere revisión humana.`,
+      );
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1085,11 +1234,11 @@ export function RequirementDocumentEditor({
             Comparar versiones
           </RqActionButton>
           <RqActionButton
-            disabled={busy || version.status !== "APPROVED"}
-            onClick={() => setExportOpen(true)}
-            tone="operation"
+            disabled={busy}
+            onClick={() => void openAiHistory()}
+            tone="consult"
           >
-            Exportar
+            Historial IA
           </RqActionButton>
           <RqActionButton
             disabled={busy || documentState.status === "ARCHIVED"}
@@ -1097,6 +1246,18 @@ export function RequirementDocumentEditor({
             tone="affirmative"
           >
             Nueva versión
+          </RqActionButton>
+          <RqActionButton
+            disabled={
+              busy ||
+              unsaved ||
+              !currentVersion ||
+              documentState.status === "ARCHIVED"
+            }
+            onClick={() => void openAiVersionDialog()}
+            tone="operation"
+          >
+            Nueva versión con IA
           </RqActionButton>
         </div>
       </header>
@@ -1184,6 +1345,13 @@ export function RequirementDocumentEditor({
           >
             ×
           </button>
+        </div>
+      ) : null}
+
+      {aiGeneratedVersionIds.has(version.id.toLowerCase()) ? (
+        <div className="rq-document-ai-disclosure" role="status">
+          <strong>Generado con IA</strong>
+          <span>Requiere revisión humana antes de enviarse a validación.</span>
         </div>
       ) : null}
 
@@ -1357,16 +1525,15 @@ export function RequirementDocumentEditor({
 
           <aside
             className="rq-document-ai-future"
-            aria-labelledby="ai-future-title"
+            aria-labelledby="ai-document-title"
           >
             <span aria-hidden="true">IA</span>
             <div>
-              <h3 id="ai-future-title">
-                Propuestas de inteligencia artificial
-              </h3>
+              <h3 id="ai-document-title">Asistencia con revisión humana</h3>
               <p>
-                Las propuestas de inteligencia artificial se habilitarán en el
-                Paso 18.
+                La IA solo genera el borrador inicial o una nueva versión
+                solicitada explícitamente. Editar, guardar, comparar y validar
+                nunca ejecutan IA.
               </p>
             </div>
           </aside>
@@ -1600,131 +1767,205 @@ export function RequirementDocumentEditor({
         </div>
       ) : null}
 
-      {exportOpen ? (
+      {aiVersionOpen ? (
         <div className="rq-project-modal-backdrop" role="presentation">
           <section
-            aria-labelledby="export-title"
+            aria-labelledby="ai-version-title"
             aria-modal="true"
-            className="rq-project-modal rq-document-export-modal"
-            ref={exportDialogRef}
+            className="rq-project-modal rq-document-ai-version-modal"
+            ref={aiVersionDialogRef}
             role="dialog"
             tabIndex={-1}
           >
             <header className="rq-project-modal__header">
               <div>
-                <span>Entregables aprobados</span>
-                <h2 id="export-title">Exportar documento</h2>
+                <span>Generación explícita</span>
+                <h2 id="ai-version-title">Nueva versión con IA</h2>
               </div>
               <button
-                aria-label="Cerrar exportaciones"
-                disabled={exportBusy}
-                onClick={() => setExportOpen(false)}
+                aria-label="Cerrar nueva versión con IA"
+                disabled={busy}
+                onClick={() => setAiVersionOpen(false)}
                 type="button"
               >
                 ×
               </button>
             </header>
-            <div className="rq-document-export-create">
-              <div>
-                <strong>
-                  Versión {version.version} · {statusLabel(version.status)}
-                </strong>
-                <span>
-                  El archivo conservará las 13 secciones, los requisitos,
-                  criterios y evidencias de esta versión exacta.
-                </span>
-              </div>
-              <label>
-                <span>Formato</span>
-                <select
-                  disabled={exportBusy}
-                  onChange={(event) =>
-                    setExportFormat(event.target.value as ExportFormat)
-                  }
-                  value={exportFormat}
-                >
-                  <option value="PDF">PDF · entrega final</option>
-                  <option value="DOCX">DOCX · editable</option>
-                </select>
+            <div className="rq-document-ai-version-content">
+              <p>
+                Se clonará la versión actual y una única ejecución de IA
+                completará el nuevo DRAFT. La versión anterior no se modifica.
+              </p>
+              <fieldset>
+                <legend>Fuentes READY</legend>
+                {aiSources.length === 0 ? (
+                  <p>No hay fuentes listas para usar.</p>
+                ) : (
+                  <div className="rq-document-ai-source-list">
+                    {aiSources.map((source) => (
+                      <label key={source.id}>
+                        <input
+                          checked={selectedAiSourceIds.has(source.id)}
+                          disabled={busy}
+                          onChange={() => toggleAiSource(source.id)}
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>{source.title}</strong>
+                          <small>
+                            {source.sourceType} ·{" "}
+                            {source.classification ?? "Sin clasificación"}
+                          </small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+              <label className="rq-field">
+                <span>Instrucción adicional opcional</span>
+                <textarea
+                  disabled={busy}
+                  maxLength={2000}
+                  onChange={(event) => setAiInstruction(event.target.value)}
+                  placeholder="Ejemplo: prioriza los vacíos y contradicciones identificados."
+                  rows={4}
+                  value={aiInstruction}
+                />
+                <small>{aiInstruction.length}/2000</small>
               </label>
+            </div>
+            <div className="rq-project-modal__actions">
               <RqActionButton
-                disabled={exportBusy}
-                onClick={() => void requestExport()}
+                disabled={busy}
+                onClick={() => setAiVersionOpen(false)}
+              >
+                Cancelar
+              </RqActionButton>
+              <RqActionButton
+                disabled={busy || selectedAiSourceIds.size === 0}
+                onClick={() => void createAiVersion()}
                 tone="affirmative"
               >
-                {exportBusy ? "Programando…" : `Generar ${exportFormat}`}
+                {busy ? "Generando…" : "Crear versión con IA"}
               </RqActionButton>
             </div>
-            <section className="rq-document-export-history">
-              <header>
-                <div>
-                  <strong>Historial de exportaciones</strong>
-                  <span>Se actualiza automáticamente cada 3 segundos.</span>
-                </div>
-                <span>{exportRequests.length} solicitudes</span>
-              </header>
-              {exportRequests.length === 0 ? (
-                <p className="rq-document-export-empty">
-                  Todavía no se han solicitado exportaciones para este
-                  documento.
-                </p>
-              ) : (
-                <div className="rq-document-export-table-wrap">
-                  <table className="rq-document-export-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Formato</th>
-                        <th scope="col">Versión</th>
-                        <th scope="col">Estado</th>
-                        <th scope="col">Solicitud</th>
-                        <th scope="col">Finalización</th>
-                        <th scope="col">Tamaño</th>
-                        <th scope="col">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {exportRequests.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.format}</td>
-                          <td>{item.versionNumber}</td>
-                          <td>
-                            <RqStatusBadge tone={exportStatusTone(item.status)}>
-                              {exportStatusLabel(item.status)}
-                            </RqStatusBadge>
-                            {item.errorMessage ? (
-                              <small>{item.errorMessage}</small>
-                            ) : null}
-                          </td>
-                          <td>{formatDate(item.requestedAt)}</td>
-                          <td>
-                            {item.completedAt
-                              ? formatDate(item.completedAt)
-                              : "—"}
-                          </td>
-                          <td>
-                            {item.artifact
-                              ? formatBytes(item.artifact.sizeBytes)
-                              : "—"}
-                          </td>
-                          <td>
-                            {item.status === "COMPLETED" && item.artifact ? (
-                              <a
-                                className="rq-document-export-download"
-                                href={`${GATEWAY_URL}/api/v1/exports/${encodeURIComponent(item.id)}/download`}
-                              >
-                                Descargar
-                              </a>
-                            ) : (
-                              <span>En espera</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+          </section>
+        </div>
+      ) : null}
+
+      {aiHistoryOpen ? (
+        <div className="rq-project-modal-backdrop" role="presentation">
+          <section
+            aria-labelledby="ai-history-title"
+            aria-modal="true"
+            className="rq-project-modal rq-document-ai-history-modal"
+            ref={aiHistoryDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <header className="rq-project-modal__header">
+              <div>
+                <span>Trazabilidad técnica</span>
+                <h2 id="ai-history-title">Historial IA</h2>
+              </div>
+              <button
+                aria-label="Cerrar historial IA"
+                onClick={() => setAiHistoryOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+            {aiHistory.length === 0 ? (
+              <p className="rq-document-ai-history-empty">
+                Este documento todavía no tiene generaciones con IA.
+              </p>
+            ) : (
+              <ol className="rq-document-ai-history-list">
+                {aiHistory.map((item) => {
+                  const execution = item.executions.at(-1);
+                  return (
+                    <li key={item.id}>
+                      <header>
+                        <div>
+                          <strong>
+                            {item.purpose === "INITIAL_DRAFT"
+                              ? "Borrador inicial"
+                              : "Nueva versión con IA"}
+                          </strong>
+                          <span>
+                            Versión {item.generatedVersion} · {item.status}
+                          </span>
+                        </div>
+                        <RqStatusBadge
+                          tone={
+                            item.status === "COMPLETED"
+                              ? "success"
+                              : item.status === "FAILED"
+                                ? "danger"
+                                : "process"
+                          }
+                        >
+                          {item.status}
+                        </RqStatusBadge>
+                      </header>
+                      <dl>
+                        <div>
+                          <dt>Solicitud</dt>
+                          <dd>{item.id}</dd>
+                        </div>
+                        <div>
+                          <dt>Ejecución</dt>
+                          <dd>{execution?.id ?? "Pendiente"}</dd>
+                        </div>
+                        <div>
+                          <dt>Proveedor / modelo</dt>
+                          <dd>
+                            {execution?.provider ?? "—"} /{" "}
+                            {execution?.model ?? "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Fuentes</dt>
+                          <dd>
+                            {item.sources
+                              .map(
+                                (source) =>
+                                  source.sourceTitle ?? source.sourceId,
+                              )
+                              .join(", ")}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Tokens entrada / salida</dt>
+                          <dd>
+                            {execution?.inputTokens ?? "—"} /{" "}
+                            {execution?.outputTokens ?? "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Duración / intentos</dt>
+                          <dd>
+                            {execution?.durationMs ?? "—"} ms /{" "}
+                            {item.executionCount}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Fecha</dt>
+                          <dd>{formatDate(item.createdAt)}</dd>
+                        </div>
+                      </dl>
+                      {item.errorMessage || execution?.errorMessage ? (
+                        <p role="alert">
+                          {item.errorMessage ?? execution?.errorMessage}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </section>
         </div>
       ) : null}

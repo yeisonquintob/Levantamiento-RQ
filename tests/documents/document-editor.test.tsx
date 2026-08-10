@@ -118,7 +118,7 @@ test("el listado renderiza proyecto, creación manual y estado vacío", () => {
   assert.match(html, /No hay documentos/);
 });
 
-test("el editor renderiza las trece secciones, avance y área futura de IA", () => {
+test("el editor renderiza las trece secciones y limita la IA a generaciones explícitas", () => {
   const html = renderToStaticMarkup(
     <RequirementDocumentEditor initialDocument={document} project={project} />,
   );
@@ -128,12 +128,9 @@ test("el editor renderiza las trece secciones, avance y área futura de IA", () 
   }
   assert.match(html, /13 secciones/);
   assert.match(html, /Cambios sin guardar|Sin cambios pendientes/);
-  assert.match(html, /Propuestas de inteligencia artificial/);
-  assert.match(
-    html,
-    /Las propuestas de inteligencia artificial se habilitarán en el Paso 18/,
-  );
-  assert.doesNotMatch(html, /Generar con IA|Analizar con IA/);
+  assert.match(html, /Asistencia con revisión humana/);
+  assert.match(html, /Nueva versión con IA/);
+  assert.doesNotMatch(html, />Exportar</);
 });
 
 test("la bandeja de validación está habilitada y abre el flujo documental", async () => {
@@ -198,6 +195,44 @@ test("navegación, guardado, concurrencia, bloqueo y confirmaciones están imple
   assert.match(editor, /Confirmar nueva versión/);
   assert.match(editor, /Comparar versiones/);
   assert.match(editor, /Historial/);
+  assert.match(editor, /Historial IA/);
+  assert.match(editor, /Nueva versión con IA/);
+  assert.match(editor, /purpose: "AI_VERSION"/);
+  assert.doesNotMatch(editor, />\s*Exportar\s*</);
+});
+
+test("Fuentes concentra el procesamiento, la generación inicial y el reproceso técnico", async () => {
+  const sources = await readFile(
+    "apps/web/src/app/workspace/sources/sources-workspace.tsx",
+    "utf8",
+  );
+  assert.match(sources, /Procesar y generar borrador/);
+  assert.match(
+    sources,
+    /Borrador inicial generado a partir de fuentes procesadas/,
+  );
+  assert.match(sources, /Reprocesar fuente/);
+  assert.match(sources, /no ejecuta IA ni crea versiones documentales/i);
+  assert.match(sources, /idempotencyKey: operationKey/);
+});
+
+test("Validación concentra las exportaciones de versiones aprobadas", async () => {
+  const validation = await readFile(
+    "apps/web/src/app/workspace/validation/validation-workspace.tsx",
+    "utf8",
+  );
+  assert.match(validation, /Descargas PDF y DOCX/);
+  assert.match(validation, /status === "APPROVED"/);
+  assert.match(validation, /Esta acción\s+no ejecuta IA/);
+});
+
+test("Análisis desaparece del menú operativo y la URL anterior redirige a Documentos", async () => {
+  const [shell, analysisPage] = await Promise.all([
+    readFile("apps/web/src/app/app-shell.tsx", "utf8"),
+    readFile("apps/web/src/app/workspace/analysis/page.tsx", "utf8"),
+  ]);
+  assert.doesNotMatch(shell, /href="\/workspace\/analysis"/);
+  assert.match(analysisPage, /redirect\("\/workspace\/documents"\)/);
 });
 
 test("el editor es responsive y Web solo consume Gateway", async () => {

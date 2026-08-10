@@ -1,12 +1,16 @@
 "use client";
 
 import type { DragEvent, FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
+  AiAnalysisRequestDetail,
+  AiAnalysisRequestListResponse,
   CreateTextSourceRequest,
   ProjectListResponse,
   ProjectStatus,
+  RequirementDocumentDetail,
+  RequirementDocumentListResponse,
   SourceBatchProcessingResponse,
   SourceClassification,
   SourceDetail,
@@ -282,6 +286,7 @@ export function SourcesWorkspace({
   initialProjectId,
   initialError = null,
 }: SourcesWorkspaceProps) {
+  const generationLockRef = useRef(false);
   const firstProjectId = initialProjects.items[0]?.id ?? "";
   const resolvedInitialProjectId =
     initialProjectId &&
@@ -313,6 +318,10 @@ export function SourcesWorkspace({
   );
   const [batchProcessing, setBatchProcessing] =
     useState<BatchProcessingMode | null>(null);
+  const [generationStage, setGenerationStage] = useState<string | null>(null);
+  const [generatedDocumentId, setGeneratedDocumentId] = useState<string | null>(
+    null,
+  );
   const [dragActive, setDragActive] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(
     initialError
@@ -332,7 +341,6 @@ export function SourcesWorkspace({
       sources.items
         .filter(
           (source) =>
-            source.sourceType === "FILE" &&
             source.status === "ACTIVE" &&
             source.processingStatus !== "PROCESSING",
         )
@@ -722,43 +730,224 @@ export function SourcesWorkspace({
     });
   }
 
+  async function waitUntilReady(
+    selectedIds: readonly string[],
+  ): Promise<readonly SourceDetail[]> {
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      const details = await Promise.all(
+        selectedIds.map((sourceId) =>
+          requestJson<SourceDetail>(
+            `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(sourceId)}`,
+          ),
+        ),
+      );
+      const failed = details.find(
+        (source) => source.processingStatus === "FAILED",
+      );
+      if (failed) {
+        throw new Error(
+          failed.processingMessage ||
+            `La fuente "${failed.title}" no pudo procesarse.`,
+        );
+      }
+      const ready = details.filter(
+        (source) => source.processingStatus === "READY",
+      ).length;
+      setGenerationStage(`Procesando fuentes ${ready}/${details.length}…`);
+      if (ready === details.length) return details;
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
+    }
+    throw new Error(
+      "Las fuentes no terminaron de procesarse dentro del tiempo esperado.",
+    );
+  }
+
+  async function waitForDraft(
+    initial: AiAnalysisRequestDetail,
+  ): Promise<AiAnalysisRequestDetail> {
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+      const detail = await requestJson<AiAnalysisRequestDetail>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(initial.id)}`,
+      );
+      if (detail.status === "COMPLETED") return detail;
+      if (detail.status === "FAILED") {
+        throw new Error(
+          detail.errorMessage ||
+            detail.executions.at(-1)?.errorMessage ||
+            "La generación del borrador terminó con error.",
+        );
+      }
+      setGenerationStage("Generando borrador con IA…");
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+    throw new Error(
+      "La generación continúa en segundo plano. Consulta el historial IA del documento.",
+    );
+  }
+
   async function processBatch(): Promise<void> {
-    if (!projectId || batchProcessing || selectedSourceIds.size === 0) return;
+    if (
+      !projectId ||
+      batchProcessing ||
+      generationLockRef.current ||
+      selectedSourceIds.size === 0
+    )
+      return;
 
     const selectedIds = [...selectedSourceIds];
-    const confirmed = window.confirm(
-      `Se procesarán o reprocesarán las ${selectedIds.length} fuente(s) seleccionada(s).`,
+    let documents: RequirementDocumentListResponse;
+    try {
+      documents = await requestJson<RequirementDocumentListResponse>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/documents`,
+      );
+    } catch (error) {
+      setAlert({
+        tone: "danger",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No fue posible consultar el documento del proyecto.",
+      });
+      return;
+    }
+    const existingDocument = documents.items.find(
+      (document) => document.status !== "ARCHIVED",
     );
-
+    if (existingDocument) {
+      try {
+        const analyses = await requestJson<AiAnalysisRequestListResponse>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests?page=1&pageSize=100`,
+        );
+        const activeGeneration = analyses.items.find(
+          (item) =>
+            item.documentId.toLowerCase() ===
+              existingDocument.id.toLowerCase() &&
+            (item.status === "PENDING" || item.status === "PROCESSING"),
+        );
+        if (activeGeneration) {
+          setAlert({
+            tone: "information",
+            message:
+              "Ya existe una generación de IA en curso para este documento. Espera a que termine antes de crear otra versión.",
+          });
+          return;
+        }
+      } catch (error) {
+        setAlert({
+          tone: "danger",
+          message:
+            error instanceof Error
+              ? error.message
+              : "No fue posible validar las generaciones activas.",
+        });
+        return;
+      }
+    }
+    const confirmed = window.confirm(
+      existingDocument
+        ? `El proyecto ya tiene el documento "${existingDocument.title}". Se creará una nueva versión DRAFT con IA usando ${selectedIds.length} fuente(s); la versión anterior se conservará. ¿Continuar?`
+        : `Se procesarán ${selectedIds.length} fuente(s) y se generará el borrador inicial con una única ejecución de IA. ¿Continuar?`,
+    );
     if (!confirmed) return;
 
+    const operationKey = crypto.randomUUID();
+    generationLockRef.current = true;
     setBatchProcessing("SELECTED");
+    setGeneratedDocumentId(null);
 
     try {
-      const result = await requestJson<SourceBatchProcessingResponse>(
-        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process`,
+      const selectedItems = sources.items.filter((source) =>
+        selectedSourceIds.has(source.id),
+      );
+      const fileIdsToProcess = selectedItems
+        .filter(
+          (source) =>
+            source.sourceType === "FILE" && source.processingStatus !== "READY",
+        )
+        .map((source) => source.id);
+
+      if (fileIdsToProcess.length > 0) {
+        setGenerationStage(`Procesando fuentes 0/${selectedIds.length}…`);
+        const result = await requestJson<SourceBatchProcessingResponse>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process`,
+          {
+            method: "POST",
+            body: JSON.stringify({ sourceIds: fileIdsToProcess }),
+          },
+        );
+        if (result.failed > 0 && result.enqueued === 0) {
+          throw new Error(
+            "Ninguna fuente pudo entrar a procesamiento. Revisa los errores individuales.",
+          );
+        }
+      }
+
+      await waitUntilReady(selectedIds);
+      setGenerationStage("Preparando documento DRAFT…");
+
+      let document: RequirementDocumentDetail;
+      let purpose: "INITIAL_DRAFT" | "AI_VERSION";
+      if (existingDocument) {
+        const current = await requestJson<RequirementDocumentDetail>(
+          `/api/v1/documents/${encodeURIComponent(existingDocument.id)}`,
+        );
+        document = await requestJson<RequirementDocumentDetail>(
+          `/api/v1/documents/${encodeURIComponent(current.id)}/versions`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              expectedRevision: current.revision,
+              changeSummary:
+                "Nueva versión generada con IA a partir de fuentes procesadas",
+              idempotencyKey: operationKey,
+            }),
+          },
+        );
+        purpose = "AI_VERSION";
+      } else {
+        document = await requestJson<RequirementDocumentDetail>(
+          `/api/v1/projects/${encodeURIComponent(projectId)}/documents`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              title: selectedProject?.title,
+              changeSummary:
+                "Borrador inicial generado a partir de fuentes procesadas",
+              idempotencyKey: operationKey,
+            }),
+          },
+        );
+        purpose = "INITIAL_DRAFT";
+      }
+
+      setGenerationStage("Generando borrador con IA…");
+      const analysis = await requestJson<AiAnalysisRequestDetail>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests`,
         {
           method: "POST",
-          body: JSON.stringify({ sourceIds: selectedIds }),
+          body: JSON.stringify({
+            analysisType: "REQUIREMENT_DOCUMENT",
+            documentId: document.id,
+            documentVersionId: document.currentVersionDetail.id,
+            sourceIds: selectedIds,
+            purpose,
+            idempotencyKey: operationKey,
+          }),
         },
       );
-      const summary =
-        `Procesadas: ${result.enqueued}. ` +
-        `Omitidas: ${result.skipped}. Fallidas: ${result.failed}.`;
+      await waitForDraft(analysis);
 
       setSelectedSourceIds(new Set());
+      setGeneratedDocumentId(document.id);
       setAlert({
-        tone:
-          result.failed > 0
-            ? result.enqueued > 0
-              ? "information"
-              : "danger"
-            : result.enqueued > 0
-              ? "success"
-              : "information",
-        message: summary,
+        tone: "success",
+        message:
+          purpose === "INITIAL_DRAFT"
+            ? "Borrador generado y aplicado. Requiere revisión humana."
+            : `La versión ${document.currentVersion} fue generada con IA y requiere revisión humana.`,
       });
-
       await loadSources(
         projectId,
         search,
@@ -772,10 +961,50 @@ export function SourcesWorkspace({
         message:
           error instanceof Error
             ? error.message
-            : "No fue posible iniciar el procesamiento.",
+            : "No fue posible generar el borrador.",
       });
     } finally {
       setBatchProcessing(null);
+      setGenerationStage(null);
+      generationLockRef.current = false;
+    }
+  }
+
+  async function reprocessSource(source: SourceSummary): Promise<void> {
+    if (
+      !window.confirm(
+        `Se reprocesará técnicamente "${source.title}". Esta acción no ejecuta IA ni crea versiones documentales.`,
+      )
+    )
+      return;
+    setLoading(true);
+    try {
+      await requestJson<SourceDetail>(
+        `/api/v1/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(source.id)}/reprocess`,
+        { method: "POST" },
+      );
+      setAlert({
+        tone: "information",
+        message:
+          "Reprocesamiento técnico iniciado. No se ejecutó IA ni se creó una versión.",
+      });
+      await loadSources(
+        projectId,
+        search,
+        sourceType,
+        processingStatus,
+        status,
+      );
+    } catch (error) {
+      setAlert({
+        tone: "danger",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No fue posible reprocesar la fuente.",
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -889,8 +1118,16 @@ export function SourcesWorkspace({
             onClick={() => void processBatch()}
             tone="operation"
           >
-            {batchProcessing ? "Procesando..." : "Procesar"}
+            {generationStage ?? "Procesar y generar borrador"}
           </RqActionButton>
+          {generatedDocumentId ? (
+            <a
+              className="rq-source-view-draft"
+              href={`/workspace/documents/${encodeURIComponent(generatedDocumentId)}`}
+            >
+              Ver borrador
+            </a>
+          ) : null}
           <RqActionButton
             disabled={loading || batchProcessing !== null || !projectId}
             onClick={openCreate}
@@ -1098,8 +1335,7 @@ export function SourcesWorkspace({
               sources.items.map((source) => (
                 <tr key={source.id}>
                   <td>
-                    {source.sourceType === "FILE" &&
-                    source.status === "ACTIVE" &&
+                    {source.status === "ACTIVE" &&
                     source.processingStatus !== "PROCESSING" ? (
                       <input
                         aria-label={`Seleccionar ${source.title}`}
@@ -1152,14 +1388,24 @@ export function SourcesWorkspace({
                         Editar
                       </RqActionButton>
                       {source.sourceType === "FILE" ? (
-                        <RqActionButton
-                          compact
-                          disabled={loading}
-                          onClick={() => void downloadSource(source)}
-                          tone="consult"
-                        >
-                          Descargar
-                        </RqActionButton>
+                        <>
+                          <RqActionButton
+                            compact
+                            disabled={loading}
+                            onClick={() => void downloadSource(source)}
+                            tone="consult"
+                          >
+                            Descargar
+                          </RqActionButton>
+                          <RqActionButton
+                            compact
+                            disabled={loading}
+                            onClick={() => void reprocessSource(source)}
+                            tone="secondary"
+                          >
+                            Reprocesar fuente
+                          </RqActionButton>
+                        </>
                       ) : null}
                       {source.status === "ACTIVE" ? (
                         <RqActionButton

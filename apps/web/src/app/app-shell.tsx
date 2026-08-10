@@ -93,14 +93,6 @@ function resolvePageContext(pathname: string): WorkspacePageContext {
     };
   }
 
-  if (pathname.startsWith("/workspace/analysis")) {
-    return {
-      eyebrow: "Inteligencia artificial",
-      title: "Análisis de requerimientos",
-      description: "Borradores estructurados, trazabilidad y revisión humana.",
-    };
-  }
-
   if (pathname.startsWith("/workspace/validation")) {
     return {
       eyebrow: "Revisión",
@@ -345,19 +337,6 @@ export function AppShell({ children, user }: AppShellProps) {
 
           <a
             aria-current={
-              pathname.startsWith("/workspace/analysis") ? "page" : undefined
-            }
-            href="/workspace/analysis"
-            onClick={() => setMenuOpen(false)}
-          >
-            <span aria-hidden="true" className="rq-nav__icon">
-              IA
-            </span>
-            <span>Análisis</span>
-          </a>
-
-          <a
-            aria-current={
               pathname.startsWith("/workspace/validation") ? "page" : undefined
             }
             href="/workspace/validation"
@@ -415,27 +394,25 @@ export function AppShell({ children, user }: AppShellProps) {
       <footer className="rq-footer">
         {pathname.startsWith("/workspace/documents")
           ? "Editor documental, versiones e historial · Paso 17"
-          : pathname.startsWith("/workspace/analysis")
-            ? "Análisis asíncrono, trazable y sujeto a revisión humana"
-            : pathname.startsWith("/workspace/validation")
-              ? "Revisión, observaciones y aprobación documental · Paso 17"
-              : pathname.startsWith("/workspace/notifications")
-                ? "Notificaciones internas generadas por eventos idempotentes"
-                : pathname.startsWith("/workspace/settings/audit")
-                  ? "Auditoría funcional y correlación por proyecto"
-                  : pathname.startsWith("/workspace/settings/templates")
-                    ? "Catálogo de plantillas configurables y versionadas · Paso 14"
-                    : pathname.startsWith("/workspace/settings/users")
-                      ? "Administración segura de usuarios, roles y sesiones"
-                      : pathname.startsWith("/workspace/settings/ai-providers")
-                        ? "Configuración segura de proveedores de inteligencia artificial"
-                        : pathname.startsWith("/workspace/settings")
-                          ? "Preferencias personales y administración segura del sistema"
-                          : pathname.startsWith("/workspace/sources")
-                            ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
-                            : pathname.startsWith("/workspace/projects")
-                              ? "Gestión de proyectos y participantes · Paso 12"
-                              : "Flujo documental: datos, análisis, borradores y aprobación"}
+          : pathname.startsWith("/workspace/validation")
+            ? "Revisión, observaciones y aprobación documental · Paso 17"
+            : pathname.startsWith("/workspace/notifications")
+              ? "Notificaciones internas generadas por eventos idempotentes"
+              : pathname.startsWith("/workspace/settings/audit")
+                ? "Auditoría funcional y correlación por proyecto"
+                : pathname.startsWith("/workspace/settings/templates")
+                  ? "Catálogo de plantillas configurables y versionadas · Paso 14"
+                  : pathname.startsWith("/workspace/settings/users")
+                    ? "Administración segura de usuarios, roles y sesiones"
+                    : pathname.startsWith("/workspace/settings/ai-providers")
+                      ? "Configuración segura de proveedores de inteligencia artificial"
+                      : pathname.startsWith("/workspace/settings")
+                        ? "Preferencias personales y administración segura del sistema"
+                        : pathname.startsWith("/workspace/sources")
+                          ? "Fuentes textuales y trazabilidad por proyecto · Paso 13.1"
+                          : pathname.startsWith("/workspace/projects")
+                            ? "Gestión de proyectos y participantes · Paso 12"
+                            : "Flujo documental: datos, análisis, borradores y aprobación"}
       </footer>
     </div>
   );
