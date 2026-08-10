@@ -630,9 +630,16 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
   assert.match(client, />\s*Editar\s*</);
   assert.match(client, />\s*Eliminar\s*</);
   assert.match(client, /data\.append\(\s*"metadata"/);
-  assert.doesNotMatch(client, /Reprocesar/);
+  assert.match(client, />\s*Reprocesar fuente\s*</);
+  assert.match(
+    client,
+    /Esta acción no ejecuta IA ni crea versiones documentales/,
+  );
   assert.match(client, /Descargar/);
-  assert.equal((client.match(/"Procesar"/g) ?? []).length, 1);
+  assert.equal(
+    (client.match(/"Procesar y generar borrador"/g) ?? []).length,
+    1,
+  );
   assert.doesNotMatch(client, /Procesar todos/);
   assert.match(client, /source\.processingStatus !== "PROCESSING"/);
   assert.match(client, /classification: "OTHER" as const/);
@@ -660,8 +667,7 @@ test("KPI y Nueva fuente aparecen antes del selector de proyecto", async () => {
 
 test("el arranque local garantiza la infraestructura de Fuentes", async () => {
   const up = await readFile("scripts/local-auth-up.sh", "utf8");
-  const infrastructure =
-    'bash "$ROOT/scripts/infrastructure-up.sh"';
+  const infrastructure = 'bash "$ROOT/scripts/infrastructure-up.sh"';
   const sourcesService = '"$PID_DIR/sources-service.pid"';
 
   assert.match(up, /scripts\/infrastructure-up\.sh/);
