@@ -220,3 +220,75 @@ test("Ollama Images indica cómo instalar el modelo cuando no existe", async () 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Ollama Images explica la falta de memoria de GPU en lugar de «no disponible temporalmente»", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({
+        error:
+          "model requires 11.9 GiB but only 11.3 GiB are available (after 512.0 MiB overhead)",
+      }),
+      { status: 500, headers: { "content-type": "application/json" } },
+    )) as typeof fetch;
+
+  try {
+    const configuration = {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      providerType: "OLLAMA_IMAGES",
+      purpose: "IMAGE",
+      model: "x/z-image-turbo:latest",
+      baseUrl: "http://127.0.0.1:11435",
+      timeoutMs: 5_000,
+    };
+    const providers = {
+      resolveImageProviderConfiguration: async () => configuration,
+      resolveImageProvider: async () => ({ configuration, apiKey: null }),
+    };
+    const audits = {
+      create: (value: unknown) => value,
+      save: async (value: unknown) => value,
+    };
+    const service = new InternalImageGenerationService(
+      providers as never,
+      audits as never,
+      {
+        model: "openai-unused",
+        quality: "medium",
+        timeoutMs: 5_000,
+        maxBase64Chars: 1_000_000,
+      },
+    );
+
+    await assert.rejects(
+      () =>
+        service.generate(
+          {
+            purpose: "PROTOTYPE_IMAGE_GENERATION",
+            providerConfigurationId: configuration.id,
+            prompt: "Pantalla corporativa limpia",
+            device: "WEB",
+            requestedSize: "1536x1024",
+          },
+          "corr-ollama-memory",
+        ),
+      (error: unknown) => {
+        const response = (
+          error as { getResponse?: () => Record<string, unknown> }
+        ).getResponse?.();
+        assert.equal(response?.errorCode, "OLLAMA_IMAGE_INSUFFICIENT_MEMORY");
+        assert.match(
+          String(response?.message),
+          /necesita 11\.9 GiB de memoria de GPU y solo hay 11\.3 GiB/u,
+        );
+        assert.equal(
+          (error as { getStatus?: () => number }).getStatus?.(),
+          502,
+        );
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

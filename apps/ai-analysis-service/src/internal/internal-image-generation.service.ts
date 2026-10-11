@@ -770,6 +770,27 @@ export class InternalImageGenerationService {
 
       const raw = await response.text();
       if (!response.ok) {
+        // Falta de memoria de GPU: es determinista, así que no se reintenta ni se presenta como
+        // «no disponible temporalmente».
+        const memory =
+          /model requires ([\d.]+ GiB) but only ([\d.]+ GiB)/u.exec(raw);
+        if (memory) {
+          await this.audit(
+            executionId,
+            configuration.id,
+            correlationId,
+            "FAILED",
+            {
+              ...metadata,
+              errorCode: "OLLAMA_IMAGE_INSUFFICIENT_MEMORY",
+              completedAt: new Date().toISOString(),
+            },
+          );
+          throw new BadGatewayException({
+            errorCode: "OLLAMA_IMAGE_INSUFFICIENT_MEMORY",
+            message: `El modelo ${configuration.model} necesita ${memory[1]} de memoria de GPU y solo hay ${memory[2]} disponibles. Libera memoria, usa un modelo más ligero o elige ComfyUI.`,
+          });
+        }
         const retryable =
           response.status === 408 ||
           response.status === 429 ||
