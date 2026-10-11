@@ -774,6 +774,19 @@ export function PrototypeWorkspace() {
         ? "Prueba la IA del Markdown en Configuración"
         : null
       : null;
+  // Con imágenes ya intentadas (fallidas, parciales o completas) sigue siendo posible exportar los
+  // prompts a otra IA e importar los PNG, además de cambiar la IA y reintentar.
+  const imagesAttempted = Boolean(
+    generation &&
+      generation.totalImages > 0 &&
+      ["FAILED", "PARTIALLY_COMPLETED", "COMPLETED", "IMAGE_GENERATING"].includes(
+        generation.status,
+      ),
+  );
+  const imagesNeedAttention = Boolean(
+    generation && imagesAttempted && (imageProgress?.failedImages ?? generation.failedImages) > 0,
+  );
+
   // Con el texto ya interpretado se puede cambiar la IA de imágenes (p. ej. de Ollama a ComfyUI)
   // mientras no haya una generación de imágenes en curso.
   const imageProviderChangeable =
@@ -2149,6 +2162,50 @@ export function PrototypeWorkspace() {
                             </button>
                           ) : null}
                         </div>
+                      ) : null}
+                      {imagesAttempted ? (
+                        <>
+                          {imagesNeedAttention ? (
+                            <p className={styles.selectionHint} role="status">
+                              Algunas imágenes fallaron. Cambia la IA de imágenes
+                              en la columna izquierda y pulsa «Reintentar
+                              fallidas», o genera las imágenes en otra IA con el
+                              TXT de prompts e impórtalas.
+                            </p>
+                          ) : null}
+                          <div className={styles.selectionActions}>
+                            <button
+                              className={styles.exportSelection}
+                              disabled={exportingPrompts || isActive}
+                              onClick={() => void exportPrompts()}
+                              title="Descarga un TXT con un prompt por imagen para generarlas en otra IA"
+                              type="button"
+                            >
+                              {exportingPrompts
+                                ? "Exportando…"
+                                : "Exportar prompts (TXT)"}
+                            </button>
+                            <button
+                              className={styles.secondaryAction}
+                              disabled={importingImages || isActive}
+                              onClick={() => importInputRef.current?.click()}
+                              title="Importa PNG generados en otra IA; se asignan por el nombre del archivo"
+                              type="button"
+                            >
+                              {importingImages
+                                ? "Importando…"
+                                : "Importar imágenes"}
+                            </button>
+                            <input
+                              accept="image/png"
+                              hidden
+                              multiple
+                              onChange={(event) => void importImages(event)}
+                              ref={importInputRef}
+                              type="file"
+                            />
+                          </div>
+                        </>
                       ) : null}
                       {importNotice && previewTab === "TEXT" ? (
                         <p aria-live="polite" className={styles.compactStatus}>

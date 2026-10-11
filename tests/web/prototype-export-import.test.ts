@@ -157,3 +157,14 @@ test("con el texto interpretado se puede cambiar la IA de imágenes y se aplica 
     /value=\{plannerConfigurationId\}[\s\S]{0,120}disabled=\{isActive \|\| Boolean\(generation\) \|\| !aiOptions\}/u,
   );
 });
+
+test("con imágenes ya intentadas se puede exportar el TXT, importar PNG y se explica qué hacer", () => {
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  assert.match(source, /const imagesAttempted = Boolean\(/u);
+  assert.match(source, /\["FAILED", "PARTIALLY_COMPLETED", "COMPLETED", "IMAGE_GENERATING"\]/u);
+  const block = source.slice(source.indexOf("{imagesAttempted ? ("), source.indexOf('{importNotice && previewTab === "TEXT" ? ('));
+  assert.match(block, /Algunas imágenes fallaron/u);
+  assert.match(block, /Exportar prompts \(TXT\)/u);
+  assert.match(block, /Importar imágenes/u);
+  assert.match(block, /importInputRef/u);
+});
