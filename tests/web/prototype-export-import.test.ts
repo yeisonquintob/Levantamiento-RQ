@@ -96,16 +96,14 @@ test("el detalle por pantalla se puede detener sin cancelar la generación", () 
   assert.match(source, /Boolean\(detailProgress\) \|\|\s+\(Boolean\(plan\) && !canReprocess\)/u);
 });
 
-test("Procesar Markdown explica el bloqueo por proveedor y permite probar la conexión sin salir de la página", () => {
+test("Procesar Markdown explica el bloqueo por proveedor sin ofrecer probar la conexión en la página", () => {
   const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
-  // Una IA que requiere prueba ya no deja el botón inerte sin explicación.
-  assert.match(source, /Prueba la conexión de la IA de imágenes/u);
-  assert.match(source, /Prueba la conexión de la IA del Markdown/u);
-  assert.match(source, /\/api\/v1\/admin\/ai-providers\/\$\{encodeURIComponent\(providerId\)\}\/test/u);
-  assert.equal((source.match(/Probar conexión/gu) ?? []).length, 2);
-  // Tras probar se vuelven a consultar las IAs disponibles.
-  assert.match(source, /setOptionsReload\(\(value\) => value \+ 1\)/u);
-  assert.match(source, /\}, \[optionsReload\]\);/u);
+  // Una IA que requiere prueba ya no deja el botón inerte sin explicación...
+  assert.match(source, /Prueba la IA de imágenes en Configuración/u);
+  assert.match(source, /Prueba la IA del Markdown en Configuración/u);
+  // ...pero la prueba de conexión se hace solo en Configuración, no aquí.
+  assert.doesNotMatch(source, /Probar conexión/u);
+  assert.doesNotMatch(source, /ai-providers\/\$\{encodeURIComponent\(providerId\)\}\/test/u);
 
   // El botón principal es de una sola línea: título sin saltos y texto secundario recortado.
   const css = readStylesSync();
