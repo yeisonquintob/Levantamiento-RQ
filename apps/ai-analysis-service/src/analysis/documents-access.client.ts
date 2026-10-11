@@ -93,6 +93,58 @@ export class AiAnalysisDocumentsAccessClient {
     return document;
   }
 
+  async requireCurrentDocumentForEstimate(
+    projectId: string,
+    documentId: string,
+    accessToken: string,
+    correlationId: string,
+  ): Promise<RequirementDocumentDetail> {
+    let response: Response;
+
+    try {
+      response = await fetch(
+        `${this.config.documentsServiceUrl}/api/v1/documents/${encodeURIComponent(documentId)}`,
+        {
+          headers: {
+            accept: "application/json",
+            authorization: `Bearer ${accessToken}`,
+            "x-correlation-id": correlationId,
+          },
+          signal: AbortSignal.timeout(this.config.documentsTimeoutMs),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException(
+        "Documents Service no está disponible para estimar el consumo de tokens.",
+      );
+    }
+
+    const payload = await this.readPayload(response);
+
+    if (!response.ok) {
+      throw new HttpException(
+        payload ?? { message: "No fue posible consultar el documento para estimar tokens." },
+        response.status,
+      );
+    }
+
+    const document = payload as RequirementDocumentDetail;
+
+    if (!sameUuid(document.projectId, projectId)) {
+      throw new ConflictException(
+        "El documento no pertenece al proyecto solicitado.",
+      );
+    }
+
+    if (document.archivedAt || document.status === "ARCHIVED") {
+      throw new ConflictException(
+        "No se puede estimar un análisis para un documento archivado.",
+      );
+    }
+
+    return document;
+  }
+
   async applyAiDraft(
     documentId: string,
     versionNumber: number,

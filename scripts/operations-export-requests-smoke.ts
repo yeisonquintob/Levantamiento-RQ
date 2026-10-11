@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 
 import dataSource from "../apps/operations-service/src/database/data-source.js";
 import {
+  AuditEventEntity,
   ExportArtifactEntity,
   ExportRequestEntity,
+  NotificationRequestEntity,
 } from "../apps/operations-service/src/operations/operation.entities.js";
 import { ExportRequestsService } from "../apps/operations-service/src/operations/export-requests.service.js";
 
@@ -12,6 +14,8 @@ async function main(): Promise<void> {
   await dataSource.initialize();
   const exports = dataSource.getRepository(ExportRequestEntity);
   const artifacts = dataSource.getRepository(ExportArtifactEntity);
+  const notifications = dataSource.getRepository(NotificationRequestEntity);
+  const audits = dataSource.getRepository(AuditEventEntity);
   const projectId = randomUUID();
   const documentId = randomUUID();
   const versionId = randomUUID();
@@ -21,6 +25,8 @@ async function main(): Promise<void> {
   const service = new ExportRequestsService(
     exports,
     artifacts,
+    notifications,
+    audits,
     dataSource,
     { requireRead: async () => ({}) } as never,
     {

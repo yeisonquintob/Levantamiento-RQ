@@ -28,7 +28,7 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({ bodyLimit: 20 * 1024 * 1024 }),
   );
 
   const globalPrefix = "api/v1";

@@ -9,7 +9,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, In, Repository } from "typeorm";
 
 import type {
   AuthenticatedUser,
@@ -17,6 +17,7 @@ import type {
   ExportArtifactDetail,
   ExportRequestDetail,
   ExportRequestListResponse,
+  ProjectDomainPurgeResult,
 } from "@levantamiento-rq/shared-contracts";
 import { IntegrationEventsPublisher } from "@levantamiento-rq/shared-messaging";
 
@@ -30,6 +31,7 @@ import {
   AuditEventEntity,
   ExportArtifactEntity,
   ExportRequestEntity,
+  NotificationRequestEntity,
 } from "./operation.entities";
 import { OperationsProjectsAccessClient } from "./projects-access.client";
 
@@ -53,6 +55,10 @@ export class ExportRequestsService {
     private readonly exports: Repository<ExportRequestEntity>,
     @InjectRepository(ExportArtifactEntity)
     private readonly artifacts: Repository<ExportArtifactEntity>,
+    @InjectRepository(NotificationRequestEntity)
+    private readonly notifications: Repository<NotificationRequestEntity>,
+    @InjectRepository(AuditEventEntity)
+    _audits: Repository<AuditEventEntity>,
     private readonly dataSource: DataSource,
     private readonly projects: OperationsProjectsAccessClient,
     private readonly documents: OperationsDocumentsAccessClient,
@@ -97,13 +103,24 @@ export class ExportRequestsService {
         "La clave idempotente ya fue utilizada por otra exportación.",
       );
     }
-    const { version } = await this.documents.requireApprovedVersion(
+    const { version } = await this.documents.requireVersion(
       projectId,
       documentId,
       versionNumber,
       context.accessToken,
       context.correlationId,
     );
+    const shareableDraft = ["DRAFT", "IN_REVIEW", "CHANGES_REQUESTED"].includes(
+      version.status,
+    );
+    if (
+      version.status !== "APPROVED" &&
+      !(input.format === "DOCX" && shareableDraft)
+    ) {
+      throw new ConflictException(
+        "PDF y Markdown requieren una versión aprobada. Word también puede generarse para borradores y versiones en revisión.",
+      );
+    }
     const id = randomUUID();
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
@@ -176,6 +193,41 @@ export class ExportRequestsService {
       },
     });
     return this.detail(await this.exports.findOneByOrFail({ id }));
+  }
+
+  async purgeProject(
+    context: OperationsActorContext,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    await this.projects.requireOwner(
+      projectId,
+      context.accessToken,
+      context.actor,
+      context.correlationId,
+    );
+    const exports = await this.exports.find({ where: { projectId } });
+    const exportIds = exports.map((item) => item.id);
+    const artifacts =
+      exportIds.length === 0
+        ? []
+        : await this.artifacts.find({
+            where: { exportRequestId: In(exportIds) },
+          });
+    for (const artifact of artifacts) {
+      await this.storage.deleteIfExists(artifact.storagePath);
+    }
+    const notifications = await this.notifications.countBy({ projectId });
+    await this.dataSource.transaction(async (manager) => {
+      if (exportIds.length > 0) {
+        await manager.delete(ExportRequestEntity, { id: In(exportIds) });
+      }
+      await manager.delete(NotificationRequestEntity, { projectId });
+      // El historial permanece disponible para auditoría aun después de eliminar el proyecto.
+    });
+    return {
+      deleted: true,
+      count: exports.length + notifications,
+    };
   }
 
   async list(

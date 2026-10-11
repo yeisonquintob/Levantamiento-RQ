@@ -11,11 +11,7 @@ import {
   type ProjectTemplateReference,
 } from "@levantamiento-rq/shared-contracts";
 
-function requiredText(
-  value: unknown,
-  field: string,
-  maximum: number,
-): string {
+function requiredText(value: unknown, field: string, maximum: number): string {
   if (
     typeof value !== "string" ||
     !value.trim() ||
@@ -111,9 +107,7 @@ export class DocumentTemplatesAccessClient {
       const detail = payloadMessage(payload);
 
       if (response.status === 404) {
-        throw new BadRequestException(
-          "La plantilla seleccionada no existe.",
-        );
+        throw new BadRequestException("La plantilla seleccionada no existe.");
       }
 
       if (response.status === 401 || response.status === 403) {

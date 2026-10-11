@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import test from "node:test";
 
 import { SignJWT } from "jose";
+import { verifyAccessJwt } from "../../libs/shared/http/src/index.js";
 
 import {
   AI_ANALYSIS_PROJECT_ACTIONS,
@@ -15,11 +17,35 @@ import { AiAnalysisAccessTokenGuard } from "../../apps/ai-analysis-service/src/a
 import type { AiAnalysisRequest } from "../../apps/ai-analysis-service/src/analysis/ai-analysis-request.js";
 import { AiAnalysisProjectsAccessClient } from "../../apps/ai-analysis-service/src/analysis/projects-access.client.js";
 
-const SECRET = "ai-analysis-test-secret-with-32-characters";
+const ACCESS_KEY_ID = "identity-test-2026";
+const WORKLOAD_KEY_ID = ACCESS_KEY_ID;
+const { privateKey: accessPrivateKey, publicKey: accessPublicKey } =
+  generateKeyPairSync("ed25519");
+const accessPublicJwk = {
+  ...accessPublicKey.export({ format: "jwk" }),
+  alg: "EdDSA",
+  kid: ACCESS_KEY_ID,
+  use: "sig",
+  principal: "identity",
+};
+const accessPrivateJwk = {
+  ...accessPrivateKey.export({ format: "jwk" }),
+  alg: "EdDSA",
+  kid: ACCESS_KEY_ID,
+  use: "sig",
+};
+const ACCESS_PUBLIC_JWKS = Buffer.from(
+  JSON.stringify({ keys: [accessPublicJwk] }),
+).toString("base64");
+const ACCESS_PRIVATE_JWK = Buffer.from(
+  JSON.stringify(accessPrivateJwk),
+).toString("base64");
 const CONFIG: AiAnalysisAuthConfig = {
   issuer: "levantamiento-rq-identity",
   audience: "levantamiento-rq",
-  accessSecret: SECRET,
+  accessPublicJwks: ACCESS_PUBLIC_JWKS,
+  workloadPrivateJwk: ACCESS_PRIVATE_JWK,
+  workloadKeyId: WORKLOAD_KEY_ID,
   projectsServiceUrl: "http://127.0.0.1:3002",
   projectsTimeoutMs: 8000,
 };
@@ -80,13 +106,13 @@ async function accessToken(
     permissions: user.permissions,
     mustChangePassword,
   })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setProtectedHeader({ alg: "EdDSA", typ: "JWT", kid: ACCESS_KEY_ID })
     .setSubject(user.id)
     .setIssuer(CONFIG.issuer)
     .setAudience(CONFIG.audience)
     .setIssuedAt()
     .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(SECRET));
+    .sign(accessPrivateKey);
 }
 
 function projectPayload(
@@ -108,15 +134,17 @@ test("el contrato define lectura, creación y cancelación", () => {
   ]);
 });
 
-test("la configuración exige secreto seguro, URL y timeout válidos", () => {
+test("la configuración exige JWKS Ed25519, clave de carga, URL y timeout válidos", () => {
   assert.throws(
-    () => loadAiAnalysisAuthConfig({ JWT_ACCESS_SECRET: "corto" }),
-    /mínimo 32/i,
+    () => loadAiAnalysisAuthConfig({ JWT_ACCESS_PUBLIC_JWKS_BASE64: "inválido" }),
+    /JWKS|base64|JSON/i,
   );
   assert.throws(
     () =>
       loadAiAnalysisAuthConfig({
-        JWT_ACCESS_SECRET: SECRET,
+        JWT_ACCESS_PUBLIC_JWKS_BASE64: ACCESS_PUBLIC_JWKS,
+        WORKLOAD_JWT_PRIVATE_JWK_BASE64: ACCESS_PRIVATE_JWK,
+        WORKLOAD_JWT_KEY_ID: WORKLOAD_KEY_ID,
         PROJECTS_SERVICE_URL: "no-es-url",
       }),
     /URL absoluta/i,
@@ -124,7 +152,9 @@ test("la configuración exige secreto seguro, URL y timeout válidos", () => {
   assert.throws(
     () =>
       loadAiAnalysisAuthConfig({
-        JWT_ACCESS_SECRET: SECRET,
+        JWT_ACCESS_PUBLIC_JWKS_BASE64: ACCESS_PUBLIC_JWKS,
+        WORKLOAD_JWT_PRIVATE_JWK_BASE64: ACCESS_PRIVATE_JWK,
+        WORKLOAD_JWT_KEY_ID: WORKLOAD_KEY_ID,
         PROJECTS_TIMEOUT_MS: "10",
       }),
     /500 y 30000/i,
@@ -132,7 +162,9 @@ test("la configuración exige secreto seguro, URL y timeout válidos", () => {
 
   assert.equal(
     loadAiAnalysisAuthConfig({
-      JWT_ACCESS_SECRET: SECRET,
+      JWT_ACCESS_PUBLIC_JWKS_BASE64: ACCESS_PUBLIC_JWKS,
+      WORKLOAD_JWT_PRIVATE_JWK_BASE64: ACCESS_PRIVATE_JWK,
+      WORKLOAD_JWT_KEY_ID: WORKLOAD_KEY_ID,
     }).projectsServiceUrl,
     "http://127.0.0.1:3002",
   );
@@ -186,6 +218,78 @@ test("el guard rechaza ausencia de token y contraseña temporal", async () => {
         403,
         "Debes cambiar la contraseña temporal antes de continuar.",
       ),
+  );
+});
+
+test("JWT rechaza algoritmo, issuer, audience y expiración incorrectos", async () => {
+  const base = () => new SignJWT({
+    typ: "access",
+    email: "test@local.invalid",
+    name: "Test",
+    roles: ["ANALYST"],
+    permissions: [],
+    mustChangePassword: false,
+  })
+    .setProtectedHeader({ alg: "EdDSA", typ: "JWT", kid: ACCESS_KEY_ID })
+    .setSubject("77777777-7777-4777-8777-777777777777")
+    .setIssuedAt();
+  for (const token of [
+    await base().setIssuer("incorrecto").setAudience(CONFIG.audience).setExpirationTime("5m").sign(accessPrivateKey),
+    await base().setIssuer(CONFIG.issuer).setAudience("incorrecta").setExpirationTime("5m").sign(accessPrivateKey),
+    await base().setIssuer(CONFIG.issuer).setAudience(CONFIG.audience).setExpirationTime(1).sign(accessPrivateKey),
+  ]) {
+    await assert.rejects(() => verifyAccessJwt(token, {
+      issuer: CONFIG.issuer,
+      audience: CONFIG.audience,
+      publicJwks: CONFIG.accessPublicJwks,
+    }));
+  }
+  const hsToken = await new SignJWT({ typ: "access" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT", kid: ACCESS_KEY_ID })
+    .setIssuer(CONFIG.issuer)
+    .setAudience(CONFIG.audience)
+    .setSubject("77777777-7777-4777-8777-777777777777")
+    .setExpirationTime("5m")
+    .sign(new TextEncoder().encode("a-secret-that-is-long-enough-for-tests"));
+  await assert.rejects(() => verifyAccessJwt(hsToken, {
+    issuer: CONFIG.issuer,
+    audience: CONFIG.audience,
+    publicJwks: CONFIG.accessPublicJwks,
+  }));
+});
+
+test("una clave de workload no puede autoasignarse ADMIN o system.admin", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const kid = "ai-analysis-escalation-test";
+  const jwks = Buffer.from(JSON.stringify({ keys: [{
+    ...publicKey.export({ format: "jwk" }),
+    kid,
+    alg: "EdDSA",
+    use: "sig",
+    principal: "ai-analysis-service",
+  }] })).toString("base64");
+  const token = await new SignJWT({
+    typ: "access",
+    service: "ai-analysis-service",
+    email: "ai-analysis-service@internal.local",
+    name: "AI Analysis Service",
+    roles: ["ADMIN"],
+    permissions: ["system.admin"],
+    mustChangePassword: false,
+  })
+    .setProtectedHeader({ alg: "EdDSA", typ: "JWT", kid })
+    .setSubject("00000000-0000-4000-8000-000000000005")
+    .setIssuer(CONFIG.issuer)
+    .setAudience(CONFIG.audience)
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  await assert.rejects(
+    () => verifyAccessJwt(token, {
+      issuer: CONFIG.issuer,
+      audience: CONFIG.audience,
+      publicJwks: jwks,
+    }),
+    /privilegios del workload/i,
   );
 });
 

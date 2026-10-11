@@ -162,8 +162,21 @@ test("la entrada exige concurrencia optimista y limita comentarios", () => {
 });
 
 test("la configuración segura valida secreto, URLs y tiempos", () => {
+  const publicJwks = Buffer.from(
+    JSON.stringify({
+      keys: [
+        {
+          kty: "OKP",
+          crv: "Ed25519",
+          x: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          kid: "identity-test",
+          principal: "identity",
+        },
+      ],
+    }),
+  ).toString("base64");
   const config = loadWorkflowAuthConfig({
-    JWT_ACCESS_SECRET: "s".repeat(32),
+    JWT_ACCESS_PUBLIC_JWKS_BASE64: publicJwks,
     PROJECTS_SERVICE_URL: "http://projects.internal:3002/",
     DOCUMENTS_SERVICE_URL: "http://documents.internal:3004/",
     PROJECTS_TIMEOUT_MS: "1200",
@@ -174,7 +187,7 @@ test("la configuración segura valida secreto, URLs y tiempos", () => {
   assert.equal(config.documentsServiceUrl, "http://documents.internal:3004");
   assert.equal(config.projectsTimeoutMs, 1200);
   assert.equal(config.documentsTimeoutMs, 1500);
-  assert.throws(() => loadWorkflowAuthConfig({ JWT_ACCESS_SECRET: "short" }));
+  assert.throws(() => loadWorkflowAuthConfig({}));
 });
 
 test("la API coordina revisiones sin apropiarse de datos documentales", async () => {
@@ -201,7 +214,11 @@ test("la API coordina revisiones sin apropiarse de datos documentales", async ()
   assert.match(service, /clave idempotente ya fue utilizada/);
   assert.match(service, /WorkflowReviewActivityEntity/);
   assert.match(documentsClient, /submit-review/);
-  assert.match(documentsClient, /"approve" \| "reject"/);
+  assert.match(documentsClient, /"request-changes" \| "approve" \| "reject"/);
+  assert.match(service, /existing\.status !== "CHANGES_REQUESTED"/);
+  assert.match(service, /status: "IN_REVIEW"/);
+  assert.match(service, /Status = :status/);
+  assert.match(service, /"request-changes"/);
   assert.doesNotMatch(
     service,
     /DocumentVersionEntity|RequirementDocumentEntity/,
@@ -235,7 +252,7 @@ test("Gateway y editor exponen Workflow y cierran las transiciones directas", as
   assert.match(editor, /WorkflowReviewDetail/);
   assert.match(editor, /request-changes/);
   assert.match(editor, /Agregar comentario/);
-  assert.match(editor, /crypto\.randomUUID\(\)/);
+  assert.match(editor, /createBrowserUuid\(\)/);
   assert.match(localUp, /workflow-service/);
   assert.match(localUp, /3007/);
   assert.match(localDown, /workflow-service/);
@@ -256,4 +273,19 @@ test("el E2E cubre aprobación, correcciones, rechazo, auditoría y limpieza", a
   assert.match(e2e, /DELETE FROM dbo\.IdentityUsers/);
   assert.match(swagger, /workflow-service/);
   assert.match(swagger, /directa/);
+});
+
+test("la purga de revisiones exige propietario y conserva el borrado en cascada", async () => {
+  const service = await readFile(
+    "apps/workflow-service/src/reviews/workflow-reviews.service.ts",
+    "utf8",
+  );
+  const controller = await readFile(
+    "apps/workflow-service/src/reviews/workflow-reviews.controller.ts",
+    "utf8",
+  );
+  assert.match(service, /async purgeProject/);
+  assert.match(service, /access\.role !== "ADMIN"/);
+  assert.match(service, /reviews\.delete\(\{ projectId \}\)/);
+  assert.match(controller, /@Delete\("projects\/:projectId\/reviews"\)/);
 });

@@ -1,3 +1,16 @@
+import { ProjectAuditEntity } from "./project-audit.entity";
+import {
+  readAuditHistory,
+  requireAuditAdministrator,
+} from "@levantamiento-rq/shared-persistence";
+import {
+  PROJECT_AUDIT_FIELDS,
+  auditFieldChanges,
+  auditMetadata,
+  auditMetadataChanges,
+  type AuditHistoryResponse,
+  type AuditFieldChange,
+} from "@levantamiento-rq/shared-contracts";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -16,12 +29,14 @@ import type {
   AuthenticatedUser,
   CreateProjectRequest,
   ProjectDetail,
+  ProjectDomainPurgeResult,
   ProjectListResponse,
   ProjectMetrics,
   ProjectParticipant,
   ProjectSummary,
   UpdateProjectRequest,
 } from "@levantamiento-rq/shared-contracts";
+import { advanceProjectLifecycleStatus } from "@levantamiento-rq/shared-contracts";
 
 import { DocumentTemplatesAccessClient } from "./document-templates-access.client";
 import { ProjectParticipantEntity } from "./project-participant.entity";
@@ -32,6 +47,12 @@ function isAdministrator(actor: AuthenticatedUser): boolean {
   return (
     actor.roles.some((role) => role.toUpperCase() === "ADMIN") ||
     actor.permissions.includes("system.admin")
+  );
+}
+
+function canReadAllProjects(actor: AuthenticatedUser): boolean {
+  return (
+    isAdministrator(actor) || actor.permissions.includes("projects.read.all")
   );
 }
 
@@ -87,6 +108,19 @@ function projectCreationError(error: unknown): string {
   return String(error);
 }
 
+function projectAuditSnapshot(project: ProjectEntity) {
+  return {
+    title: project.title,
+    requestingArea: project.requestingArea,
+    description: project.description,
+    status: project.status,
+    activityState: project.activityState,
+    template: project.templateName
+      ? `${project.templateName} · ${project.templateVersion}`
+      : null,
+  };
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -97,6 +131,70 @@ export class ProjectsService {
     private readonly participants: Repository<ProjectParticipantEntity>,
     private readonly templates: DocumentTemplatesAccessClient,
   ) {}
+
+  async auditHistory(
+    actor: AuthenticatedUser,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<AuditHistoryResponse> {
+    requireAuditAdministrator(actor);
+    const page = await readAuditHistory(
+      this.dataSource
+        .getRepository(ProjectAuditEntity)
+        .createQueryBuilder("audit"),
+      query,
+      {
+        date: "audit.occurredAt",
+        id: "audit.id",
+        projectId: "audit.projectId",
+        search: [
+          "audit.action",
+          "audit.actorName",
+          "audit.projectLabel",
+          "audit.metadataJson",
+        ],
+      },
+    );
+    return {
+      ...page,
+      items: page.items.map((row) => {
+        const metadata = auditMetadata(row.metadataJson);
+        return {
+          id: row.id,
+          occurredAt: row.occurredAt.toISOString(),
+          action: row.action,
+          actorUserId: row.actorUserId,
+          actorName: row.actorName,
+          resourceId: row.projectId,
+          resourceLabel: row.projectLabel,
+          projectId: row.projectId,
+          result: "SUCCEEDED" as const,
+          changes: auditMetadataChanges(metadata, PROJECT_AUDIT_FIELDS),
+          details: metadata.historical
+            ? "Registro histórico: se conserva el creador y la fecha original; no se registraron los valores iniciales."
+            : null,
+        };
+      }),
+    };
+  }
+
+  private async recordAudit(
+    manager: DataSource["manager"],
+    actor: AuthenticatedUser,
+    project: ProjectEntity,
+    action: string,
+    changes: readonly AuditFieldChange[],
+  ): Promise<void> {
+    await manager.getRepository(ProjectAuditEntity).insert({
+      id: randomUUID(),
+      projectId: project.id,
+      actorUserId: actor.id,
+      actorName: actor.displayName,
+      projectLabel: `${project.code} · ${project.title}`,
+      action,
+      metadataJson: JSON.stringify({ changes }),
+      occurredAt: new Date(),
+    });
+  }
 
   async create(
     actor: AuthenticatedUser,
@@ -184,14 +282,7 @@ export class ProjectsService {
             )
             VALUES (@0, @1, @2, @3, @4, @5)
           `,
-          [
-            participantId,
-            projectId,
-            actor.id,
-            "OWNER",
-            actor.id,
-            now,
-          ],
+          [participantId, projectId, actor.id, "OWNER", actor.id, now],
         );
 
         const owner = Object.assign(new ProjectParticipantEntity(), {
@@ -209,6 +300,7 @@ export class ProjectsService {
           requestingArea: request.requestingArea,
           description: request.description ?? null,
           status: "DRAFT" as const,
+          activityState: "ACTIVE" as const,
           templateId: template.id,
           templateCode: template.code,
           templateName: template.name,
@@ -222,6 +314,13 @@ export class ProjectsService {
           participants: [owner],
         });
 
+        await this.recordAudit(
+          manager,
+          actor,
+          project,
+          "PROJECT_CREATED",
+          auditFieldChanges({}, projectAuditSnapshot(project)),
+        );
         return this.toDetail(project);
       });
     } catch (error) {
@@ -254,8 +353,21 @@ export class ProjectsService {
       );
     }
 
+    if (query.area) {
+      base.andWhere("project.requestingArea = :area", { area: query.area });
+    }
+
     if (query.status) {
       base.andWhere("project.status = :status", { status: query.status });
+    }
+
+    // Por defecto el listado oculta los proyectos eliminados (situación reversible).
+    if (query.activityState === null) {
+      base.andWhere("project.activityState <> 'DELETED'");
+    } else if (query.activityState !== "ALL") {
+      base.andWhere("project.activityState = :activityState", {
+        activityState: query.activityState,
+      });
     }
 
     const totalItems = await base.getCount();
@@ -285,26 +397,48 @@ export class ProjectsService {
   async metrics(actor: AuthenticatedUser): Promise<ProjectMetrics> {
     const query = this.projects
       .createQueryBuilder("project")
-      .select("COUNT(1)", "total")
+      .select(
+        "SUM(CASE WHEN project.activityState <> 'DELETED' THEN 1 ELSE 0 END)",
+        "total",
+      )
       .addSelect(
-        "SUM(CASE WHEN project.status = 'DRAFT' THEN 1 ELSE 0 END)",
+        "SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status = 'DRAFT' THEN 1 ELSE 0 END)",
         "draft",
       )
       .addSelect(
-        "SUM(CASE WHEN project.status = 'IN_PROGRESS' THEN 1 ELSE 0 END)",
+        `SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status IN (
+          'DISCUSSION', 'SOURCES', 'DOCUMENT_GENERATED',
+          'VALIDATION', 'APPROVED', 'EXECUTION'
+        ) THEN 1 ELSE 0 END)`,
         "inProgress",
       )
       .addSelect(
-        "SUM(CASE WHEN project.status = 'VALIDATION' THEN 1 ELSE 0 END)",
+        "SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status = 'VALIDATION' THEN 1 ELSE 0 END)",
         "validation",
       )
       .addSelect(
-        "SUM(CASE WHEN project.status = 'APPROVED' THEN 1 ELSE 0 END)",
+        "SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status = 'APPROVED' THEN 1 ELSE 0 END)",
         "approved",
       )
       .addSelect(
-        "SUM(CASE WHEN project.status = 'ARCHIVED' THEN 1 ELSE 0 END)",
+        "SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status = 'ARCHIVED' THEN 1 ELSE 0 END)",
         "archived",
+      )
+      .addSelect(
+        "SUM(CASE WHEN project.activityState <> 'DELETED' AND project.status = 'COMPLETED' THEN 1 ELSE 0 END)",
+        "completed",
+      )
+      .addSelect(
+        "SUM(CASE WHEN project.activityState <> 'DELETED' THEN 1 ELSE 0 END)",
+        "active",
+      )
+      .addSelect(
+        "SUM(CASE WHEN project.activityState = 'PAUSED' THEN 1 ELSE 0 END)",
+        "paused",
+      )
+      .addSelect(
+        "SUM(CASE WHEN project.activityState = 'DELETED' THEN 1 ELSE 0 END)",
+        "deleted",
       );
 
     this.applyAccess(query, actor);
@@ -322,7 +456,11 @@ export class ProjectsService {
       inProgress: numberValue("inProgress"),
       validation: numberValue("validation"),
       approved: numberValue("approved"),
+      completed: numberValue("completed"),
       archived: numberValue("archived"),
+      active: numberValue("active"),
+      paused: numberValue("paused"),
+      deleted: numberValue("deleted"),
     };
   }
 
@@ -341,6 +479,7 @@ export class ProjectsService {
   ): Promise<ProjectDetail> {
     const project = await this.requireAccessibleProject(actor, projectId);
     this.requireManageAccess(actor, project);
+    const before = projectAuditSnapshot(project);
 
     if (request.title !== undefined) {
       project.title = request.title;
@@ -354,16 +493,94 @@ export class ProjectsService {
       project.description = request.description;
     }
 
+    if (
+      request.activityState !== undefined &&
+      request.activityState !== project.activityState
+    ) {
+      // Eliminar: solo propietario o administrador. Pausar y reactivar: quien puede editar.
+      if (request.activityState === "DELETED") {
+        this.requireOwnerAccess(actor, project);
+      }
+      project.activityState = request.activityState;
+    }
+
     if (request.status !== undefined) {
-      project.status = request.status;
+      project.status =
+        request.status === "ARCHIVED"
+          ? "ARCHIVED"
+          : advanceProjectLifecycleStatus(project.status, request.status);
     }
 
     project.updatedByUserId = actor.id;
     project.updatedAt = new Date();
 
-    await this.projects.save(project);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ProjectEntity).save(project);
+      await this.recordAudit(
+        manager,
+        actor,
+        project,
+        "PROJECT_UPDATED",
+        auditFieldChanges(before, projectAuditSnapshot(project)),
+      );
+    });
 
     return this.toDetail(project);
+  }
+
+  async documentGenerated(
+    actor: AuthenticatedUser,
+    projectId: string,
+    documentId: string,
+    accessToken: string,
+  ): Promise<void> {
+    const project = await this.requireAccessibleProject(actor, projectId);
+    if (!actor.permissions.includes("documents.ai.apply"))
+      this.requireManageAccess(actor, project);
+    const url =
+      process.env.DOCUMENTS_SERVICE_URL?.trim() || "http://127.0.0.1:3004";
+    const response = await fetch(
+      `${url}/api/v1/documents/${encodeURIComponent(documentId)}`,
+      {
+        headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        "No se pudo verificar la versión generada.",
+      );
+    const document = (await response.json()) as {
+      projectId: string;
+      status: string;
+    };
+    if (
+      !sameUuid(document.projectId, projectId) ||
+      document.status !== "DRAFT"
+    ) {
+      throw new ConflictException(
+        "El documento debe ser un borrador actual del proyecto.",
+      );
+    }
+    if (
+      project.status === "ARCHIVED" ||
+      project.status === "DOCUMENT_GENERATED"
+    )
+      return;
+    const before = projectAuditSnapshot(project);
+    project.status = "DOCUMENT_GENERATED";
+    project.updatedByUserId = actor.id;
+    project.updatedAt = new Date();
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ProjectEntity).save(project);
+      await this.recordAudit(
+        manager,
+        actor,
+        project,
+        "PROJECT_UPDATED",
+        auditFieldChanges(before, projectAuditSnapshot(project)),
+      );
+    });
   }
 
   async addParticipant(
@@ -374,8 +591,8 @@ export class ProjectsService {
     const project = await this.requireAccessibleProject(actor, projectId);
     this.requireOwnerAccess(actor, project);
 
-    const existing = project.participants.find(
-      (participant) => sameUuid(participant.userId, request.userId),
+    const existing = project.participants.find((participant) =>
+      sameUuid(participant.userId, request.userId),
     );
 
     if (existing) {
@@ -391,11 +608,23 @@ export class ProjectsService {
       createdAt: new Date(),
     });
 
-    await this.participants.save(participant);
     project.participants.push(participant);
     project.updatedByUserId = actor.id;
     project.updatedAt = new Date();
-    await this.projects.save(project);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ProjectParticipantEntity).save(participant);
+      await manager.getRepository(ProjectEntity).save(project);
+      await this.recordAudit(
+        manager,
+        actor,
+        project,
+        "PROJECT_PARTICIPANT_ADDED",
+        auditFieldChanges(
+          {},
+          { participant: request.userId, role: request.role },
+        ),
+      );
+    });
 
     return this.toDetail(project);
   }
@@ -414,30 +643,64 @@ export class ProjectsService {
       );
     }
 
-    const participant = project.participants.find(
-      (item) => sameUuid(item.userId, userId),
+    const participant = project.participants.find((item) =>
+      sameUuid(item.userId, userId),
     );
 
     if (!participant) {
       throw new NotFoundException("El participante no existe.");
     }
 
-    await this.participants.remove(participant);
     project.participants = project.participants.filter(
       (item) => item.id !== participant.id,
     );
     project.updatedByUserId = actor.id;
     project.updatedAt = new Date();
-    await this.projects.save(project);
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ProjectParticipantEntity).remove(participant);
+      await manager.getRepository(ProjectEntity).save(project);
+      await this.recordAudit(
+        manager,
+        actor,
+        project,
+        "PROJECT_PARTICIPANT_REMOVED",
+        auditFieldChanges({ participant: userId, role: participant.role }, {}),
+      );
+    });
 
     return this.toDetail(project);
+  }
+
+  async deleteProject(
+    actor: AuthenticatedUser,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult & { projectId: string; code: string }> {
+    const project = await this.requireAccessibleProject(actor, projectId);
+    this.requireOwnerAccess(actor, project);
+    const code = project.code;
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ProjectEntity).remove(project);
+      await this.recordAudit(
+        manager,
+        actor,
+        { ...project, id: projectId },
+        "PROJECT_DELETED",
+        auditFieldChanges(projectAuditSnapshot(project), {}),
+      );
+    });
+    return {
+      deleted: true,
+      count: 1,
+      projectId: normalizeUuid(projectId),
+      code,
+    };
   }
 
   private applyAccess(
     query: SelectQueryBuilder<ProjectEntity>,
     actor: AuthenticatedUser,
   ): void {
-    if (isAdministrator(actor)) {
+    if (canReadAllProjects(actor)) {
       return;
     }
 
@@ -463,9 +726,9 @@ export class ProjectsService {
     }
 
     if (
-      !isAdministrator(actor) &&
-      !project.participants.some(
-        (participant) => sameUuid(participant.userId, actor.id),
+      !canReadAllProjects(actor) &&
+      !project.participants.some((participant) =>
+        sameUuid(participant.userId, actor.id),
       )
     ) {
       throw new ForbiddenException("No tienes acceso a este proyecto.");
@@ -482,8 +745,8 @@ export class ProjectsService {
       return;
     }
 
-    const role = project.participants.find(
-      (participant) => sameUuid(participant.userId, actor.id),
+    const role = project.participants.find((participant) =>
+      sameUuid(participant.userId, actor.id),
     )?.role;
 
     if (role !== "OWNER" && role !== "EDITOR") {
@@ -501,13 +764,13 @@ export class ProjectsService {
       return;
     }
 
-    const role = project.participants.find(
-      (participant) => sameUuid(participant.userId, actor.id),
+    const role = project.participants.find((participant) =>
+      sameUuid(participant.userId, actor.id),
     )?.role;
 
     if (role !== "OWNER") {
       throw new ForbiddenException(
-        "Solo el propietario puede administrar participantes.",
+        "Solo el propietario puede administrar participantes o eliminar el proyecto.",
       );
     }
   }
@@ -543,6 +806,7 @@ export class ProjectsService {
       requestingArea: project.requestingArea,
       description: project.description,
       status: project.status,
+      activityState: project.activityState ?? "ACTIVE",
       template:
         project.templateId &&
         project.templateCode &&

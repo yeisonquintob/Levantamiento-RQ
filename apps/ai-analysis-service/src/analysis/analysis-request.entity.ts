@@ -19,6 +19,9 @@ import type {
   { unique: true },
 )
 export class AnalysisRequestEntity {
+  @Column("nvarchar", { name: "ProviderSelectionsJson", nullable: true })
+  providerSelectionsJson!: string | null;
+
   @PrimaryColumn("uniqueidentifier", { name: "Id" })
   id!: string;
 
@@ -45,8 +48,14 @@ export class AnalysisRequestEntity {
   })
   purpose!: AiDraftGenerationPurpose;
 
-  @Column("nvarchar", { name: "Instruction", length: 2000, nullable: true })
+  @Column("nvarchar", { name: "Instruction", nullable: true })
   instruction!: string | null;
+
+  @Column("bit", { name: "UseLocalAi", default: true })
+  useLocalAi!: boolean;
+
+  @Column("bit", { name: "UseCloudAi" })
+  useCloudAi!: boolean;
 
   @Column("nvarchar", { name: "IdempotencyKey", length: 120 })
   idempotencyKey!: string;

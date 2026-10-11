@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -34,6 +35,7 @@ import {
   parseTransition,
   parseUpdateDocument,
   parseUpdateSection,
+  validateDocumentSectionContent,
   parseVersionNumber,
 } from "./documents-input";
 import {
@@ -95,6 +97,21 @@ export class DocumentsController {
     return this.documents.list(context(request), parseProjectId(projectId));
   }
 
+  @ApiOperation({
+    summary: "Eliminar definitivamente los documentos del proyecto",
+  })
+  @Delete("projects/:projectId/documents")
+  @HttpCode(200)
+  purgeProject(
+    @Req() request: DocumentsRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.documents.purgeProject(
+      context(request),
+      parseProjectId(projectId),
+    );
+  }
+
   @ApiOperation({ summary: "Consultar un documento y su versión actual" })
   @Get("documents/:documentId")
   getById(
@@ -102,6 +119,20 @@ export class DocumentsController {
     @Param("documentId") documentId: string,
   ) {
     return this.documents.getById(
+      context(request),
+      parseDocumentId(documentId),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Listar todas las versiones existentes del documento",
+  })
+  @Get("documents/:documentId/versions")
+  listVersions(
+    @Req() request: DocumentsRequest,
+    @Param("documentId") documentId: string,
+  ) {
+    return this.documents.listVersions(
       context(request),
       parseDocumentId(documentId),
     );
@@ -115,6 +146,23 @@ export class DocumentsController {
     @Param("versionNumber") versionNumber: string,
   ) {
     return this.documents.getVersion(
+      context(request),
+      parseDocumentId(documentId),
+      parseVersionNumber(versionNumber),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Eliminar una versión que todavía está en borrador",
+  })
+  @Delete("documents/:documentId/versions/:versionNumber")
+  @HttpCode(200)
+  deleteDraftVersion(
+    @Req() request: DocumentsRequest,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+  ) {
+    return this.documents.deleteDraftVersion(
       context(request),
       parseDocumentId(documentId),
       parseVersionNumber(versionNumber),
@@ -158,12 +206,15 @@ export class DocumentsController {
     @Param("sectionKey") sectionKey: string,
     @Body() body: unknown,
   ) {
+    const parsedSectionKey = parseSectionKey(sectionKey);
+    const parsedRequest = parseUpdateSection(body);
+    validateDocumentSectionContent(parsedSectionKey, parsedRequest.content);
     return this.documents.updateSection(
       context(request),
       parseDocumentId(documentId),
       parseVersionNumber(versionNumber),
-      parseSectionKey(sectionKey),
-      parseUpdateSection(body),
+      parsedSectionKey,
+      parsedRequest,
     );
   }
 
@@ -213,6 +264,23 @@ export class DocumentsController {
     @Body() body: unknown,
   ) {
     return this.documents.submitReview(
+      context(request),
+      parseDocumentId(documentId),
+      parseVersionNumber(versionNumber),
+      parseTransition(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Reabrir una versión para aplicar correcciones" })
+  @Post("documents/:documentId/versions/:versionNumber/request-changes")
+  @HttpCode(200)
+  requestChanges(
+    @Req() request: DocumentsRequest,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+    @Body() body: unknown,
+  ) {
+    return this.documents.requestChanges(
       context(request),
       parseDocumentId(documentId),
       parseVersionNumber(versionNumber),

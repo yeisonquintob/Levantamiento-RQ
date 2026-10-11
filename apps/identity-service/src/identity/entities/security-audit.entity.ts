@@ -23,7 +23,7 @@ export class SecurityAuditEntity {
   @Column("uniqueidentifier", { name: "TargetUserId" })
   targetUserId!: string;
 
-  @Column("nvarchar", { name: "Detail", length: 2000, nullable: true })
+  @Column("nvarchar", { name: "Detail", length: "MAX", nullable: true })
   detail!: string | null;
 
   @Column("datetime2", {

@@ -14,6 +14,18 @@ export interface SignInRequest {
   password: string;
 }
 
+export interface RegisterAccountRequest {
+  displayName: string;
+  email: string;
+  password: string;
+}
+
+export interface RegisterAccountResponse {
+  userId: string;
+  status: "PENDING_ACTIVATION";
+  roleCode: "ANALYST";
+}
+
 export interface RefreshSessionRequest {
   refreshToken: string;
 }

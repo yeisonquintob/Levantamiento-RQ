@@ -2,9 +2,13 @@ import { BadRequestException } from "@nestjs/common";
 
 import {
   AUDIT_RESULTS,
+  EXECUTION_TASK_SOURCES,
+  EXECUTION_TASK_STATES,
   EXPORT_FORMATS,
   type AuditResult,
   type CreateExportRequest,
+  type ExecutionTaskSource,
+  type ExecutionTaskState,
   type ExportFormat,
 } from "@levantamiento-rq/shared-contracts";
 
@@ -138,7 +142,78 @@ export function parseCreateExport(value: unknown): CreateExportRequest {
     typeof format !== "string" ||
     !EXPORT_FORMATS.includes(format as ExportFormat)
   ) {
-    throw new BadRequestException("format debe ser PDF o DOCX.");
+    throw new BadRequestException("format debe ser PDF, DOCX o MARKDOWN.");
   }
   return { format: format as ExportFormat };
+}
+
+export interface ParsedExecutionTaskUpdate {
+  taskCode: string;
+  state: ExecutionTaskState;
+  source: ExecutionTaskSource;
+  note: string | null;
+  completedAt: Date | null;
+}
+
+const MAX_EXECUTION_TASK_UPDATES = 500;
+
+/** Normaliza el código de una tarea para comparar sin importar mayúsculas ni espacios. */
+export function normalizeExecutionTaskCode(value: string): string {
+  return value.trim().replace(/\s+/gu, " ").toUpperCase();
+}
+
+export function parseExecutionTaskUpdates(
+  body: unknown,
+): ParsedExecutionTaskUpdate[] {
+  const items =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? (body as { items?: unknown }).items
+      : undefined;
+  if (
+    !Array.isArray(items) ||
+    items.length === 0 ||
+    items.length > MAX_EXECUTION_TASK_UPDATES
+  ) {
+    throw new BadRequestException(
+      `items debe contener entre 1 y ${MAX_EXECUTION_TASK_UPDATES} tareas.`,
+    );
+  }
+  const seen = new Set<string>();
+  return items.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new BadRequestException(`items[${index}] no es válido.`);
+    }
+    const item = raw as Readonly<Record<string, unknown>>;
+    const code =
+      typeof item.taskCode === "string"
+        ? normalizeExecutionTaskCode(item.taskCode)
+        : "";
+    if (!code || code.length > 120) {
+      throw new BadRequestException(`items[${index}].taskCode no es válido.`);
+    }
+    if (seen.has(code)) {
+      throw new BadRequestException(`La tarea ${code} está repetida.`);
+    }
+    seen.add(code);
+    if (!EXECUTION_TASK_STATES.includes(item.state as ExecutionTaskState)) {
+      throw new BadRequestException(`items[${index}].state no es válido.`);
+    }
+    const state = item.state as ExecutionTaskState;
+    const source =
+      item.source === undefined || item.source === null
+        ? "MANUAL"
+        : (item.source as ExecutionTaskSource);
+    if (!EXECUTION_TASK_SOURCES.includes(source)) {
+      throw new BadRequestException(`items[${index}].source no es válido.`);
+    }
+    const note = optionalText(item.note, `items[${index}].note`, 1000);
+    const reported = optionalDate(item.completedAt, `items[${index}].completedAt`);
+    return {
+      taskCode: code,
+      state,
+      source,
+      note,
+      completedAt: state === "DONE" ? (reported ?? new Date()) : null,
+    };
+  });
 }

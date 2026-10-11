@@ -1,3 +1,11 @@
+import {
+  readAuditHistory,
+  requireAuditAdministrator,
+} from "@levantamiento-rq/shared-persistence";
+import {
+  auditMetadata,
+  type AuditHistoryResponse,
+} from "@levantamiento-rq/shared-contracts";
 import { randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
@@ -10,6 +18,7 @@ import type {
   AuditResult,
   AuthenticatedUser,
   NotificationDetail,
+  NotificationClearResult,
   NotificationListResponse,
   NotificationStatus,
   NotificationType,
@@ -42,6 +51,65 @@ export class NotificationsAuditService {
     private readonly audits: Repository<AuditEventEntity>,
     private readonly projects: OperationsProjectsAccessClient,
   ) {}
+
+  async approvalsHistory(
+    context: NotificationAuditContext,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<AuditHistoryResponse> {
+    requireAuditAdministrator(context.actor);
+    const builder = this.audits
+      .createQueryBuilder("audit")
+      .where("audit.Action IN (:...actions)", {
+        actions: [
+          "REVIEW_REQUESTED",
+          "DOCUMENT_CHANGES_REQUESTED",
+          "DOCUMENT_APPROVED",
+          "DOCUMENT_REJECTED",
+        ],
+      });
+    const page = await readAuditHistory(builder, query, {
+      date: "audit.occurredAt",
+      id: "audit.id",
+      search: [
+        "audit.action",
+        "audit.metadataJson",
+        "CAST(audit.actorUserId AS nvarchar(36))",
+      ],
+      result: "audit.result",
+      projectId: "audit.projectId",
+    });
+    return {
+      ...page,
+      items: page.items.map((row) => {
+        const metadata = auditMetadata(row.metadataJson);
+        return {
+          id: row.id,
+          occurredAt: row.occurredAt.toISOString(),
+          action: row.action,
+          actorUserId: row.actorUserId,
+          actorName:
+            typeof metadata.actorName === "string" ? metadata.actorName : null,
+          resourceId: row.resourceId,
+          projectId: row.projectId,
+          resourceLabel: `${typeof metadata.projectLabel === "string" ? metadata.projectLabel : (row.projectId ?? "Documento")}${typeof metadata.versionNumber === "number" ? ` · Versión ${metadata.versionNumber}` : ""}`,
+          result: row.result as AuditResult,
+          changes:
+            typeof metadata.previousStatus === "string" &&
+            typeof metadata.status === "string"
+              ? [
+                  {
+                    field: "status",
+                    before: metadata.previousStatus,
+                    after: metadata.status,
+                  },
+                ]
+              : [],
+          details:
+            typeof metadata.comment === "string" ? metadata.comment : null,
+        };
+      }),
+    };
+  }
 
   async listNotifications(
     context: NotificationAuditContext,
@@ -114,6 +182,31 @@ export class NotificationsAuditService {
       });
     }
     return this.notification(notification);
+  }
+
+  async clearNotifications(
+    context: NotificationAuditContext,
+  ): Promise<NotificationClearResult> {
+    const deleted = await this.notifications.delete({
+      recipientUserId: context.actor.id,
+    });
+    const count = deleted.affected ?? 0;
+    const now = new Date();
+    await this.audits.save({
+      id: randomUUID(),
+      actorUserId: context.actor.id,
+      projectId: null,
+      action: "NOTIFICATIONS_CLEARED",
+      resourceType: "NotificationInbox",
+      resourceId: null,
+      result: "SUCCEEDED",
+      correlationId: context.correlationId,
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent?.slice(0, 500) ?? null,
+      metadataJson: JSON.stringify({ count }),
+      occurredAt: now,
+    });
+    return { deleted: true, count };
   }
 
   async listAudit(

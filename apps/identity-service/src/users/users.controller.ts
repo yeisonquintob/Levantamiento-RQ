@@ -82,6 +82,11 @@ function listQuery(query: Readonly<Record<string, unknown>>) {
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
+  @Get("audit-events")
+  auditHistory(@Req() request: AuthenticatedRequest, @Query() query: Readonly<Record<string, unknown>>) {
+    return this.users.auditHistory(actorOf(request), query);
+  }
+
   @ApiOperation({ summary: "Listar cuentas de Identity" })
   @Get()
   list(@Query() query: Readonly<Record<string, unknown>>) {

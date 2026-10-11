@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -113,6 +114,21 @@ export class WorkflowReviewsController {
   @Get("projects/:projectId/reviews")
   list(@Req() request: WorkflowRequest, @Param("projectId") projectId: string) {
     return this.reviews.list(actorContext(request), parseProjectId(projectId));
+  }
+
+  @ApiOperation({
+    summary: "Eliminar definitivamente las revisiones del proyecto",
+  })
+  @Delete("projects/:projectId/reviews")
+  @HttpCode(200)
+  purgeProject(
+    @Req() request: WorkflowRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.reviews.purgeProject(
+      actorContext(request),
+      parseProjectId(projectId),
+    );
   }
 
   @ApiOperation({ summary: "Consultar revisión, asignaciones y actividad" })

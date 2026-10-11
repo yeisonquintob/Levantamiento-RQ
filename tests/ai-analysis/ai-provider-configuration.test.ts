@@ -7,6 +7,7 @@ import { AiProviderConfigurationsService } from "../../apps/ai-analysis-service/
 import {
   OPENAI_BASE_URL,
   parseCreateAiProviderConfiguration,
+  parseDuplicateAiProviderConfiguration,
   parseUpdateAiProviderConfiguration,
 } from "../../apps/ai-analysis-service/src/providers/ai-provider-input.js";
 import { loadAiProviderRuntimeConfig } from "../../apps/ai-analysis-service/src/providers/ai-provider.config.js";
@@ -28,6 +29,7 @@ test("la entrada restringe OpenAI al endpoint oficial y valida límites", () => 
   const parsed = parseCreateAiProviderConfiguration({
     name: "OpenAI corporativo",
     providerType: "OPENAI",
+    purpose: "TEXT",
     model: "modelo-habilitado",
     apiKey: "secret-value-with-minimum-length",
   });
@@ -45,7 +47,83 @@ test("la entrada restringe OpenAI al endpoint oficial y valida límites", () => 
   );
   assert.throws(
     () => parseUpdateAiProviderConfiguration({ timeoutMs: 10 }),
-    /1000 y 300000/i,
+    /1000 y 600000/i,
+  );
+});
+
+test("duplicar conserva la configuración y copia la credencial sin activar la copia", async () => {
+  const vault = new MemoryAiSecretVault();
+  await vault.put("provider-source", "secret-value-with-minimum-length");
+  const now = new Date("2026-08-31T12:00:00.000Z");
+  const source = {
+    id: "22222222-2222-4222-8222-222222222222",
+    name: "OpenAI principal",
+    providerType: "OPENAI" as const,
+    purpose: "TEXT" as const,
+    model: "gpt-5.4",
+    baseUrl: OPENAI_BASE_URL,
+    isEnabled: true,
+    isDefault: true,
+    timeoutMs: 60000,
+    maxInputTokens: 120000,
+    maxOutputTokens: 12000,
+    maxAttempts: 3,
+    secretReference: "provider-source",
+    lastConnectionTestAt: now,
+    lastConnectionTestStatus: "SUCCEEDED" as const,
+    lastErrorCode: null,
+    createdByUserId: ADMIN.id,
+    updatedByUserId: ADMIN.id,
+    createdAt: now,
+    updatedAt: now,
+  };
+  let duplicated: typeof source | null = null;
+  const repository = {
+    findOneBy: async ({ id, name }: { id?: string; name?: string }) => {
+      if (name) return null;
+      if (id === source.id) return source;
+      return duplicated?.id === id ? duplicated : null;
+    },
+  };
+  const manager = {
+    create: (_entity: unknown, value: unknown) => value,
+    save: async (value: typeof source) => {
+      if ("providerType" in value) duplicated = value;
+      return value;
+    },
+  };
+  const dataSource = {
+    transaction: async (work: (value: typeof manager) => Promise<void>) =>
+      work(manager),
+  };
+  const service = new AiProviderConfigurationsService(
+    repository as never,
+    dataSource as never,
+    vault,
+  );
+
+  const result = await service.duplicate(
+    { actor: ADMIN, correlationId: "duplicate-test" },
+    source.id,
+    parseDuplicateAiProviderConfiguration({
+      ...source,
+      name: "OpenAI modelo nuevo",
+      model: "gpt-5.5",
+    }),
+  );
+
+  assert.equal(result.model, "gpt-5.5");
+  assert.equal(result.isEnabled, false);
+  assert.equal(result.isDefault, false);
+  assert.equal(result.lastConnectionTestStatus, "NOT_TESTED");
+  assert.equal(result.credentialConfigured, true);
+  assert.equal(
+    await vault.resolve((duplicated as typeof source).secretReference),
+    "secret-value-with-minimum-length",
+  );
+  assert.notEqual(
+    (duplicated as typeof source).secretReference,
+    "provider-source",
   );
 });
 
@@ -137,6 +215,7 @@ test("las respuestas administrativas nunca incluyen clave ni referencia secreta"
         id: "22222222-2222-4222-8222-222222222222",
         name: "OpenAI",
         providerType: "OPENAI",
+        purpose: "TEXT",
         model: "modelo-habilitado",
         baseUrl: OPENAI_BASE_URL,
         isEnabled: true,
@@ -221,4 +300,106 @@ test("Azure prepara Key Vault con identidad administrada y la base correcta", as
     environment,
     /AI_KEY_VAULT_URL=https:\/\/<vault>\.vault\.azure\.net/,
   );
+});
+
+test("el catálogo de modelos OpenAI se consulta con la clave protegida y no la expone", async () => {
+  const vault = new MemoryAiSecretVault();
+  await vault.put("provider-openai", "secret-value-with-minimum-length");
+  const entity = {
+    id: "11111111-1111-4111-8111-111111111111",
+    providerType: "OPENAI",
+    baseUrl: "https://api.openai.com/v1",
+    secretReference: "provider-openai",
+    timeoutMs: 60000,
+  };
+  const repository = {
+    findOneBy: async (where: { id: string }) =>
+      where.id === entity.id ? entity : null,
+  };
+  const service = new AiProviderConfigurationsService(
+    repository as never,
+    {} as never,
+    vault,
+  );
+  const originalFetch = globalThis.fetch;
+  let seen: { url: string; authorization: string | null } | null = null;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    seen = {
+      url,
+      authorization: new Headers(init?.headers).get("authorization"),
+    };
+    return new Response(
+      JSON.stringify({
+        data: [{ id: "gpt-5.4" }, { id: "gpt-5-mini" }, { id: "gpt-5.4" }, {}],
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+  try {
+    const result = await service.listOpenAiModels(
+      { actor: ADMIN, correlationId: "models-test" },
+      entity.id,
+    );
+    assert.deepEqual(result, {
+      models: [{ id: "gpt-5-mini" }, { id: "gpt-5.4" }],
+    });
+    assert.equal(seen!.url, "https://api.openai.com/v1/models");
+    assert.equal(
+      seen!.authorization,
+      "Bearer secret-value-with-minimum-length",
+    );
+    // La respuesta jamás contiene la clave.
+    assert.doesNotMatch(JSON.stringify(result), /secret-value/u);
+
+    // Solo para OpenAI y con credencial.
+    entity.providerType = "OLLAMA";
+    await assert.rejects(() =>
+      service.listOpenAiModels(
+        { actor: ADMIN, correlationId: "models-test" },
+        entity.id,
+      ),
+    );
+    entity.providerType = "OPENAI";
+    entity.secretReference = "";
+    await assert.rejects(() =>
+      service.listOpenAiModels(
+        { actor: ADMIN, correlationId: "models-test" },
+        entity.id,
+      ),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listar modelos de Ollama sin servidor devuelve un mensaje claro, no un error interno", async () => {
+  const service = new AiProviderConfigurationsService(
+    {} as never,
+    {} as never,
+    new MemoryAiSecretVault(),
+  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    throw new TypeError("fetch failed");
+  }) as typeof fetch;
+  try {
+    await assert.rejects(
+      () =>
+        service.listOllamaModels(
+          { actor: ADMIN, correlationId: "ollama-down" },
+          "http://127.0.0.1:11435",
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(
+          error.message,
+          /No hay un servidor Ollama respondiendo en http:\/\/127\.0\.0\.1:11435.*ollama serve/u,
+        );
+        assert.equal(error.constructor.name, "ConflictException");
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

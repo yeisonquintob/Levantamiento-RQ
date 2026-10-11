@@ -25,6 +25,11 @@ export function SettingsNavigation({
       visible: true,
     },
     {
+      href: "/workspace/settings/parameters",
+      label: "Parámetros",
+      visible: true,
+    },
+    {
       href: "/workspace/settings/templates",
       label: "Plantillas",
       visible: canManageTemplates,
@@ -37,6 +42,11 @@ export function SettingsNavigation({
     {
       href: "/workspace/settings/ai-providers",
       label: "Proveedores de IA",
+      visible: canManageSystem,
+    },
+    {
+      href: "/workspace/settings/viability",
+      label: "Criterios de viabilidad",
       visible: canManageSystem,
     },
     {

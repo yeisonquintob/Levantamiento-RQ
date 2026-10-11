@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
   DocumentTemplateDetail,
   DocumentTemplateListResponse,
+  DocumentTemplateLogo,
   DocumentTemplateMetrics,
   DocumentTemplateSection,
   DocumentTemplateStatus,
@@ -20,10 +21,15 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { WorkspaceKpiIcon } from "../workspace-kpi-icon";
 import { useDialogAccessibility } from "../../use-dialog-accessibility";
+import { useAutoDismiss } from "../../use-auto-dismiss";
+import { useConfirm } from "../../confirm-dialog";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 const EMPTY_METRICS: DocumentTemplateMetrics = {
   total: 0,
@@ -66,7 +72,14 @@ interface TemplateForm {
   sections: DocumentTemplateSection[];
 }
 
-type ModalMode = "create" | "view" | "edit" | "clone";
+type ModalMode = "create" | "view" | "edit" | "clone" | "logo";
+
+interface LogoSelection {
+  fileName: string;
+  mediaType: "image/png" | "image/jpeg";
+  sizeBytes: number;
+  dataBase64: string;
+}
 
 interface TemplatesWorkspaceProps {
   initialList?: DocumentTemplateListResponse;
@@ -156,12 +169,15 @@ export function TemplatesWorkspace({
   initialMetrics,
   initialError,
 }: TemplatesWorkspaceProps) {
+  const confirm = useConfirm();
   const [list, setList] = useState(initialList ?? EMPTY_LIST);
   const [metrics, setMetrics] = useState(initialMetrics ?? EMPTY_METRICS);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState("PUBLISHED");
   const [templateType, setTemplateType] = useState("");
   const [alert, setAlert] = useState<string | null>(initialError ?? null);
+  useAutoDismiss(alert, () => setAlert(null));
   const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
   const [busy, setBusy] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
@@ -172,7 +188,45 @@ export function TemplatesWorkspace({
     },
   );
   const [selected, setSelected] = useState<DocumentTemplateDetail | null>(null);
+  const [currentLogo, setCurrentLogo] = useState<DocumentTemplateLogo | null>(
+    null,
+  );
+  const [logoSelection, setLogoSelection] = useState<LogoSelection | null>(
+    null,
+  );
   const [form, setForm] = useState<TemplateForm>(emptyForm());
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const query = new URLSearchParams({ page: "1", pageSize: "50" });
+    if (debouncedSearch.trim()) query.set("search", debouncedSearch.trim());
+    if (status) query.set("status", status);
+    if (templateType) query.set("templateType", templateType);
+
+    async function filterTemplates(): Promise<void> {
+      try {
+        const response = await fetch(
+          `${GATEWAY_URL}/api/v1/templates?${query.toString()}`,
+          { credentials: "include", signal: controller.signal },
+        );
+        if (!response.ok) throw new Error(await errorMessage(response));
+        const result = (await response.json()) as DocumentTemplateListResponse;
+        if (!controller.signal.aborted) setList(result);
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        setAlert(error instanceof Error ? error.message : String(error));
+        setAlertTone("danger");
+      }
+    }
+
+    void filterTemplates();
+    return () => controller.abort();
+  }, [debouncedSearch, status, templateType]);
 
   const canManage = list.canManage || metrics.canManage;
 
@@ -180,6 +234,7 @@ export function TemplatesWorkspace({
     if (modalMode === "create") return "Nueva plantilla";
     if (modalMode === "edit") return "Editar plantilla";
     if (modalMode === "clone") return "Crear nueva versión";
+    if (modalMode === "logo") return "Editar logo de plantilla";
     return "Detalle de plantilla";
   }, [modalMode]);
 
@@ -192,6 +247,8 @@ export function TemplatesWorkspace({
     if (busy && !force) return;
     setModalMode(null);
     setSelected(null);
+    setCurrentLogo(null);
+    setLogoSelection(null);
     setForm(emptyForm());
   }
 
@@ -238,16 +295,35 @@ export function TemplatesWorkspace({
     setBusy(true);
 
     try {
-      const response = await fetch(
-        `${GATEWAY_URL}/api/v1/templates/${encodeURIComponent(template.id)}`,
-        { credentials: "include" },
-      );
+      const [response, logoResponse] = await Promise.all([
+        fetch(
+          `${GATEWAY_URL}/api/v1/templates/${encodeURIComponent(template.id)}`,
+          { credentials: "include" },
+        ),
+        mode === "logo"
+          ? fetch(
+              `${GATEWAY_URL}/api/v1/templates/${encodeURIComponent(template.id)}/logo`,
+              { credentials: "include" },
+            )
+          : Promise.resolve(null),
+      ]);
 
       if (!response.ok) {
         throw new Error(await errorMessage(response));
       }
 
       const detail = (await response.json()) as DocumentTemplateDetail;
+
+      if (logoResponse && !logoResponse.ok) {
+        throw new Error(await errorMessage(logoResponse));
+      }
+
+      setCurrentLogo(
+        logoResponse
+          ? ((await logoResponse.json()) as DocumentTemplateLogo | null)
+          : null,
+      );
+      setLogoSelection(null);
 
       setSelected(detail);
       setForm({
@@ -380,6 +456,43 @@ export function TemplatesWorkspace({
     });
   }
 
+  function selectLogo(file: File | undefined): void {
+    if (!file) return;
+
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      showAlert("El logo debe ser una imagen PNG o JPEG.", "danger");
+      return;
+    }
+
+    if (file.size < 1 || file.size > 512 * 1024) {
+      showAlert("El logo debe pesar máximo 512 KB.", "danger");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      showAlert("No fue posible leer la imagen seleccionada.", "danger");
+    };
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      const dataBase64 = value.split(",", 2)[1];
+
+      if (!dataBase64) {
+        showAlert("La imagen seleccionada no es válida.", "danger");
+        return;
+      }
+
+      setLogoSelection({
+        fileName: file.name,
+        mediaType: file.type as "image/png" | "image/jpeg",
+        sizeBytes: file.size,
+        dataBase64,
+      });
+      setAlert(null);
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function submitModal(): Promise<void> {
     if (!modalMode || modalMode === "view") return;
 
@@ -387,6 +500,39 @@ export function TemplatesWorkspace({
 
     try {
       let response: Response;
+
+      if (modalMode === "logo" && selected) {
+        if (!logoSelection) {
+          throw new Error("Selecciona un logo PNG o JPEG antes de guardar.");
+        }
+
+        response = await fetch(
+          `${GATEWAY_URL}/api/v1/templates/${encodeURIComponent(selected.id)}/logo`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              fileName: logoSelection.fileName,
+              mediaType: logoSelection.mediaType,
+              dataBase64: logoSelection.dataBase64,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(await errorMessage(response));
+        }
+
+        closeModal(true);
+        await refresh();
+        showAlert(
+          "El logo quedó guardado y se usará en las nuevas exportaciones PDF.",
+          "success",
+        );
+        return;
+      }
+
       const sections = normalizedSections();
 
       if (modalMode === "create") {
@@ -467,10 +613,18 @@ export function TemplatesWorkspace({
   ): Promise<void> {
     const message =
       action === "publish"
-        ? "La versión publicada será inmutable. ¿Deseas continuar?"
-        : "La plantilla dejará de estar disponible como versión activa. ¿Deseas continuar?";
+        ? "La versión publicada será inmutable."
+        : "La plantilla dejará de estar disponible como versión activa.";
 
-    if (!window.confirm(message)) return;
+    if (
+      !(await confirm({
+        title: action === "publish" ? "Publicar versión" : "Retirar plantilla",
+        message,
+        confirmLabel: action === "publish" ? "Publicar" : "Retirar",
+        destructive: action === "retire",
+      }))
+    )
+      return;
 
     setBusy(true);
 
@@ -516,27 +670,21 @@ export function TemplatesWorkspace({
         <RqKpiGrid label="Resumen de plantillas">
           <RqKpiCard
             description="Versiones registradas"
-            icon="T"
+            icon={<WorkspaceKpiIcon name="layers" />}
             title="Total"
             value={String(metrics.total)}
           />
           <RqKpiCard
-            description="Editables"
-            icon="B"
-            title="Borradores"
-            value={String(metrics.draft)}
+            description="Editables / fuera de uso"
+            icon={<WorkspaceKpiIcon name="drafts" />}
+            title="Borradores / retiradas"
+            value={`${metrics.draft} / ${metrics.retired}`}
           />
           <RqKpiCard
             description="Versiones inmutables"
-            icon="P"
+            icon={<WorkspaceKpiIcon name="check" />}
             title="Publicadas"
             value={String(metrics.published)}
-          />
-          <RqKpiCard
-            description="Fuera de uso"
-            icon="R"
-            title="Retiradas"
-            value={String(metrics.retired)}
           />
         </RqKpiGrid>
 
@@ -565,32 +713,45 @@ export function TemplatesWorkspace({
       ) : null}
 
       <form
-        className="rq-filter-bar rq-template-filter-bar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setBusy(true);
-          void refresh()
-            .catch((error: unknown) => {
-              showAlert(
-                error instanceof Error ? error.message : String(error),
-                "danger",
-              );
-            })
-            .finally(() => setBusy(false));
-        }}
+        className="rq-projects-filters"
+        onSubmit={(event) => event.preventDefault()}
       >
-        <label className="rq-field">
-          <span>Buscar</span>
+        <label className="rq-projects-filter rq-projects-filter--search">
+          <span>Buscar plantilla:</span>
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="17"
+            viewBox="0 0 24 24"
+            width="17"
+          >
+            <circle
+              cx="10.5"
+              cy="10.5"
+              r="6.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+            <path
+              d="m15.5 15.5 5 5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.8"
+            />
+          </svg>
           <input
+            aria-label="Buscar plantilla por código, nombre o versión"
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Código, nombre o versión"
+            type="search"
             value={search}
           />
         </label>
 
-        <label className="rq-field">
-          <span>Tipo</span>
+        <label className="rq-projects-filter">
+          <span>Tipo:</span>
           <select
+            aria-label="Tipo"
             onChange={(event) => setTemplateType(event.target.value)}
             value={templateType}
           >
@@ -603,9 +764,10 @@ export function TemplatesWorkspace({
           </select>
         </label>
 
-        <label className="rq-field">
-          <span>Estado</span>
+        <label className="rq-projects-filter">
+          <span>Estado:</span>
           <select
+            aria-label="Estado"
             onChange={(event) => setStatus(event.target.value)}
             value={status}
           >
@@ -616,30 +778,18 @@ export function TemplatesWorkspace({
           </select>
         </label>
 
-        <div className="rq-filter-bar__actions">
-          <RqActionButton disabled={busy} tone="consult" type="submit">
-            Consultar
-          </RqActionButton>
-          <RqActionButton
-            disabled={busy}
-            onClick={() => {
-              setSearch("");
-              setStatus("");
-              setTemplateType("");
-              setBusy(true);
-              void refresh("", "", "")
-                .catch((error: unknown) => {
-                  showAlert(
-                    error instanceof Error ? error.message : String(error),
-                    "danger",
-                  );
-                })
-                .finally(() => setBusy(false));
-            }}
-          >
-            Limpiar
-          </RqActionButton>
-        </div>
+        <RqActionButton
+          disabled={busy}
+          onClick={() => {
+            setSearch("");
+            setStatus("PUBLISHED");
+            setTemplateType("");
+            setDebouncedSearch("");
+          }}
+          tone="secondary"
+        >
+          Limpiar
+        </RqActionButton>
       </form>
 
       <RqTableShell
@@ -676,6 +826,11 @@ export function TemplatesWorkspace({
                     <span className="rq-template-table__name">
                       <strong>{template.name}</strong>
                       <span>{template.description ?? "Sin descripción"}</span>
+                      {template.logo ? (
+                        <small className="rq-template-table__logo-status">
+                          Logo configurado · {template.logo.fileName}
+                        </small>
+                      ) : null}
                     </span>
                   </td>
                   <td>{typeLabel(template.templateType)}</td>
@@ -690,12 +845,13 @@ export function TemplatesWorkspace({
                   <td>
                     <div className="rq-template-table__actions">
                       <RqActionButton
+                        className="rq-row-open"
                         compact
                         disabled={busy}
                         onClick={() => void loadDetail(template, "view")}
                         tone="consult"
                       >
-                        Ver
+                        Abrir
                       </RqActionButton>
 
                       {canManage && template.status === "DRAFT" ? (
@@ -719,12 +875,24 @@ export function TemplatesWorkspace({
                         </>
                       ) : null}
 
+                      {canManage && template.status === "PUBLISHED" ? (
+                        <RqActionButton
+                          aria-label={`Editar logo de ${template.name}`}
+                          compact
+                          disabled={busy}
+                          onClick={() => void loadDetail(template, "logo")}
+                          tone="operation"
+                        >
+                          Editar
+                        </RqActionButton>
+                      ) : null}
+
                       {canManage && template.status !== "DRAFT" ? (
                         <RqActionButton
                           compact
                           disabled={busy}
                           onClick={() => void loadDetail(template, "clone")}
-                          tone="operation"
+                          tone="affirmative"
                         >
                           Nueva versión
                         </RqActionButton>
@@ -809,6 +977,12 @@ export function TemplatesWorkspace({
                     <small>Uso con IA</small>
                     <strong>Contexto y contrato de salida</strong>
                   </span>
+                  <span>
+                    <small>Logo PDF</small>
+                    <strong>
+                      {selected.logo?.fileName ?? "Sin logo configurado"}
+                    </strong>
+                  </span>
                 </div>
 
                 <article>
@@ -866,6 +1040,81 @@ export function TemplatesWorkspace({
                   </RqActionButton>
                 </div>
               </div>
+            ) : modalMode === "logo" && selected ? (
+              <form
+                className="rq-template-logo-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitModal();
+                }}
+              >
+                <div className="rq-template-logo-form__context">
+                  <span>Plantilla publicada</span>
+                  <strong>
+                    {selected.name} · v{selected.version}
+                  </strong>
+                  <p>
+                    El logo es un recurso de presentación. No cambia la
+                    estructura ni las reglas documentales de esta versión.
+                  </p>
+                </div>
+
+                <div className="rq-template-logo-form__preview">
+                  {logoSelection || currentLogo ? (
+                    <img
+                      alt={`Vista previa del logo de ${selected.name}`}
+                      src={`data:${logoSelection?.mediaType ?? currentLogo?.mediaType};base64,${logoSelection?.dataBase64 ?? currentLogo?.dataBase64}`}
+                    />
+                  ) : (
+                    <div>
+                      <strong>Sin logo configurado</strong>
+                      <span>El PDF conservará el encabezado de respaldo.</span>
+                    </div>
+                  )}
+                </div>
+
+                <label className="rq-field rq-template-logo-form__field">
+                  <span>Logo para exportaciones PDF</span>
+                  <input
+                    accept="image/png,image/jpeg"
+                    disabled={busy}
+                    onChange={(event) => selectLogo(event.target.files?.[0])}
+                    required={!currentLogo}
+                    type="file"
+                  />
+                  <small>
+                    PNG o JPEG, máximo 512 KB. Se conserva en la base de datos
+                    de Documents y no se comparte con la IA.
+                  </small>
+                </label>
+
+                {logoSelection ? (
+                  <p className="rq-template-logo-form__selection">
+                    <strong>{logoSelection.fileName}</strong>
+                    <span>
+                      {(logoSelection.sizeBytes / 1024).toFixed(1)} KB
+                    </span>
+                  </p>
+                ) : currentLogo ? (
+                  <p className="rq-template-logo-form__selection">
+                    <strong>{currentLogo.fileName}</strong>
+                    <span>Logo actual</span>
+                  </p>
+                ) : null}
+
+                <div className="rq-project-modal__actions">
+                  <RqActionButton disabled={busy} onClick={() => closeModal()}>
+                    Cancelar
+                  </RqActionButton>
+                  <RqActionButton
+                    disabled={busy || !logoSelection}
+                    tone="affirmative"
+                    type="submit"
+                  >
+                    Guardar logo
+                  </RqActionButton>
+                </div>
+              </form>
             ) : (
               <form
                 className="rq-project-form rq-template-form"

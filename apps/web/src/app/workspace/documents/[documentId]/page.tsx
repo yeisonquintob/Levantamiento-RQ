@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type {
+  DocumentVersionDetail,
   ProjectDetail,
   RequirementDocumentDetail,
 } from "@levantamiento-rq/shared-contracts";
@@ -9,14 +10,18 @@ import type {
 import { RequirementDocumentEditor } from "./requirement-document-editor";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 interface EditorPageProps {
   params: Promise<{ documentId: string }>;
+  searchParams: Promise<{ from?: string; version?: string }>;
 }
 
-async function loadEditor(documentId: string): Promise<{
+async function loadEditor(documentId: string, requestedVersion?: number): Promise<{
   document?: RequirementDocumentDetail;
+  version?: DocumentVersionDetail;
   project?: ProjectDetail;
   error?: string;
   unauthorized?: boolean;
@@ -37,6 +42,24 @@ async function loadEditor(documentId: string): Promise<{
     }
     const document =
       (await documentResponse.json()) as RequirementDocumentDetail;
+    let version = document.currentVersionDetail;
+    if (
+      requestedVersion &&
+      requestedVersion !== document.currentVersionNumber &&
+      requestedVersion <= document.currentVersionNumber
+    ) {
+      const versionResponse = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentId)}/versions/${requestedVersion}`,
+        { cache: "no-store", headers },
+      );
+      if (versionResponse.status === 401) return { unauthorized: true };
+      if (!versionResponse.ok) {
+        return {
+          error: "No fue posible abrir la versión solicitada.",
+        };
+      }
+      version = (await versionResponse.json()) as DocumentVersionDetail;
+    }
     const projectResponse = await fetch(
       `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(document.projectId)}`,
       { cache: "no-store", headers },
@@ -45,11 +68,13 @@ async function loadEditor(documentId: string): Promise<{
     if (!projectResponse.ok) {
       return {
         document,
+        version,
         error: "El documento existe, pero no fue posible cargar su proyecto.",
       };
     }
     return {
       document,
+      version,
       project: (await projectResponse.json()) as ProjectDetail,
     };
   } catch {
@@ -59,9 +84,18 @@ async function loadEditor(documentId: string): Promise<{
   }
 }
 
-export default async function EditorPage({ params }: EditorPageProps) {
+export default async function EditorPage({
+  params,
+  searchParams,
+}: EditorPageProps) {
   const { documentId } = await params;
-  const initial = await loadEditor(documentId);
+  const query = await searchParams;
+  const parsedVersion = Number(query.version);
+  const requestedVersion =
+    Number.isInteger(parsedVersion) && parsedVersion > 0
+      ? parsedVersion
+      : undefined;
+  const initial = await loadEditor(documentId, requestedVersion);
   if (initial.unauthorized) redirect("/sign-in");
 
   if (!initial.document || !initial.project) {
@@ -78,7 +112,9 @@ export default async function EditorPage({ params }: EditorPageProps) {
   return (
     <RequirementDocumentEditor
       initialDocument={initial.document}
+      initialVersion={initial.version}
       project={initial.project}
+      returnToAllProjects={query.from === "all"}
     />
   );
 }

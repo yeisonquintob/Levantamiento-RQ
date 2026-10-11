@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Req,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -26,6 +27,7 @@ import {
 } from "./ai-provider-configurations.service";
 import {
   parseCreateAiProviderConfiguration,
+  parseDuplicateAiProviderConfiguration,
   parseProviderConfigurationId,
   parseRotateAiProviderCredential,
   parseUpdateAiProviderConfiguration,
@@ -48,10 +50,57 @@ function actorContext(request: AiAnalysisRequest): AiProviderActorContext {
 export class AiProviderConfigurationsController {
   constructor(private readonly providers: AiProviderConfigurationsService) {}
 
+  @Get("audit-events")
+  auditHistory(
+    @Req() request: AiAnalysisRequest,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    return this.providers.auditHistory(actorContext(request), query);
+  }
+
   @ApiOperation({ summary: "Listar proveedores de IA configurados" })
   @Get()
   list(@Req() request: AiAnalysisRequest) {
     return this.providers.list(actorContext(request));
+  }
+
+  @ApiOperation({ summary: "Listar modelos instalados en Ollama local" })
+  @Get("ollama/models")
+  listOllamaModels(
+    @Req() request: AiAnalysisRequest,
+    @Query("baseUrl") baseUrl: string,
+  ) {
+    return this.providers.listOllamaModels(actorContext(request), baseUrl);
+  }
+
+  @ApiOperation({
+    summary: "Listar modelos de un servidor compatible con OpenAI (llama-swap)",
+  })
+  @Get("openai-compatible/models")
+  listOpenAiCompatibleModels(
+    @Req() request: AiAnalysisRequest,
+    @Query("baseUrl") baseUrl: string,
+  ) {
+    return this.providers.listOpenAiCompatibleModels(
+      actorContext(request),
+      baseUrl,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      "Listar los modelos disponibles para la clave de un proveedor OpenAI",
+  })
+  @ApiParam({ name: "providerConfigurationId", format: "uuid" })
+  @Get(":providerConfigurationId/openai/models")
+  listOpenAiModels(
+    @Req() request: AiAnalysisRequest,
+    @Param("providerConfigurationId") providerConfigurationId: string,
+  ) {
+    return this.providers.listOpenAiModels(
+      actorContext(request),
+      parseProviderConfigurationId(providerConfigurationId),
+    );
   }
 
   @ApiOperation({ summary: "Registrar un proveedor de IA" })
@@ -64,6 +113,21 @@ export class AiProviderConfigurationsController {
     return this.providers.create(
       actorContext(request),
       parseCreateAiProviderConfiguration(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Duplicar un proveedor y su credencial protegida" })
+  @ApiParam({ name: "providerConfigurationId", format: "uuid" })
+  @Post(":providerConfigurationId/duplicate")
+  duplicate(
+    @Req() request: AiAnalysisRequest,
+    @Param("providerConfigurationId") providerConfigurationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.providers.duplicate(
+      actorContext(request),
+      parseProviderConfigurationId(providerConfigurationId),
+      parseDuplicateAiProviderConfiguration(body),
     );
   }
 

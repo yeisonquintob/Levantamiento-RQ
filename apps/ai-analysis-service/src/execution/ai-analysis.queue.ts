@@ -52,6 +52,33 @@ export class AiAnalysisQueue implements OnModuleDestroy {
     return job;
   }
 
+  async hasRunnableJob(analysisRequestId: string): Promise<boolean> {
+    const jobs = await this.queue.getJobs([
+      "waiting",
+      "active",
+      "delayed",
+      "paused",
+      "prioritized",
+    ]);
+
+    return jobs.some((job) => job.data.analysisRequestId === analysisRequestId);
+  }
+
+  async cancel(analysisRequestId: string): Promise<{ cancelled: boolean; active: boolean }> {
+    const jobs = await this.queue.getJobs(["waiting", "active", "delayed", "paused", "prioritized"]);
+    const matches = jobs.filter((job) => job.data.analysisRequestId === analysisRequestId);
+    await Promise.all(matches.map(async (job) => {
+      const state = await job.getState();
+      if (state === "active") {
+        job.discard();
+        return;
+      }
+      await job.remove();
+    }));
+    const states = await Promise.all(matches.map((job) => job.getState().catch(() => "unknown")));
+    return { cancelled: matches.length > 0, active: states.includes("active") };
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.queue.close();
   }

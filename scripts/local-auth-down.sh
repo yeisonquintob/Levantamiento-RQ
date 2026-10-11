@@ -35,6 +35,7 @@ pkill -TERM -f "nx( |.* )serve documents-service" >/dev/null 2>&1 || true
 pkill -TERM -f "nx( |.* )serve ai-analysis-service" >/dev/null 2>&1 || true
 pkill -TERM -f "nx( |.* )serve workflow-service" >/dev/null 2>&1 || true
 pkill -TERM -f "nx( |.* )serve operations-service" >/dev/null 2>&1 || true
+pkill -TERM -f "nx( |.* )serve prototypes-service" >/dev/null 2>&1 || true
 pkill -TERM -f "nx( |.* )serve gateway" >/dev/null 2>&1 || true
 pkill -TERM -f "nx( |.* )dev web.*4200" >/dev/null 2>&1 || true
 
@@ -45,6 +46,7 @@ pkill -TERM -f "documents-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "ai-analysis-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "workflow-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "operations-service:serve:development" >/dev/null 2>&1 || true
+pkill -TERM -f "prototypes-service:serve:development" >/dev/null 2>&1 || true
 pkill -TERM -f "gateway:serve:development" >/dev/null 2>&1 || true
 
 pkill -TERM -f "apps/identity-service/dist/main.js" >/dev/null 2>&1 || true
@@ -54,9 +56,10 @@ pkill -TERM -f "apps/documents-service/dist/main.js" >/dev/null 2>&1 || true
 pkill -TERM -f "apps/ai-analysis-service/dist/main.js" >/dev/null 2>&1 || true
 pkill -TERM -f "apps/workflow-service/dist/main.js" >/dev/null 2>&1 || true
 pkill -TERM -f "apps/operations-service/dist/main.js" >/dev/null 2>&1 || true
+pkill -TERM -f "apps/prototypes-service/dist/main.js" >/dev/null 2>&1 || true
 pkill -TERM -f "apps/gateway/dist/main.js" >/dev/null 2>&1 || true
 
-for port in 4200 3000 3001 3002 3003 3004 3005 3007 3008; do
+for port in 4200 3000 3001 3002 3003 3004 3005 3007 3008 3009; do
   pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
 
   if [ -n "$pids" ]; then
@@ -66,7 +69,7 @@ done
 
 sleep 1
 
-for port in 4200 3000 3001 3002 3003 3004 3005 3007 3008; do
+for port in 4200 3000 3001 3002 3003 3004 3005 3007 3008 3009; do
   pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
 
   if [ -n "$pids" ]; then
@@ -74,5 +77,7 @@ for port in 4200 3000 3001 3002 3003 3004 3005 3007 3008; do
   fi
 done
 
-rm -rf "$PID_DIR"
-echo "✓ Identity, Projects, Sources, Documents, AI Analysis, Workflow, Operations, Gateway, frontend y procesos Nx detenidos."
+if [ -d "$PID_DIR" ]; then
+  find "$PID_DIR" -maxdepth 1 -type f -name '*.pid' -delete
+fi
+echo "✓ Identity, Projects, Sources, Documents, AI Analysis, Workflow, Operations, Prototypes, Gateway, frontend y procesos Nx detenidos."

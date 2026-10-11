@@ -1,3 +1,4 @@
+import type { AuditHistoryResponse } from "@levantamiento-rq/shared-contracts";
 import {
   HttpException,
   Inject,
@@ -8,7 +9,10 @@ import {
 import type {
   AddProjectParticipantRequest,
   CreateProjectRequest,
+  ProjectAreaListResponse,
+  ProjectAreaSummary,
   ProjectDetail,
+  ProjectDomainPurgeResult,
   ProjectListResponse,
   ProjectMetrics,
   UpdateProjectRequest,
@@ -54,6 +58,44 @@ export class ProjectsClientService {
     return this.request<ProjectMetrics>(
       "/api/v1/projects/summary",
       "GET",
+      accessToken,
+    );
+  }
+
+  listAreas(accessToken: string): Promise<ProjectAreaListResponse> {
+    return this.request<ProjectAreaListResponse>(
+      "/api/v1/project-areas",
+      "GET",
+      accessToken,
+    );
+  }
+
+  createArea(accessToken: string, body: unknown): Promise<ProjectAreaSummary> {
+    return this.request<ProjectAreaSummary>(
+      "/api/v1/project-areas",
+      "POST",
+      accessToken,
+      body,
+    );
+  }
+
+  renameArea(
+    accessToken: string,
+    areaId: string,
+    body: unknown,
+  ): Promise<ProjectAreaSummary> {
+    return this.request<ProjectAreaSummary>(
+      `/api/v1/project-areas/${encodeURIComponent(areaId)}`,
+      "PATCH",
+      accessToken,
+      body,
+    );
+  }
+
+  deleteArea(accessToken: string, areaId: string): Promise<{ id: string }> {
+    return this.request<{ id: string }>(
+      `/api/v1/project-areas/${encodeURIComponent(areaId)}`,
+      "DELETE",
       accessToken,
     );
   }
@@ -112,6 +154,33 @@ export class ProjectsClientService {
     return this.request<ProjectDetail>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/participants/${encodeURIComponent(userId)}`,
       "DELETE",
+      accessToken,
+    );
+  }
+
+  deleteProject(
+    accessToken: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult & { projectId: string; code: string }> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}`,
+      "DELETE",
+      accessToken,
+    );
+  }
+
+  auditHistory(
+    accessToken: string,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<AuditHistoryResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === "string" || typeof value === "number")
+        params.set(key, String(value));
+    }
+    return this.request(
+      `/api/v1/projects/audit-events?${params}`,
+      "GET",
       accessToken,
     );
   }

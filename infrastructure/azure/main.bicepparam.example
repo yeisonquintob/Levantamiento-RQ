@@ -3,6 +3,7 @@ using './main.bicep'
 param prefix = 'rqdemo'
 param location = 'eastus2'
 param environmentName = 'prod'
+param enablePrivateNetworking = false
 param sqlAdministratorLogin = 'rqsqladmin'
 param sqlAdministratorPassword = readEnvironmentVariable('RQ_SQL_ADMIN_PASSWORD')
 

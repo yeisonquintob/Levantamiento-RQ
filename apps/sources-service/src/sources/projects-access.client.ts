@@ -19,7 +19,7 @@ import {
 
 export interface ProjectAccess {
   project: ProjectDetail;
-  role: ProjectParticipantRole | "ADMIN";
+  role: ProjectParticipantRole | "ADMIN" | "SERVICE";
   canManage: boolean;
 }
 
@@ -98,11 +98,14 @@ export class ProjectsAccessClient {
 
     const project = payload as ProjectDetail;
     const administrator = isAdministrator(actor);
+    const serviceReader = actor.permissions.includes("projects.read.all");
     const role = administrator
       ? "ADMIN"
-      : project.participants.find(
-          (participant) => participant.userId === actor.id,
-        )?.role;
+      : serviceReader
+        ? "SERVICE"
+        : project.participants.find(
+            (participant) => participant.userId === actor.id,
+          )?.role;
 
     if (!role) {
       throw new ForbiddenException("No tienes acceso a este proyecto.");

@@ -1,4 +1,4 @@
-import { RqPageHero, RqStatusBadge } from "@levantamiento-rq/shared-ui";
+import { RqStatusBadge } from "@levantamiento-rq/shared-ui";
 
 import { canManageSystem, canManageTemplates } from "./settings-access";
 import { loadSettingsUser } from "./settings-user";
@@ -48,51 +48,34 @@ export default async function SettingsPage() {
 
   return (
     <section className="rq-module-page rq-settings-workspace">
-      <RqPageHero
-        eyebrow="Sistema"
-        title="Configuración"
-        description="Administración y parámetros de la plataforma. Las opciones visibles respetan los permisos actuales de tu cuenta."
-      />
-
-      <section
-        aria-labelledby="personal-settings-heading"
-        className="rq-settings-personal"
-      >
-        <div>
-          <h2 id="personal-settings-heading">Preferencias personales</h2>
-          <p>
-            Sesión y seguridad, apariencia, accesibilidad y aplicación
-            instalable.
-          </p>
-        </div>
-        <a href="/workspace/settings/general">
-          Administrar preferencias <span aria-hidden="true">→</span>
-        </a>
-      </section>
-
       <section aria-labelledby="system-settings-heading">
         <header className="rq-settings-section-heading">
           <div>
-            <span>Administración del sistema</span>
-            <h2 id="system-settings-heading">Administración</h2>
+            <span>Centro de administración</span>
+            <h2 id="system-settings-heading">Opciones de configuración</h2>
           </div>
-          <p>
-            Configura únicamente las capacidades autorizadas para tu perfil.
-          </p>
+          <p>Se muestran únicamente las opciones disponibles para tu perfil.</p>
         </header>
 
         <div className="rq-settings-hub-grid">
           <SettingsCard
-            description="Configuración general y preferencias administrativas."
+            description="Personaliza la apariencia, accesibilidad, seguridad de la sesión y comportamiento de la aplicación."
             href="/workspace/settings/general"
             icon="G"
             status="Disponible"
             title="General"
           />
 
+          <SettingsCard
+            description="Barra lateral (secciones, visibilidad y orden de los menús) y áreas solicitantes de los proyectos."
+            href="/workspace/settings/parameters"
+            icon="M"
+            title="Parámetros"
+          />
+
           {showTemplates ? (
             <SettingsCard
-              description="Plantillas documentales, versiones y publicación."
+              description="Crea y publica estructuras reutilizables para estandarizar los documentos de requerimientos."
               href="/workspace/settings/templates"
               icon="T"
               title="Plantillas"
@@ -102,22 +85,28 @@ export default async function SettingsPage() {
           {showSystemAdministration ? (
             <>
               <SettingsCard
-                description="Usuarios, estados, roles, contraseñas y sesiones."
+                description="Administra accesos, estados de cuenta, roles asignados, contraseñas y sesiones activas."
                 href="/workspace/settings/users"
                 icon="U"
                 title="Usuarios y roles"
               />
               <SettingsCard
-                description="Proveedor, modelo, límites y credenciales protegidas."
+                description="Define proveedores, modelos, límites de uso y credenciales protegidas para los análisis."
                 href="/workspace/settings/ai-providers"
                 icon="IA"
                 title="Proveedores de IA"
+              />
+              <SettingsCard
+                description="Administra los rangos, recomendaciones y umbral usados para evaluar la viabilidad del levantamiento."
+                href="/workspace/settings/viability"
+                icon="V"
+                title="Criterios de viabilidad"
               />
             </>
           ) : null}
 
           <SettingsCard
-            description="Trazabilidad de operaciones y eventos del sistema."
+            description="Consulta quién realizó cada operación, cuándo ocurrió y cuál fue su resultado."
             href="/workspace/settings/audit"
             icon="A"
             title="Auditoría"

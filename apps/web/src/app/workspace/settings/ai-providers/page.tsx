@@ -6,7 +6,9 @@ import type { AiProviderConfigurationListResponse } from "@levantamiento-rq/shar
 import { AiProvidersWorkspace } from "./ai-providers-workspace";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 async function loadProviders(): Promise<{
   list?: AiProviderConfigurationListResponse;

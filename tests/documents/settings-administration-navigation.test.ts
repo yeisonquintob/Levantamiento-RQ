@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  defaultSidebarConfiguration,
+  SIDEBAR_MENU_DEFINITIONS,
+} from "../../apps/web/src/app/sidebar-navigation.js";
+import {
   canManageSystem,
   canManageTemplates,
 } from "../../apps/web/src/app/workspace/settings/settings-access.js";
@@ -14,24 +18,57 @@ test("el sidebar deja Configuración como único acceso administrativo", async (
     shell.indexOf("</aside>"),
   );
 
-  assert.match(
-    sidebar,
-    /<span className="rq-nav__label">Administración<\/span>/,
+  // El menú se define y se coloca en sidebar-navigation.ts (configurable desde
+  // Configuración > Barra lateral); el shell solo lo consume.
+  assert.match(shell, /SIDEBAR_MENU_DEFINITIONS/);
+  const definitions = new Map(
+    SIDEBAR_MENU_DEFINITIONS.map((menu) => [menu.id, menu]),
   );
-  assert.match(sidebar, /href="\/workspace\/settings"/);
-  assert.match(sidebar, />Configuración<\/span>/);
-  assert.doesNotMatch(sidebar, /href="\/workspace\/templates"/);
-  assert.doesNotMatch(sidebar, /href="\/workspace\/audit"/);
-  assert.doesNotMatch(sidebar, /href="\/workspace\/settings\/templates"/);
-  assert.doesNotMatch(sidebar, /href="\/workspace\/settings\/users"/);
-  assert.doesNotMatch(sidebar, /href="\/workspace\/settings\/ai-providers"/);
-  assert.doesNotMatch(sidebar, />Plantillas<\/span>/);
-  assert.doesNotMatch(sidebar, />Usuarios<\/span>/);
-  assert.doesNotMatch(sidebar, />Proveedores IA<\/span>/);
-  assert.doesNotMatch(sidebar, />Auditoría<\/span>/);
+  assert.equal(definitions.get("settings")?.href, "/workspace/settings");
+  assert.equal(definitions.get("settings")?.label, "Configuración");
+
+  const configuration = defaultSidebarConfiguration();
+  const administration = configuration.sections.find(
+    (section) => section.id === "administration",
+  );
+  assert.equal(administration?.name, "Administración");
+  assert.deepEqual(
+    configuration.menus
+      .filter((menu) => menu.sectionId === "administration")
+      .map((menu) => menu.id),
+    ["settings"],
+  );
+
+  // Ningún submódulo administrativo es un menú propio del sidebar.
+  const hrefs = SIDEBAR_MENU_DEFINITIONS.map((menu) => menu.href);
+  const labels = SIDEBAR_MENU_DEFINITIONS.map((menu) => menu.label);
+  for (const forbidden of [
+    "/workspace/templates",
+    "/workspace/audit",
+    "/workspace/settings/templates",
+    "/workspace/settings/users",
+    "/workspace/settings/ai-providers",
+  ]) {
+    assert.ok(!hrefs.includes(forbidden), `menú no permitido: ${forbidden}`);
+  }
+  for (const forbidden of [
+    "Plantillas",
+    "Usuarios",
+    "Proveedores IA",
+    "Auditoría",
+  ]) {
+    assert.ok(
+      !labels.includes(forbidden),
+      `etiqueta no permitida: ${forbidden}`,
+    );
+  }
+  assert.doesNotMatch(
+    sidebar,
+    /href="\/workspace\/settings\/(?:templates|users|ai-providers)"/,
+  );
 });
 
-test("Configuración reúne los cinco submódulos y preferencias personales", async () => {
+test("Configuración reúne sus submódulos en un centro con acceso según el perfil", async () => {
   const page = await readFile(
     "apps/web/src/app/workspace/settings/page.tsx",
     "utf8",
@@ -41,13 +78,29 @@ test("Configuración reúne los cinco submódulos y preferencias personales", as
     "utf8",
   );
 
-  assert.match(page, /Preferencias personales/);
-  assert.match(page, /Administración del sistema/);
-  assert.match(page, /title="General"/);
-  assert.match(page, /title="Plantillas"/);
-  assert.match(page, /title="Usuarios y roles"/);
-  assert.match(page, /title="Proveedores de IA"/);
-  assert.match(page, /title="Auditoría"/);
+  assert.match(page, /Centro de administración/);
+  assert.match(page, /Opciones de configuración/);
+  assert.match(
+    page,
+    /Se muestran únicamente las opciones disponibles para tu perfil/,
+  );
+  const cards: Array<[string, string]> = [
+    ["General", "/workspace/settings/general"],
+    ["Parámetros", "/workspace/settings/parameters"],
+    ["Plantillas", "/workspace/settings/templates"],
+    ["Usuarios y roles", "/workspace/settings/users"],
+    ["Proveedores de IA", "/workspace/settings/ai-providers"],
+    ["Criterios de viabilidad", "/workspace/settings/viability"],
+    ["Auditoría", "/workspace/settings/audit"],
+  ];
+  for (const [title, href] of cards) {
+    assert.match(page, new RegExp(`href="${href}"`), `falta ${href}`);
+    assert.match(page, new RegExp(`title="${title}"`), `falta ${title}`);
+  }
+  // El acceso depende del perfil: plantillas y administración del sistema solo
+  // se muestran con los permisos correspondientes.
+  assert.match(page, /showTemplates \? \(/);
+  assert.match(page, /showSystemAdministration \? \(/);
   assert.match(navigation, /aria-current=\{isCurrent \? "page" : undefined\}/);
   assert.match(navigation, /aria-label="Secciones de Configuración"/);
 });

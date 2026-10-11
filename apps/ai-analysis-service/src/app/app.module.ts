@@ -20,6 +20,7 @@ import { AnalysisPromptVersionEntity } from "../analysis/analysis-prompt-version
 import { AnalysisRequestSourceEntity } from "../analysis/analysis-request-source.entity";
 import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
 import { AnalysisResultEntity } from "../analysis/analysis-result.entity";
+import { LocalDraftBlockCheckpointEntity } from "../analysis/local-draft-block-checkpoint.entity";
 import { AiAnalysisDocumentsAccessClient } from "../analysis/documents-access.client";
 import { AiAnalysisProjectsAccessClient } from "../analysis/projects-access.client";
 import { AiAnalysisSourcesAccessClient } from "../analysis/sources-access.client";
@@ -44,6 +45,30 @@ import {
 } from "../providers/ai-secret-vault";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { LOCAL_AI_CONFIG, loadLocalAiConfig } from "../local-ai/ollama.config";
+import { OllamaClient } from "../local-ai/ollama.client";
+import { OllamaSourceAnalyzerService } from "../local-ai/ollama-source-analyzer.service";
+import { LocalAiPipelineService } from "../local-ai/local-ai-pipeline.service";
+import { SourceLocalAnalysisEntity } from "../local-ai/source-local-analysis.entity";
+import { ProjectKnowledgeSnapshotEntity } from "../local-ai/project-knowledge-snapshot.entity";
+import { LocalSourceAnalysisQueue } from "../local-ai/local-source-analysis.queue";
+import { LocalAiAuditEntity } from "../local-ai/local-ai-audit.entity";
+import { LocalAiSettingsService } from "../local-ai/local-ai-settings.service";
+import { AiUsageGuardService } from "../security/ai-usage-guard.service";
+import { AiSecurityAuditEntity } from "../security/ai-security-audit.entity";
+import { RequirementDiscussionService } from "../discussion/requirement-discussion.service";
+import { ViabilityCriterionEntity } from "../viability/viability-criterion.entity";
+import { ViabilitySettingEntity } from "../viability/viability-setting.entity";
+import { ViabilityCriteriaController } from "../viability/viability-criteria.controller";
+import { ViabilityCriteriaService } from "../viability/viability-criteria.service";
+import { InternalStructuredExecutionController } from "../internal/internal-structured-execution.controller";
+import { InternalStructuredExecutionService } from "../internal/internal-structured-execution.service";
+import { InternalImageGenerationController } from "../internal/internal-image-generation.controller";
+import { InternalImageGenerationService } from "../internal/internal-image-generation.service";
+import {
+  PROTOTYPE_IMAGE_GENERATION_CONFIG,
+  loadPrototypeImageGenerationConfig,
+} from "../internal/prototype-image-generation.config";
 
 const databaseConfig = loadSqlServerDatabaseConfig({
   serviceName: "ai-analysis-service",
@@ -58,6 +83,13 @@ const aiAnalysisEntities = [
   AiProviderAuditEntity,
   AnalysisPromptVersionEntity,
   AnalysisResultEntity,
+  LocalDraftBlockCheckpointEntity,
+  SourceLocalAnalysisEntity,
+  ProjectKnowledgeSnapshotEntity,
+  LocalAiAuditEntity,
+  AiSecurityAuditEntity,
+  ViabilityCriterionEntity,
+  ViabilitySettingEntity,
 ];
 
 @Module({
@@ -76,7 +108,13 @@ const aiAnalysisEntities = [
   controllers: [
     AppController,
     ...(databaseConfig.enabled
-      ? [AiAnalysisController, AiProviderConfigurationsController]
+      ? [
+          AiAnalysisController,
+          AiProviderConfigurationsController,
+          ViabilityCriteriaController,
+          InternalStructuredExecutionController,
+          InternalImageGenerationController,
+        ]
       : []),
   ],
   providers: [
@@ -98,6 +136,7 @@ const aiAnalysisEntities = [
             useFactory: loadAiAnalysisProcessingConfig,
           },
           AiAnalysisQueue,
+          AiUsageGuardService,
           {
             provide: AI_PROVIDER_RUNTIME_CONFIG,
             useFactory: loadAiProviderRuntimeConfig,
@@ -108,8 +147,22 @@ const aiAnalysisEntities = [
             useExisting: PlatformAiSecretVault,
           },
           AiProviderConfigurationsService,
+          ViabilityCriteriaService,
+          { provide: LOCAL_AI_CONFIG, useFactory: loadLocalAiConfig },
+          OllamaClient,
+          OllamaSourceAnalyzerService,
+          LocalAiSettingsService,
+          LocalSourceAnalysisQueue,
+          LocalAiPipelineService,
+          RequirementDiscussionService,
           AiAnalysisExecutionService,
           AiAnalysisWorker,
+          InternalStructuredExecutionService,
+          {
+            provide: PROTOTYPE_IMAGE_GENERATION_CONFIG,
+            useFactory: loadPrototypeImageGenerationConfig,
+          },
+          InternalImageGenerationService,
         ]
       : []),
   ],

@@ -5,8 +5,7 @@ export const DOCUMENT_TEMPLATE_TYPES = [
   "ERP_FDD",
 ] as const;
 
-export type DocumentTemplateType =
-  (typeof DOCUMENT_TEMPLATE_TYPES)[number];
+export type DocumentTemplateType = (typeof DOCUMENT_TEMPLATE_TYPES)[number];
 
 export const DOCUMENT_TEMPLATE_STATUSES = [
   "DRAFT",
@@ -73,6 +72,17 @@ export interface DocumentTemplateDefinition {
   };
 }
 
+export interface DocumentTemplateLogoMetadata {
+  fileName: string;
+  mediaType: "image/png" | "image/jpeg";
+  sizeBytes: number;
+  updatedAt: string;
+}
+
+export interface DocumentTemplateLogo extends DocumentTemplateLogoMetadata {
+  dataBase64: string;
+}
+
 export interface DocumentTemplateSummary {
   id: string;
   code: string;
@@ -87,6 +97,7 @@ export interface DocumentTemplateSummary {
   updatedAt: string;
   publishedAt: string | null;
   retiredAt: string | null;
+  logo: DocumentTemplateLogoMetadata | null;
 }
 
 export interface DocumentTemplateDetail extends DocumentTemplateSummary {
@@ -138,4 +149,10 @@ export interface CloneDocumentTemplateRequest {
   description?: string | null;
   includesScrum?: boolean;
   sections?: readonly DocumentTemplateSection[];
+}
+
+export interface UpdateDocumentTemplateLogoRequest {
+  fileName: string;
+  mediaType: "image/png" | "image/jpeg";
+  dataBase64: string;
 }

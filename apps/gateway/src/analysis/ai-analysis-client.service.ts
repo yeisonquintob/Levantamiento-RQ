@@ -1,3 +1,4 @@
+import type { AuditHistoryResponse } from "@levantamiento-rq/shared-contracts";
 import {
   HttpException,
   Inject,
@@ -9,14 +10,23 @@ import type {
   AiProviderConfigurationListResponse,
   AiProviderConfigurationSummary,
   AiProviderConnectionTestResult,
+  AiAnalysisPromptDetail,
   AiAnalysisRequestDetail,
   AiAnalysisRequestListResponse,
+  AiAnalysisTokenEstimateRequest,
+  AiAnalysisTokenEstimateResponse,
   CreateAiAnalysisRequest,
+  ProcessRequirementDiscussionRequest,
+  ProcessRequirementDiscussionResponse,
+  RequirementDiscussionCapabilitiesResponse,
+  ProjectDomainPurgeResult,
+  OllamaInstalledModelsResponse,
+  ViabilityConfiguration,
 } from "@levantamiento-rq/shared-contracts";
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
-type AiAnalysisMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type AiAnalysisMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 @Injectable()
 export class AiAnalysisClientService {
@@ -37,6 +47,63 @@ export class AiAnalysisClientService {
       accessToken,
       correlationId,
       body,
+    );
+  }
+
+  estimateTokens(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    body: AiAnalysisTokenEstimateRequest | unknown,
+  ): Promise<AiAnalysisTokenEstimateResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/token-estimate`,
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  processDiscussion(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    body: ProcessRequirementDiscussionRequest | unknown,
+  ): Promise<ProcessRequirementDiscussionResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/discussion/process`,
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+      600_000,
+    );
+  }
+
+  cancelDiscussion(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<{ cancelled: number }> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/discussion/cancel`,
+      "POST",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  getDiscussionCapabilities(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<RequirementDiscussionCapabilitiesResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/discussion/capabilities`,
+      "GET",
+      accessToken,
+      correlationId,
     );
   }
 
@@ -68,6 +135,19 @@ export class AiAnalysisClientService {
     );
   }
 
+  purgeProject(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests`,
+      "DELETE",
+      accessToken,
+      correlationId,
+    );
+  }
+
   getById(
     accessToken: string,
     correlationId: string,
@@ -76,6 +156,20 @@ export class AiAnalysisClientService {
   ): Promise<AiAnalysisRequestDetail> {
     return this.request(
       `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(analysisRequestId)}`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  getPrompt(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    analysisRequestId: string,
+  ): Promise<AiAnalysisPromptDetail> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analysis-requests/${encodeURIComponent(analysisRequestId)}/prompt`,
       "GET",
       accessToken,
       correlationId,
@@ -139,6 +233,45 @@ export class AiAnalysisClientService {
     );
   }
 
+  listOllamaModels(
+    accessToken: string,
+    correlationId: string,
+    baseUrl: string,
+  ): Promise<OllamaInstalledModelsResponse> {
+    return this.request(
+      `/api/v1/admin/ai-providers/ollama/models?baseUrl=${encodeURIComponent(baseUrl)}`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  listOpenAiCompatibleModels(
+    accessToken: string,
+    correlationId: string,
+    baseUrl: string,
+  ): Promise<OllamaInstalledModelsResponse> {
+    return this.request(
+      `/api/v1/admin/ai-providers/openai-compatible/models?baseUrl=${encodeURIComponent(baseUrl)}`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  listOpenAiModels(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+  ): Promise<{ models: { id: string }[] }> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}/openai/models`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
   createProvider(
     accessToken: string,
     correlationId: string,
@@ -146,6 +279,21 @@ export class AiAnalysisClientService {
   ): Promise<AiProviderConfigurationSummary> {
     return this.request(
       "/api/v1/admin/ai-providers",
+      "POST",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  duplicateProvider(
+    accessToken: string,
+    correlationId: string,
+    providerConfigurationId: string,
+    body: unknown,
+  ): Promise<AiProviderConfigurationSummary> {
+    return this.request(
+      `/api/v1/admin/ai-providers/${encodeURIComponent(providerConfigurationId)}/duplicate`,
       "POST",
       accessToken,
       correlationId,
@@ -209,12 +357,57 @@ export class AiAnalysisClientService {
     );
   }
 
+  getViabilityCriteria(
+    accessToken: string,
+    correlationId: string,
+  ): Promise<ViabilityConfiguration> {
+    return this.request(
+      "/api/v1/viability-criteria",
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  updateViabilityCriteria(
+    accessToken: string,
+    correlationId: string,
+    body: unknown,
+  ): Promise<ViabilityConfiguration> {
+    return this.request(
+      "/api/v1/viability-criteria",
+      "PUT",
+      accessToken,
+      correlationId,
+      body,
+    );
+  }
+
+  auditHistory(
+    accessToken: string,
+    query: Readonly<Record<string, unknown>>,
+    correlationId: string,
+  ): Promise<AuditHistoryResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === "string" || typeof value === "number")
+        params.set(key, String(value));
+    }
+    return this.request(
+      `/api/v1/admin/ai-providers/audit-events?${params}`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
   private async request<T>(
     path: string,
     method: AiAnalysisMethod,
     accessToken: string,
     correlationId: string,
     body?: unknown,
+    timeoutMs = this.config.aiAnalysisTimeoutMs,
   ): Promise<T> {
     const headers: Record<string, string> = {
       accept: "application/json",
@@ -233,7 +426,7 @@ export class AiAnalysisClientService {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.config.aiAnalysisTimeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new ServiceUnavailableException(

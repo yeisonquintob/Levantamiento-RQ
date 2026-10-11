@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UnauthorizedException,
@@ -23,6 +24,7 @@ import type {
   CloneDocumentTemplateRequest,
   CreateDocumentTemplateRequest,
   UpdateDocumentTemplateRequest,
+  UpdateDocumentTemplateLogoRequest,
 } from "@levantamiento-rq/shared-contracts";
 
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
@@ -106,6 +108,16 @@ export class DocumentTemplatesGatewayController {
     return this.templates.getById(requireAccessToken(request), templateId);
   }
 
+  @ApiOperation({ summary: "Consultar el logo de una plantilla" })
+  @ApiParam({ name: "templateId", format: "uuid" })
+  @Get(":templateId/logo")
+  getLogo(
+    @Req() request: RequestLike,
+    @Param("templateId") templateId: string,
+  ) {
+    return this.templates.getLogo(requireAccessToken(request), templateId);
+  }
+
   @ApiOperation({ summary: "Actualizar una plantilla en borrador" })
   @ApiParam({ name: "templateId", format: "uuid" })
   @Patch(":templateId")
@@ -115,6 +127,21 @@ export class DocumentTemplatesGatewayController {
     @Body() body: UpdateDocumentTemplateRequest | unknown,
   ) {
     return this.templates.update(requireAccessToken(request), templateId, body);
+  }
+
+  @ApiOperation({ summary: "Actualizar el logo de una plantilla activa" })
+  @ApiParam({ name: "templateId", format: "uuid" })
+  @Put(":templateId/logo")
+  updateLogo(
+    @Req() request: RequestLike,
+    @Param("templateId") templateId: string,
+    @Body() body: UpdateDocumentTemplateLogoRequest | unknown,
+  ) {
+    return this.templates.updateLogo(
+      requireAccessToken(request),
+      templateId,
+      body,
+    );
   }
 
   @ApiOperation({ summary: "Publicar una plantilla inmutable" })

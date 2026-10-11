@@ -21,6 +21,7 @@ import {
 } from "@levantamiento-rq/shared-observability";
 
 import { AppModule } from "./app/app.module";
+import { ACCESS_COOKIE, hasCookie, REFRESH_COOKIE } from "./auth/cookies";
 import { loadGatewayConfig } from "./config/gateway-config";
 import { isBrowserMutationAllowed } from "./security/gateway-security";
 
@@ -33,7 +34,8 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    // 20 MB: una imagen PNG importada a la galería viaja en base64 dentro del JSON.
+    new FastifyAdapter({ bodyLimit: 20 * 1024 * 1024 }),
   );
 
   await app.register(fastifyMultipart as never, {
@@ -68,6 +70,7 @@ async function bootstrap(): Promise<void> {
 
     const originHeader = request.headers.origin;
     const fetchSiteHeader = request.headers["sec-fetch-site"];
+    const cookieHeader = request.headers.cookie;
     const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
     const secFetchSite = Array.isArray(fetchSiteHeader)
       ? fetchSiteHeader[0]
@@ -75,10 +78,13 @@ async function bootstrap(): Promise<void> {
 
     if (
       !isBrowserMutationAllowed({
+        hasSessionCookie:
+          hasCookie(cookieHeader, ACCESS_COOKIE) ||
+          hasCookie(cookieHeader, REFRESH_COOKIE),
         method: request.method,
         origin,
         secFetchSite,
-        webOrigin: config.webOrigin,
+        webOrigins: config.webOrigins,
       })
     ) {
       const correlationHeader = request.headers["x-correlation-id"];
@@ -99,9 +105,16 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix(config.globalPrefix);
   app.enableCors({
-    origin: config.webOrigin,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, false);
+        return;
+      }
+
+      callback(null, config.webOrigins.includes(origin));
+    },
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "content-type",
       "authorization",
@@ -171,7 +184,7 @@ async function bootstrap(): Promise<void> {
       documentsServiceUrl: config.documentsServiceUrl,
       aiAnalysisServiceUrl: config.aiAnalysisServiceUrl,
       workflowServiceUrl: config.workflowServiceUrl,
-      webOrigin: config.webOrigin,
+      webOrigins: config.webOrigins,
     },
   });
 

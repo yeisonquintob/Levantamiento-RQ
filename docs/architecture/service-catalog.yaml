@@ -75,3 +75,14 @@ services:
     database: RqOperationsDb
     bullmq: true
     externally_exposed: false
+
+  # Capacidad posterior a V1, todavía en validación: no está en CI, Docker ni
+  # Bicep. Persistencia, cola y almacenamiento son propios.
+  - id: prototypes-service
+    kind: worker-service
+    scope: prototypes
+    implementation_stage: in-validation
+    database: RqPrototypesDb
+    object_storage: true
+    bullmq: true
+    externally_exposed: false

@@ -8,6 +8,7 @@ import {
 import type {
   AddWorkflowCommentRequest,
   CreateWorkflowReviewRequest,
+  ProjectDomainPurgeResult,
   DecideWorkflowReviewRequest,
   WorkflowReviewDetail,
   WorkflowReviewListResponse,
@@ -49,6 +50,20 @@ export class WorkflowClientService {
     return this.request(
       `/api/v1/projects/${encodeURIComponent(projectId)}/reviews`,
       "GET",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  purgeProject(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/reviews`,
+      "DELETE",
       accessToken,
       correlationId,
       null,
@@ -130,7 +145,7 @@ export class WorkflowClientService {
 
   private async request<T>(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     accessToken: string,
     correlationId: string,
     idempotencyKey: string | null,

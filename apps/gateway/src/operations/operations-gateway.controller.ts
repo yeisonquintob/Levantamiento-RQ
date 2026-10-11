@@ -1,12 +1,15 @@
+import { UsersClientService } from "../users/users-client.service";
 import { randomUUID } from "node:crypto";
 
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -58,7 +61,27 @@ function attachmentDisposition(fileName: string): string {
 })
 @Controller()
 export class OperationsGatewayController {
-  constructor(private readonly operations: OperationsClientService) {}
+  constructor(
+    private readonly operations: OperationsClientService,
+    private readonly users: UsersClientService,
+  ) {}
+
+  @Get("admin/audit/approvals")
+  async auditHistory(
+    @Req() request: RequestLike,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    const accessToken = token(request);
+    return this.users.resolveAuditActors(
+      await this.operations.auditHistory(
+        accessToken,
+        query,
+        correlation(request),
+      ),
+      accessToken,
+      correlation(request),
+    );
+  }
 
   @ApiOperation({ summary: "Solicitar exportación documental" })
   @Post(
@@ -134,6 +157,45 @@ export class OperationsGatewayController {
       token(request),
       correlation(request),
       notificationId,
+    );
+  }
+
+  @ApiOperation({ summary: "Eliminar todas las notificaciones propias" })
+  @Delete("notifications")
+  @HttpCode(200)
+  clearNotifications(@Req() request: RequestLike) {
+    return this.operations.clearNotifications(
+      token(request),
+      correlation(request),
+    );
+  }
+
+  @ApiOperation({ summary: "Estado de ejecución de las tareas de un proyecto" })
+  @Get("projects/:projectId/execution/tasks")
+  listExecutionTasks(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.operations.listExecutionTasks(
+      token(request),
+      correlation(request),
+      projectId,
+    );
+  }
+
+  @ApiOperation({ summary: "Marcar tareas de ejecución de un proyecto" })
+  @Put("projects/:projectId/execution/tasks")
+  @HttpCode(200)
+  updateExecutionTasks(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Body() body: unknown,
+  ) {
+    return this.operations.updateExecutionTasks(
+      token(request),
+      correlation(request),
+      projectId,
+      body,
     );
   }
 

@@ -16,9 +16,6 @@
 | documentVersion | Versión | SemVer | Obligatorio |
 | createdDate | Fecha de creación | Fecha | Obligatorio |
 | requestingArea | Área solicitante | Texto | Obligatorio |
-| preparedBy | Elaborado por | Persona y cargo | Obligatorio |
-| reviewedBy | Revisado por | Persona y cargo | Pendiente hasta revisión |
-| approvedBy | Aprobado por | Persona y cargo | Pendiente hasta aprobación |
 | status | Estado | Catálogo | BORRADOR, EN VALIDACIÓN o APROBADO |
 
 ## 2. Objetivos
@@ -43,14 +40,25 @@
 | excludedScope | No incluye | Lista | Exclusiones explícitas |
 | involvedSystems | Sistemas o fuentes | Lista | ERP, CRM, archivos, bases u otros |
 
-## 5. Diagrama
+## 5. Solución propuesta del profesional de soluciones
+
+| Campo técnico | Campo visible | Tipo | Regla |
+|---|---|---|---|
+| objective | Objetivo | Texto | Breve y respaldado por las fuentes |
+| description | Descripción breve | Párrafo | Explica la solución sin inventar definiciones |
+| involvedElements | Elementos involucrados | Lista | Sistemas, módulos, datos o procesos relevantes |
+| flowAlignment.currentState | Estado actual · AS-IS | Texto | Corresponde al diagrama actual |
+| flowAlignment.evaluation | Evaluación | Texto | Explica la decisión técnica o funcional |
+| flowAlignment.expectedResult | Resultado · TO-BE | Texto | Corresponde al diagrama esperado |
+
+## 6. Diagrama
 
 | Campo técnico | Campo visible | Tipo | Regla |
 |---|---|---|---|
 | processFlow | Diagrama de flujo | Diagrama | Incluye actores, actividades y decisiones |
 | flowNotation | Notación | Catálogo | Mermaid, BPMN simplificado o imagen |
 
-## 6. Hitos y funcionalidades
+## 7. Requerimientos
 
 | Campo técnico | Campo visible | Tipo | Regla |
 |---|---|---|---|
@@ -66,25 +74,22 @@
 | businessRules | Reglas de negocio | Lista | Reglas sustentadas |
 | requiredFields | Campos requeridos | Tabla | Campo, tipo, obligatoriedad y validación |
 
-## 7. No funcionales
+Los requerimientos funcionales y no funcionales se presentan en esta sección.
+Cada requerimiento no funcional conserva categoría, descripción, medida,
+objetivo verificable, prioridad y fuente de verificación.
 
-| Campo técnico | Campo visible | Tipo | Regla |
-|---|---|---|---|
-| security | Seguridad | Lista | Solo si aplica |
-| traceability | Trazabilidad | Lista | Usuario, fecha, hora y acción |
-| performance | Rendimiento | Lista | Debe ser medible |
-| compatibility | Compatibilidad | Lista | Plataformas concretas |
-| availability | Disponibilidad | Lista | Horario o porcentaje |
-| usability | Usabilidad | Lista | Comportamiento verificable |
+## 8. Esquema
 
-## 8. Pruebas
+Organiza el backlog canónico como Epic, Feature, Historia de Usuario y Tarea.
+
+## 9. Pruebas
 
 | Campo técnico | Campo visible | Tipo | Regla |
 |---|---|---|---|
 | testObjective | Objetivo de pruebas | Texto | Qué debe validarse |
 | testScenarios | Escenarios mínimos | Lista numerada | Incluye escenarios aplicables |
 
-## 9. Supuestos, dependencias y pendientes
+## 10. Supuestos, dependencias y pendientes
 
 | Campo técnico | Campo visible | Tipo | Regla |
 |---|---|---|---|
@@ -92,14 +97,14 @@
 | dependencies | Dependencias | Lista | Sistema, área, proveedor o dato |
 | pendingItems | Pendientes | Lista | Usa marcador obligatorio si falta definición |
 
-## 10. Aprobaciones y cambios
+## 11. Aprobaciones y cambios
 
 | Campo técnico | Campo visible | Tipo | Regla |
 |---|---|---|---|
-| changeControl | Control de cambios | Tabla | Versión, fecha, modificación y aprobó |
-| approvals | Aprobaciones | Tabla | Rol, nombre, cargo, fecha y estado |
+| approvals | Aprobaciones | Tabla | Elaboración: responsable autenticado; revisión: su líder; aprobación: solicitante o su líder. El actor real se registra al ejecutar cada transición |
+| changeControl | Control de cambios | Tabla | Máximo un registro compacto por versión; se crea únicamente al aprobar un cambio, nunca al generar con IA |
 
-## 11 a 13
+## 12 a 14
 
-Las secciones 11, 12 y 13 pertenecen a la plantilla canónica. Se incluyen
+Las secciones 12, 13 y 14 pertenecen a la plantilla canónica. Se incluyen
 en cada exportación y no son reescritas libremente por la IA.

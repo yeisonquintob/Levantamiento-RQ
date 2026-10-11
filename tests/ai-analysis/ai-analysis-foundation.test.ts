@@ -17,7 +17,16 @@ test("el contrato publica el alcance aprobado del Paso 18.1A", () => {
     "FAILED",
     "CANCELLED",
   ]);
-  assert.deepEqual(AI_PROVIDER_CODES, ["DISABLED", "OPENAI", "FAKE"]);
+  assert.deepEqual(AI_PROVIDER_CODES, [
+    "DISABLED",
+    "OPENAI",
+    "ANTHROPIC",
+    "GEMINI",
+    "GROQ",
+    "CEREBRAS",
+    "OLLAMA",
+    "FAKE",
+  ]);
 });
 
 test("RqAiDb contiene tres tablas y solo relaciones internas", async () => {
@@ -58,6 +67,24 @@ test("las restricciones protegen estados, intentos y trazabilidad", async () => 
   assert.match(migration, /UQ_AnalysisExecutions_Request_Attempt/);
   assert.match(migration, /SourceUpdatedAt/);
   assert.match(migration, /SourceSha256/);
+});
+
+test("la solicitud conserva los motores elegidos y habilita Ollama como generador", async () => {
+  const [entity, migration] = await Promise.all([
+    readFile(
+      "apps/ai-analysis-service/src/analysis/analysis-request.entity.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/ai-analysis-service/src/database/migrations/1788470401000-AddAiAnalysisEngineSelection.ts",
+      "utf8",
+    ),
+  ]);
+
+  assert.match(entity, /UseLocalAi/u);
+  assert.match(entity, /UseCloudAi/u);
+  assert.match(migration, /CK_AnalysisRequests_AiEngine/u);
+  assert.match(migration, /'OLLAMA'/u);
 });
 
 test("TypeORM registra las tres entidades solo con persistencia habilitada", async () => {

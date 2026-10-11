@@ -19,18 +19,19 @@
 
 ## Componentes
 
-| Componente    | Responsabilidad                                    |
-| ------------- | -------------------------------------------------- |
-| Web           | Interfaz responsive y experiencia PWA              |
-| Gateway       | Entrada, seguridad, agregación y enrutamiento      |
-| Identity      | Usuarios, organizaciones, roles y permisos         |
-| Projects      | Proyectos, participantes y acceso                  |
-| Sources       | Archivos, conversaciones, notas y extracción       |
-| Documents     | Plantillas, editor, requerimientos y versiones     |
-| AI Analysis   | Análisis, evidencias, contradicciones y propuestas |
-| ERP Knowledge | Conocimiento ERP y análisis fit-gap                |
-| Workflow      | Revisión, correcciones, aprobación y rechazo       |
-| Operations    | PDF, exportaciones y notificaciones                |
+| Componente    | Responsabilidad                                                          |
+| ------------- | ------------------------------------------------------------------------ |
+| Web           | Interfaz responsive y experiencia PWA                                    |
+| Gateway       | Entrada, seguridad, agregación y enrutamiento                            |
+| Identity      | Usuarios, organizaciones, roles y permisos                               |
+| Projects      | Proyectos, participantes y acceso                                        |
+| Sources       | Archivos, conversaciones, notas y extracción                             |
+| Documents     | Plantillas, editor, requerimientos y versiones                           |
+| AI Analysis   | Análisis, evidencias, contradicciones y propuestas                       |
+| ERP Knowledge | Conocimiento ERP y análisis fit-gap                                      |
+| Workflow      | Revisión, correcciones, aprobación y rechazo                             |
+| Operations    | PDF, exportaciones y notificaciones                                      |
+| Prototypes    | Prototipos: plan de pantallas e imágenes (en validación, posterior a V1) |
 
 ## Documentos relacionados
 

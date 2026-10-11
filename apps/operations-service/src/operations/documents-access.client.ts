@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 
 import type {
+  DocumentTemplateDetail,
+  DocumentTemplateLogo,
   DocumentVersionDetail,
   RequirementDocumentDetail,
 } from "@levantamiento-rq/shared-contracts";
@@ -32,6 +34,35 @@ export class OperationsDocumentsAccessClient {
   ): Promise<{
     document: RequirementDocumentDetail;
     version: DocumentVersionDetail;
+    templateLogo: DocumentTemplateLogo | null;
+    templateDescription: string | null;
+  }> {
+    const result = await this.requireVersion(
+      projectId,
+      documentId,
+      versionNumber,
+      accessToken,
+      correlationId,
+    );
+    if (result.version.status !== "APPROVED") {
+      throw new ConflictException(
+        "Solo una versión APPROVED exacta puede exportarse en este formato.",
+      );
+    }
+    return result;
+  }
+
+  async requireVersion(
+    projectId: string,
+    documentId: string,
+    versionNumber: number,
+    accessToken: string,
+    correlationId: string,
+  ): Promise<{
+    document: RequirementDocumentDetail;
+    version: DocumentVersionDetail;
+    templateLogo: DocumentTemplateLogo | null;
+    templateDescription: string | null;
   }> {
     const [document, version] = await Promise.all([
       this.request<RequirementDocumentDetail>(
@@ -50,15 +81,28 @@ export class OperationsDocumentsAccessClient {
         "El documento no pertenece al proyecto solicitado.",
       );
     }
-    if (
-      version.versionNumber !== versionNumber ||
-      version.status !== "APPROVED"
-    ) {
-      throw new ConflictException(
-        "Solo una versión APPROVED exacta puede exportarse.",
-      );
+    if (version.versionNumber !== versionNumber) {
+      throw new ConflictException("La versión solicitada no coincide.");
     }
-    return { document, version };
+    const [templateLogo, templateDetail] = await Promise.all([
+      this.request<DocumentTemplateLogo | null>(
+        `/api/v1/templates/${encodeURIComponent(document.template.sourceTemplateId)}/logo`,
+        accessToken,
+        correlationId,
+      ),
+      this.request<DocumentTemplateDetail>(
+        `/api/v1/templates/${encodeURIComponent(document.template.sourceTemplateId)}`,
+        accessToken,
+        correlationId,
+      ),
+    ]);
+
+    return {
+      document,
+      version,
+      templateLogo,
+      templateDescription: templateDetail.description,
+    };
   }
 
   private async request<T>(

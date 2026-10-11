@@ -43,6 +43,15 @@ function context(request: RequestLike): {
 export class UsersGatewayController {
   constructor(private readonly users: UsersClientService) {}
 
+  @Get("audit-events")
+  auditHistory(
+    @Req() request: RequestLike,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.users.auditHistory(token, query, correlationId);
+  }
+
   @ApiOperation({ summary: "Listar usuarios por medio de Identity" })
   @Get()
   list(

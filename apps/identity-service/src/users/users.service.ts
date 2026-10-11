@@ -1,3 +1,14 @@
+import {
+  readAuditHistory,
+  requireAuditAdministrator,
+} from "@levantamiento-rq/shared-persistence";
+import {
+  USER_AUDIT_FIELDS,
+  auditFieldChanges,
+  auditMetadata,
+  auditMetadataChanges,
+  type AuditHistoryResponse,
+} from "@levantamiento-rq/shared-contracts";
 import { randomBytes, randomUUID } from "node:crypto";
 
 import {
@@ -12,6 +23,7 @@ import {
   In,
   IsNull,
   MoreThan,
+  QueryFailedError,
   Repository,
 } from "typeorm";
 
@@ -25,6 +37,7 @@ import type {
   IdentityUserStatus,
   ResetIdentityUserPasswordResponse,
   RevokeIdentityUserSessionsResponse,
+  RegisterAccountResponse,
 } from "@levantamiento-rq/shared-contracts";
 
 import { PasswordHasher } from "../auth/password-hasher";
@@ -56,8 +69,19 @@ export interface UpdateUserInput {
   email?: string;
 }
 
+export interface RegisterAccountInput {
+  displayName: string;
+  email: string;
+  password: string;
+}
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function isUniqueConstraintError(error: QueryFailedError): boolean {
+  const driverError = error.driverError as { number?: unknown };
+  return driverError.number === 2601 || driverError.number === 2627;
 }
 
 function statusOf(user: UserEntity): IdentityUserStatus {
@@ -84,6 +108,84 @@ export class UsersService {
     private readonly dataSource: DataSource,
     private readonly passwordHasher: PasswordHasher,
   ) {}
+
+  async auditHistory(
+    actor: AuthenticatedUser,
+    query: Readonly<Record<string, unknown>>,
+  ): Promise<AuditHistoryResponse> {
+    requireAuditAdministrator(actor);
+    const builder = this.dataSource
+      .getRepository(SecurityAuditEntity)
+      .createQueryBuilder("audit")
+      .where("audit.eventType IN (:...eventTypes)", {
+        eventTypes: [
+          "USER_CREATED",
+          "USER_SELF_REGISTERED",
+          "USER_UPDATED",
+          "ROLE_ASSIGNED",
+          "ROLE_REMOVED",
+          "USER_ACTIVATED",
+          "USER_DEACTIVATED",
+          "PASSWORD_RESET",
+          "SESSIONS_REVOKED",
+        ],
+      })
+      .leftJoinAndMapOne(
+        "audit.actor",
+        UserEntity,
+        "actor",
+        "actor.id = audit.actorUserId",
+      )
+      .leftJoinAndMapOne(
+        "audit.target",
+        UserEntity,
+        "target",
+        "target.id = audit.targetUserId",
+      );
+    const page = await readAuditHistory(builder, query, {
+      date: "audit.createdAt",
+      id: "audit.id",
+      search: [
+        "audit.eventType",
+        "actor.displayName",
+        "target.displayName",
+        "target.email",
+        "audit.detail",
+      ],
+    });
+    return {
+      ...page,
+      items: page.items.map((value) => {
+        const row = value as SecurityAuditEntity & {
+          actor?: UserEntity;
+          target?: UserEntity;
+        };
+        const metadata = auditMetadata(row.detail);
+        return {
+          id: row.id,
+          occurredAt: row.createdAt.toISOString(),
+          action: row.eventType,
+          actorUserId: row.actorUserId,
+          actorName: row.actor?.displayName ?? null,
+          resourceId: row.targetUserId,
+          resourceLabel: row.target
+            ? `${row.target.displayName} · ${row.target.email}`
+            : (row.targetUserId ?? "Usuario"),
+          projectId: null,
+          result: "SUCCEEDED" as const,
+          changes: auditMetadataChanges(metadata, USER_AUDIT_FIELDS),
+          details:
+            row.eventType === "PASSWORD_RESET"
+              ? "Contraseña restablecida. Su valor no se registra."
+              : row.eventType === "SESSIONS_REVOKED"
+                ? `Sesiones cerradas: ${Number(metadata.count ?? 0)}`
+                : typeof metadata.code === "string"
+                  ? `Rol: ${metadata.code}`
+                  : null,
+        };
+      }),
+    };
+  }
 
   async list(query: UserListQuery): Promise<IdentityUserListResponse> {
     const builder = this.userQuery();
@@ -205,7 +307,18 @@ export class UsersService {
         "USER_CREATED",
         actor.id,
         saved.id,
-        { roles: selectedRoles.map((role) => role.code) },
+        {
+          roles: selectedRoles.map((role) => role.code),
+          changes: auditFieldChanges(
+            {},
+            {
+              displayName: saved.displayName,
+              email: saved.email,
+              roles: selectedRoles.map((role) => role.code),
+              isActive: true,
+            },
+          ),
+        },
         now,
       );
 
@@ -218,12 +331,82 @@ export class UsersService {
     };
   }
 
+  async registerAccount(
+    input: RegisterAccountInput,
+  ): Promise<RegisterAccountResponse> {
+    const emailNormalized = normalizeEmail(input.email);
+    const passwordHash = await this.passwordHasher.hash(input.password);
+    const now = new Date();
+
+    try {
+      const userId = await this.dataSource.transaction(async (manager) => {
+        const users = manager.getRepository(UserEntity);
+        const duplicate = await users.exists({ where: { emailNormalized } });
+
+        if (duplicate) {
+          throw new ConflictException("Ya existe una cuenta con ese correo.");
+        }
+
+        const analystRole = await manager.getRepository(RoleEntity).findOne({
+          where: { code: "ANALYST", isActive: true },
+        });
+
+        if (!analystRole) {
+          throw new BadRequestException(
+            "El rol base para nuevas cuentas no está disponible.",
+          );
+        }
+
+        const saved = await users.save(
+          users.create({
+            id: randomUUID(),
+            email: input.email.trim(),
+            emailNormalized,
+            displayName: input.displayName.trim(),
+            passwordHash,
+            isActive: false,
+            mustChangePassword: false,
+            sessionVersion: 1,
+            lastLoginAt: null,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
+
+        await manager.getRepository(UserRoleEntity).insert({
+          userId: saved.id,
+          roleId: analystRole.id,
+          createdAt: now,
+        });
+        await this.audit(
+          manager,
+          "USER_SELF_REGISTERED",
+          saved.id,
+          saved.id,
+          { role: analystRole.code, status: "PENDING_ACTIVATION" },
+          now,
+        );
+
+        return saved.id;
+      });
+
+      return { userId, status: "PENDING_ACTIVATION", roleCode: "ANALYST" };
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
+      if (error instanceof QueryFailedError && isUniqueConstraintError(error)) {
+        throw new ConflictException("Ya existe una cuenta con ese correo.");
+      }
+      throw error;
+    }
+  }
+
   async update(
     actor: AuthenticatedUser,
     userId: string,
     input: UpdateUserInput,
   ): Promise<IdentityUserDetail> {
     const user = await this.requireUser(userId);
+    const before = { displayName: user.displayName, email: user.email };
     const changedFields: string[] = [];
 
     if (input.email !== undefined) {
@@ -252,9 +435,22 @@ export class UsersService {
 
     const now = new Date();
     user.updatedAt = now;
-    await this.users.save(user);
-    await this.writeAudit("USER_UPDATED", actor.id, userId, {
-      fields: changedFields,
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(UserEntity).save(user);
+      await this.audit(
+        manager,
+        "USER_UPDATED",
+        actor.id,
+        userId,
+        {
+          fields: changedFields,
+          changes: auditFieldChanges(before, {
+            displayName: user.displayName,
+            email: user.email,
+          }),
+        },
+        now,
+      );
     });
 
     return this.getById(userId);
@@ -267,9 +463,7 @@ export class UsersService {
   ): Promise<IdentityUserDetail> {
     const user = await this.requireUser(userId);
     const selectedRoles = await this.requireRoles(roleCodes);
-    const previousCodes = new Set(
-      user.userRoles.map((item) => item.role.code),
-    );
+    const previousCodes = new Set(user.userRoles.map((item) => item.role.code));
     const nextCodes = new Set(selectedRoles.map((role) => role.code));
 
     await this.protectLastAdministrator(
@@ -290,33 +484,62 @@ export class UsersService {
           createdAt: now,
         })),
       );
-      await manager.getRepository(UserEntity).increment(
-        { id: userId },
-        "sessionVersion",
-        1,
-      );
-      await manager.getRepository(UserEntity).update(
-        { id: userId },
-        { updatedAt: now },
-      );
+      await manager
+        .getRepository(UserEntity)
+        .increment({ id: userId }, "sessionVersion", 1);
+      await manager
+        .getRepository(UserEntity)
+        .update({ id: userId }, { updatedAt: now });
       await this.revokeSessions(manager, userId, now);
 
       for (const code of added) {
-        await this.audit(manager, "ROLE_ASSIGNED", actor.id, userId, { code }, now);
+        await this.audit(
+          manager,
+          "ROLE_ASSIGNED",
+          actor.id,
+          userId,
+          {
+            code,
+            changes: auditFieldChanges(
+              { roles: [...previousCodes] },
+              { roles: [...nextCodes] },
+            ),
+          },
+          now,
+        );
       }
       for (const code of removed) {
-        await this.audit(manager, "ROLE_REMOVED", actor.id, userId, { code }, now);
+        await this.audit(
+          manager,
+          "ROLE_REMOVED",
+          actor.id,
+          userId,
+          {
+            code,
+            changes: auditFieldChanges(
+              { roles: [...previousCodes] },
+              { roles: [...nextCodes] },
+            ),
+          },
+          now,
+        );
       }
     });
 
     return this.getById(userId);
   }
 
-  activate(actor: AuthenticatedUser, userId: string): Promise<IdentityUserDetail> {
+  activate(
+    actor: AuthenticatedUser,
+    userId: string,
+  ): Promise<IdentityUserDetail> {
     return this.setActive(actor, userId, true);
   }
 
-  deactivate(actor: AuthenticatedUser, userId: string): Promise<IdentityUserDetail> {
+  deactivate(
+    actor: AuthenticatedUser,
+    userId: string,
+  ): Promise<IdentityUserDetail> {
     return this.setActive(actor, userId, false);
   }
 
@@ -331,24 +554,17 @@ export class UsersService {
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(UserEntity).increment(
-        { id: userId },
-        "sessionVersion",
-        1,
-      );
-      await manager.getRepository(UserEntity).update(
-        { id: userId },
-        { passwordHash, mustChangePassword: true, updatedAt: now },
-      );
+      await manager
+        .getRepository(UserEntity)
+        .increment({ id: userId }, "sessionVersion", 1);
+      await manager
+        .getRepository(UserEntity)
+        .update(
+          { id: userId },
+          { passwordHash, mustChangePassword: true, updatedAt: now },
+        );
       await this.revokeSessions(manager, userId, now);
-      await this.audit(
-        manager,
-        "PASSWORD_RESET",
-        actor.id,
-        userId,
-        null,
-        now,
-      );
+      await this.audit(manager, "PASSWORD_RESET", actor.id, userId, null, now);
     });
 
     return { user: await this.getById(userId), temporaryPassword };
@@ -363,15 +579,12 @@ export class UsersService {
     let revokedSessions = 0;
 
     await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(UserEntity).increment(
-        { id: userId },
-        "sessionVersion",
-        1,
-      );
-      await manager.getRepository(UserEntity).update(
-        { id: userId },
-        { updatedAt: now },
-      );
+      await manager
+        .getRepository(UserEntity)
+        .increment({ id: userId }, "sessionVersion", 1);
+      await manager
+        .getRepository(UserEntity)
+        .update({ id: userId }, { updatedAt: now });
       revokedSessions = await this.revokeSessions(manager, userId, now);
       await this.audit(
         manager,
@@ -403,22 +616,21 @@ export class UsersService {
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(UserEntity).increment(
-        { id: userId },
-        "sessionVersion",
-        1,
-      );
-      await manager.getRepository(UserEntity).update(
-        { id: userId },
-        { isActive, updatedAt: now },
-      );
+      await manager
+        .getRepository(UserEntity)
+        .increment({ id: userId }, "sessionVersion", 1);
+      await manager
+        .getRepository(UserEntity)
+        .update({ id: userId }, { isActive, updatedAt: now });
       await this.revokeSessions(manager, userId, now);
       await this.audit(
         manager,
         isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
         actor.id,
         userId,
-        null,
+        {
+          changes: auditFieldChanges({ isActive: user.isActive }, { isActive }),
+        },
         now,
       );
     });
@@ -461,7 +673,9 @@ export class UsersService {
     });
 
     if (roles.length !== normalized.length) {
-      throw new BadRequestException("Uno o más roles no existen o están inactivos.");
+      throw new BadRequestException(
+        "Uno o más roles no existen o están inactivos.",
+      );
     }
 
     return roles;
@@ -526,22 +740,6 @@ export class UsersService {
       .execute();
 
     return result.affected ?? 0;
-  }
-
-  private writeAudit(
-    eventType: string,
-    actorUserId: string,
-    targetUserId: string,
-    detail: Readonly<Record<string, unknown>> | null,
-  ): Promise<void> {
-    return this.audit(
-      this.dataSource.manager,
-      eventType,
-      actorUserId,
-      targetUserId,
-      detail,
-      new Date(),
-    );
   }
 
   private async audit(

@@ -46,6 +46,23 @@ No operará Dynamics 365, no creará transacciones, no modificará su
 configuración, no consultará producción directamente y no sustituirá
 el criterio de expertos funcionales o técnicos.
 
+## Prototypes Service
+
+Capacidad posterior a V1, en validación. Propietario de las generaciones de
+prototipo (`PrototypeGenerations`), sus pantallas, especificaciones visuales
+(sistema de diseño `CORPORATE_DEFAULT_V1`) e imágenes generadas
+(`PrototypeGeneratedImages`) en `RqPrototypesDb` y en su contenedor Blob.
+
+- Entrada: Gateway (`/api/v1/prototypes/...`) con el token de acceso del
+  usuario; solo opera sobre generaciones del usuario solicitante.
+- Salida: llama por HTTP a las rutas internas de AI Analysis
+  (`/internal/structured-executions` y `/internal/image-generations`) con un
+  token de servicio; nunca invoca proveedores de IA directamente ni accede a
+  `RqAiDb`.
+- No lee `RqDocumentsDb`: recibe el Markdown aprobado como dato de entrada de la
+  solicitud.
+- La IA solo propone: el plan y las imágenes requieren revisión humana.
+
 ## Workflow Service
 
 Propietario de solicitudes de revisión, revisores, aprobadores,

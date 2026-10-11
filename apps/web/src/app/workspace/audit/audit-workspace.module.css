@@ -1,0 +1,113 @@
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px 10px;
+}
+.filters > :global(.rq-field) {
+  flex: 0 1 150px;
+  gap: 3px;
+}
+.filters > :global(.rq-field):first-child {
+  flex: 1 1 260px;
+}
+.filters :global(.rq-field) label {
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+}
+.filters :is(input, select) {
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: calc(12px * var(--rq-font-scale));
+}
+.filters :global(.rq-action) {
+  height: 36px;
+  min-height: 36px;
+}
+.scroll {
+  overflow-x: auto;
+}
+.table {
+  min-width: 1000px;
+  width: 100%;
+}
+.table th:not(:last-child),
+.table td:not(:last-child) {
+  border-right: 1px solid #a3afb6;
+}
+.table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.table td:nth-child(1) {
+  width: 13%;
+}
+.table td:nth-child(2) {
+  width: 16%;
+}
+.table td:nth-child(4) {
+  width: 22%;
+}
+.table td:nth-child(5) {
+  width: 28%;
+}
+.table summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.changes {
+  margin: 12px 0 0;
+}
+.changes > div {
+  border-top: 1px solid #d2d9df;
+  padding: 10px 0;
+}
+.changes dt {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.changes dd {
+  margin: 0 0 8px;
+}
+.changes dd span {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+.changes p,
+.detail {
+  white-space: pre-wrap;
+  margin: 4px 0;
+}
+.pagination {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.message {
+  padding: 28px;
+  text-align: center;
+}
+@media (max-width: 1200px) {
+  .filters > :global(.rq-field) {
+    flex: 1 1 calc(33% - 10px);
+  }
+}
+@media (max-width: 650px) {
+  .filters > :global(.rq-field) {
+    flex: 1 1 calc(50% - 5px);
+  }
+  .filters > :global(.rq-field):first-child {
+    flex: 1 1 100%;
+  }
+  .pagination {
+    justify-content: center;
+  }
+}

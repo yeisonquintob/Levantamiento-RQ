@@ -49,12 +49,24 @@ async function main(): Promise<void> {
         OBJECT_ID('dbo.AuditEvents'), OBJECT_ID('dbo.IntegrationEventInbox')
       )
     `);
+    const markdownMigration = await count(`
+      SELECT COUNT(1) AS countValue FROM dbo.migrations
+      WHERE name = 'AllowMarkdownExports1787007603000'
+    `);
+    const markdownConstraint = await count(`
+      SELECT COUNT(1) AS countValue FROM sys.check_constraints
+      WHERE parent_object_id = OBJECT_ID('dbo.ExportRequests')
+        AND name = 'CK_ExportRequests_Format'
+        AND definition LIKE '%MARKDOWN%'
+    `);
     if (
       tables !== 6 ||
       migration !== 1 ||
       indexes !== 10 ||
       internalForeignKeys !== 2 ||
-      unexpectedForeignKeys !== 0
+      unexpectedForeignKeys !== 0 ||
+      markdownMigration !== 1 ||
+      markdownConstraint !== 1
     ) {
       throw new Error("RqOperationsDb no contiene su estructura V1 completa.");
     }
@@ -62,6 +74,7 @@ async function main(): Promise<void> {
     console.log("Tablas confirmadas: 6");
     console.log("Índices confirmados: 10");
     console.log("Claves internas confirmadas: 2; cross-database: 0");
+    console.log("Formato de exportación Markdown confirmado.");
   } finally {
     await dataSource.destroy();
   }

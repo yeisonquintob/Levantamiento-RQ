@@ -11,9 +11,11 @@ import type {
   CreateDocumentVersionRequest,
   CreateRequirementDocumentRequest,
   DocumentHistoryEntry,
+  ProjectDomainPurgeResult,
   DocumentSectionKey,
   DocumentTransitionRequest,
   DocumentVersionDetail,
+  DocumentVersionSummary,
   ReplaceDocumentFieldsRequest,
   RequirementDocumentDetail,
   RequirementDocumentListResponse,
@@ -23,7 +25,7 @@ import type {
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
-type DocumentsMethod = "GET" | "POST" | "PATCH";
+type DocumentsMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 @Injectable()
 export class DocumentsClientService {
@@ -60,6 +62,19 @@ export class DocumentsClientService {
     );
   }
 
+  purgeProject(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/documents`,
+      "DELETE",
+      accessToken,
+      correlationId,
+    );
+  }
+
   getById(
     accessToken: string,
     correlationId: string,
@@ -67,6 +82,19 @@ export class DocumentsClientService {
   ): Promise<RequirementDocumentDetail> {
     return this.request(
       `/api/v1/documents/${encodeURIComponent(documentId)}`,
+      "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  listVersions(
+    accessToken: string,
+    correlationId: string,
+    documentId: string,
+  ): Promise<readonly DocumentVersionSummary[]> {
+    return this.request(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/versions`,
       "GET",
       accessToken,
       correlationId,
@@ -82,6 +110,20 @@ export class DocumentsClientService {
     return this.request(
       `/api/v1/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNumber)}`,
       "GET",
+      accessToken,
+      correlationId,
+    );
+  }
+
+  deleteDraftVersion(
+    accessToken: string,
+    correlationId: string,
+    documentId: string,
+    versionNumber: string,
+  ): Promise<{ deleted: true; documentDeleted: boolean }> {
+    return this.request(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(versionNumber)}`,
+      "DELETE",
       accessToken,
       correlationId,
     );

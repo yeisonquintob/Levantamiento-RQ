@@ -1,6 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
 
 import {
+  AI_BACKLOG_CODE_PATTERNS,
+  AI_FUNCTIONAL_CODE_PATTERNS,
+  AI_PLANNING_CODE_PATTERNS,
+  DOCUMENT_SCRUM_SECTION_DEFINITION,
   DOCUMENT_SECTION_DEFINITIONS,
   type AcceptanceCriterionInput,
   type ApplyAiAnalysisDraftRequest,
@@ -18,9 +22,11 @@ import {
   type UpdateRequirementDocumentRequest,
 } from "@levantamiento-rq/shared-contracts";
 
-const SECTION_KEYS = new Set<string>(
-  DOCUMENT_SECTION_DEFINITIONS.map((section) => section.key),
-);
+const SECTION_KEYS = new Set<string>([
+  ...DOCUMENT_SECTION_DEFINITIONS.map((section) => section.key),
+  DOCUMENT_SCRUM_SECTION_DEFINITION.key,
+  "nonFunctionalRequirements",
+]);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FIELD_KEY_PATTERN = /^[a-z][a-zA-Z0-9_.-]{1,99}$/;
@@ -226,6 +232,274 @@ export function parseUpdateSection(
   };
 }
 
+function backlogCode(value: unknown, field: string, pattern: RegExp): string {
+  const code = text(value, field, 2, 80);
+  if (!pattern.test(code)) {
+    throw new BadRequestException(
+      `${field} no tiene el formato canónico esperado.`,
+    );
+  }
+  return code;
+}
+
+/**
+ * Protects the canonical Epic -> Feature -> HU -> Task tree when a human edits
+ * section 7. The AI path performs the same semantic checks before persistence;
+ * this guard prevents the editor API from becoming a weaker write path.
+ */
+export function validateDocumentSectionContent(
+  key: DocumentSectionKey,
+  content: DocumentJsonValue,
+): void {
+  if (key === "header") {
+    if (!content || typeof content !== "object" || Array.isArray(content)) return;
+    const header = asRecord(content);
+    for (const personKey of ["preparedBy", "reviewedBy", "approvedBy"]) {
+      if (header[personKey] !== undefined) {
+        throw new BadRequestException(
+          "Los responsables se registran en Aprobaciones, no en el encabezado.",
+        );
+      }
+    }
+    return;
+  }
+  if (key === "solutionProposal") {
+    if (!content || typeof content !== "object" || Array.isArray(content)) return;
+    const proposal = asRecord(content);
+    text(proposal.objective, "content.objective", 2, 2_000);
+    text(proposal.description, "content.description", 2, 3_000);
+    array(proposal.involvedElements, "content.involvedElements", 12).forEach(
+      (item, index) =>
+        text(item, `content.involvedElements[${index}]`, 2, 500),
+    );
+    const alignment = asRecord(proposal.flowAlignment);
+    text(alignment.currentState, "content.flowAlignment.currentState", 2, 2_000);
+    text(alignment.evaluation, "content.flowAlignment.evaluation", 2, 2_000);
+    text(
+      alignment.expectedResult,
+      "content.flowAlignment.expectedResult",
+      2,
+      2_000,
+    );
+    return;
+  }
+  if (key === "approvalsAndChangeControl") {
+    if (!content || typeof content !== "object" || Array.isArray(content)) return;
+    const approvals = asRecord(content);
+    const rows = array(approvals.approvals, "content.approvals", 3);
+    if (rows.length !== 3) {
+      throw new BadRequestException(
+        "content.approvals debe incluir elaboración, revisión y aprobación.",
+      );
+    }
+    const expected = ["Elaboración", "Revisión", "Aprobación"];
+    rows.forEach((item, index) => {
+      const approval = asRecord(item);
+      if (approval.responsibility !== expected[index]) {
+        throw new BadRequestException(
+          "content.approvals debe conservar el orden Elaboración, Revisión y Aprobación.",
+        );
+      }
+    });
+    array(approvals.changeControl, "content.changeControl", 1);
+    return;
+  }
+  if (key !== "backlogStructure") return;
+
+  const root = asRecord(content);
+  const epics = array(root.epics, "content.epics", 200);
+  const allCodes = new Set<string>();
+  const taskCodes = new Set<string>();
+  const dependencies = new Map<string, readonly string[]>();
+
+  const unique = (code: string, field: string) => {
+    if (allCodes.has(code)) {
+      throw new BadRequestException(`${field} está duplicado: ${code}.`);
+    }
+    allCodes.add(code);
+  };
+
+  const planningNode = (node: Record<string, unknown>, path: string) => {
+    // Historical drafts may predate these presentation fields. New AI output
+    // requires them in its strict schema; manual writes validate them whenever
+    // they are present without making old document versions unreadable.
+    if (node.title !== undefined) {
+      text(node.title, `${path}.title`, 2, 300);
+    }
+    if (node.description !== undefined) {
+      text(node.description, `${path}.description`, 2, 5_000);
+    }
+    nullableText(node.sourceNumber, `${path}.sourceNumber`, 120);
+  };
+
+  epics.forEach((rawEpic, epicIndex) => {
+    const epic = asRecord(rawEpic);
+    const epicPath = `content.epics[${epicIndex}]`;
+    const epicCode = backlogCode(
+      epic.code,
+      `${epicPath}.code`,
+      new RegExp(AI_BACKLOG_CODE_PATTERNS.EPIC),
+    );
+    unique(epicCode, `${epicPath}.code`);
+    planningNode(epic, epicPath);
+
+    array(epic.features, `${epicPath}.features`, 500).forEach(
+      (rawFeature, featureIndex) => {
+        const feature = asRecord(rawFeature);
+        const featurePath = `${epicPath}.features[${featureIndex}]`;
+        const featureCode = backlogCode(
+          feature.code,
+          `${featurePath}.code`,
+          new RegExp(AI_BACKLOG_CODE_PATTERNS.FEATURE),
+        );
+        unique(featureCode, `${featurePath}.code`);
+        planningNode(feature, featurePath);
+
+        array(feature.userStories, `${featurePath}.userStories`, 2_000).forEach(
+          (rawStory, storyIndex) => {
+            const story = asRecord(rawStory);
+            const storyPath = `${featurePath}.userStories[${storyIndex}]`;
+            const independentPlanningStory =
+              typeof story.code === "string" &&
+              (story.code.trim().toUpperCase().startsWith("HU-P-") ||
+                Array.isArray(story.functionalRequirementCodes));
+            const storyCode = backlogCode(
+              story.code,
+              `${storyPath}.code`,
+              new RegExp(
+                independentPlanningStory
+                  ? AI_PLANNING_CODE_PATTERNS.USER_STORY
+                  : AI_BACKLOG_CODE_PATTERNS.USER_STORY,
+              ),
+            );
+            unique(storyCode, `${storyPath}.code`);
+            planningNode(story, storyPath);
+
+            if (independentPlanningStory) {
+              nullableText(story.sourceNumber, `${storyPath}.sourceNumber`, 120);
+              array(
+                story.functionalRequirementCodes,
+                `${storyPath}.functionalRequirementCodes`,
+                500,
+              ).forEach((rawCode, functionalIndex) => {
+                backlogCode(
+                  rawCode,
+                  `${storyPath}.functionalRequirementCodes[${functionalIndex}]`,
+                  new RegExp(AI_FUNCTIONAL_CODE_PATTERNS.USER_STORY),
+                );
+              });
+            } else {
+              if (
+                story.featureCode !== undefined &&
+                story.featureCode !== featureCode
+              ) {
+                throw new BadRequestException(
+                  `${storyPath}.featureCode debe referenciar a ${featureCode}.`,
+                );
+              }
+
+              array(
+                story.acceptanceCriteria,
+                `${storyPath}.acceptanceCriteria`,
+                500,
+              ).forEach((rawCriterion, criterionIndex) => {
+                const criterion = asRecord(rawCriterion);
+                const criterionPath = `${storyPath}.acceptanceCriteria[${criterionIndex}]`;
+                unique(
+                  backlogCode(
+                    criterion.code,
+                    `${criterionPath}.code`,
+                    new RegExp(AI_BACKLOG_CODE_PATTERNS.ACCEPTANCE_CRITERION),
+                  ),
+                  `${criterionPath}.code`,
+                );
+              });
+            }
+
+            array(story.tasks, `${storyPath}.tasks`, 1_000).forEach(
+              (rawTask, taskIndex) => {
+                const task = asRecord(rawTask);
+                const taskPath = `${storyPath}.tasks[${taskIndex}]`;
+                const taskCode = backlogCode(
+                  task.code,
+                  `${taskPath}.code`,
+                  new RegExp(AI_BACKLOG_CODE_PATTERNS.TASK),
+                );
+                unique(taskCode, `${taskPath}.code`);
+                planningNode(task, taskPath);
+                taskCodes.add(taskCode);
+                const taskSourceNumber = nullableText(
+                  task.sourceNumber,
+                  `${taskPath}.sourceNumber`,
+                  120,
+                );
+                if (
+                  task.origin !== "EVIDENCE" &&
+                  task.origin !== "IMPLEMENTATION_PROPOSAL"
+                ) {
+                  throw new BadRequestException(
+                    `${taskPath}.origin debe ser EVIDENCE o IMPLEMENTATION_PROPOSAL.`,
+                  );
+                }
+                if (taskSourceNumber && task.origin !== "EVIDENCE") {
+                  throw new BadRequestException(
+                    `${taskPath}.origin debe ser EVIDENCE cuando sourceNumber proviene de la fuente.`,
+                  );
+                }
+                dependencies.set(
+                  taskCode,
+                  array(
+                    task.dependencyCodes,
+                    `${taskPath}.dependencyCodes`,
+                    200,
+                  ).map((dependency, dependencyIndex) =>
+                    backlogCode(
+                      dependency,
+                      `${taskPath}.dependencyCodes[${dependencyIndex}]`,
+                      new RegExp(AI_BACKLOG_CODE_PATTERNS.TASK),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  });
+
+  dependencies.forEach((items, taskCode) => {
+    items.forEach((dependencyCode) => {
+      if (!taskCodes.has(dependencyCode)) {
+        throw new BadRequestException(
+          `${taskCode} referencia una tarea inexistente: ${dependencyCode}.`,
+        );
+      }
+      if (dependencyCode === taskCode) {
+        throw new BadRequestException(
+          `${taskCode} no puede depender de sí misma.`,
+        );
+      }
+    });
+  });
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (code: string) => {
+    if (visiting.has(code)) {
+      throw new BadRequestException(
+        `El backlog contiene un ciclo de tareas en ${code}.`,
+      );
+    }
+    if (visited.has(code)) return;
+    visiting.add(code);
+    (dependencies.get(code) ?? []).forEach(visit);
+    visiting.delete(code);
+    visited.add(code);
+  };
+  taskCodes.forEach(visit);
+}
+
 function parseField(value: unknown, index: number): DocumentFieldInput {
   const record = asRecord(value);
   const key = text(record.key, `fields[${index}].key`, 2, 100);
@@ -263,6 +537,7 @@ function parseCriterion(
 function parseRequirement(
   value: unknown,
   index: number,
+  parseKey: (value: unknown, field: string) => string = sectionKey,
 ): DocumentRequirementInput {
   const record = asRecord(value);
   const rawClientId = record.clientId;
@@ -272,7 +547,7 @@ function parseRequirement(
       rawClientId === undefined
         ? undefined
         : text(rawClientId, `requirements[${index}].clientId`, 1, 80),
-    sectionKey: sectionKey(
+    sectionKey: parseKey(
       record.sectionKey,
       `requirements[${index}].sectionKey`,
     ),
@@ -302,7 +577,7 @@ function parseRequirement(
   };
 }
 
-function parseEvidence(value: unknown, index: number): DocumentEvidenceInput {
+function parseEvidence(value: unknown, index: number, parseKey: (value: unknown, field: string) => string = sectionKey): DocumentEvidenceInput {
   const record = asRecord(value);
 
   return {
@@ -310,7 +585,7 @@ function parseEvidence(value: unknown, index: number): DocumentEvidenceInput {
     sectionKey:
       record.sectionKey === undefined || record.sectionKey === null
         ? null
-        : sectionKey(record.sectionKey, `evidence[${index}].sectionKey`),
+        : parseKey(record.sectionKey, `evidence[${index}].sectionKey`),
     requirementClientId: nullableText(
       record.requirementClientId,
       `evidence[${index}].requirementClientId`,
@@ -323,13 +598,14 @@ function parseEvidence(value: unknown, index: number): DocumentEvidenceInput {
 
 export function parseReplaceFields(
   value: unknown,
+  templateDirected = false,
 ): ReplaceDocumentFieldsRequest {
   const record = asRecord(value);
   const fields = array(record.fields, "fields", 1000).map(parseField);
   const requirements = array(record.requirements, "requirements", 500).map(
-    parseRequirement,
+    (item, index) => parseRequirement(item, index, templateDirected ? templateSectionKey : sectionKey),
   );
-  const evidence = array(record.evidence, "evidence", 1000).map(parseEvidence);
+  const evidence = array(record.evidence, "evidence", 1000).map((item, index) => parseEvidence(item, index, templateDirected ? templateSectionKey : sectionKey));
 
   const fieldKeys = new Set<string>();
   for (const field of fields) {
@@ -376,36 +652,34 @@ export function parseReplaceFields(
   };
 }
 
+function templateSectionKey(value: unknown, field: string): string {
+  if (typeof value !== "string" || !/^[a-z][a-zA-Z0-9]{2,63}$/.test(value)) {
+    throw new BadRequestException(`${field} no es una clave válida de plantilla.`);
+  }
+  return value;
+}
+
 export function parseApplyAiDraft(value: unknown): ApplyAiAnalysisDraftRequest {
   const record = asRecord(value);
-  const sections = array(record.sections, "sections", 10).map(
-    (value, index) => {
-      const item = asRecord(value);
-      const key = sectionKey(item.key, `sections[${index}].key`);
-      const expected = DOCUMENT_SECTION_DEFINITIONS[index];
-      if (!expected || index >= 10 || key !== expected.key) {
-        throw new BadRequestException(
-          "sections debe contener las diez secciones editables en orden canónico.",
-        );
-      }
-      return {
-        key,
-        content: jsonValue(item.content, `sections[${index}].content`),
-      };
-    },
-  );
-  if (sections.length !== 10) {
-    throw new BadRequestException(
-      "sections debe contener exactamente las diez secciones editables.",
-    );
+  const sectionInputs = array(record.sections, "sections", 50);
+  if (sectionInputs.length === 0) {
+    throw new BadRequestException("sections no puede estar vacío.");
   }
+  const keys = new Set<string>();
+  const sections = sectionInputs.map((value, index) => {
+    const item = asRecord(value);
+    const key = templateSectionKey(item.key, `sections[${index}].key`);
+    if (keys.has(key)) throw new BadRequestException(`Sección duplicada: ${key}.`);
+    keys.add(key);
+    return { key, content: jsonValue(item.content, `sections[${index}].content`) };
+  });
 
   const structured = parseReplaceFields({
     expectedRevision: record.expectedRevision,
     fields: [],
     requirements: record.requirements,
     evidence: record.evidence,
-  });
+  }, true);
 
   return {
     expectedRevision: integer(record.expectedRevision, "expectedRevision"),

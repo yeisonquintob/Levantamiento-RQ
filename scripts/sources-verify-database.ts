@@ -78,6 +78,29 @@ async function main(): Promise<void> {
       WHERE name = 'IX_Sources_ProjectId_Classification'
         AND object_id = OBJECT_ID('dbo.Sources')
     `);
+    const securityMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddSourceSecurityQuarantine1787875200000'
+    `);
+    const securityColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.columns
+      WHERE object_id = OBJECT_ID('dbo.Sources')
+        AND name IN ('SecurityStatus', 'SecurityScanner', 'SecurityScannedAt')
+    `);
+    const securityConstraint = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.check_constraints
+      WHERE parent_object_id = OBJECT_ID('dbo.Sources')
+        AND name = 'CK_Sources_SecurityStatus'
+    `);
+    const securityIndex = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.indexes
+      WHERE object_id = OBJECT_ID('dbo.Sources')
+        AND name = 'IX_Sources_SecurityStatus'
+    `);
 
     if (
       sourcesTable !== 1 ||
@@ -90,7 +113,11 @@ async function main(): Promise<void> {
       filesMigration !== 1 ||
       metadataMigration !== 1 ||
       metadataColumns !== 2 ||
-      classificationIndex !== 1
+      classificationIndex !== 1 ||
+      securityMigration !== 1 ||
+      securityColumns !== 3 ||
+      securityConstraint !== 1 ||
+      securityIndex !== 1
     ) {
       throw new Error(
         "RqSourcesDb no contiene la estructura completa del Paso 13.",
@@ -103,13 +130,22 @@ async function main(): Promise<void> {
     console.log("Índice confirmado: IX_Sources_ProjectId_Status_UpdatedAt");
     console.log("Índice confirmado: IX_Sources_ProjectId_SourceType");
     console.log("Índice confirmado: IX_Sources_ProjectId_ProcessingStatus");
-    console.log("Índice único confirmado: UX_Sources_ProjectId_Sha256_ActiveFile");
+    console.log(
+      "Índice único confirmado: UX_Sources_ProjectId_Sha256_ActiveFile",
+    );
     console.log("Migración confirmada: CreateSourcesFoundation1785801600000");
-    console.log("Migración confirmada: AddSourceFilesAndExtraction1785888000000");
+    console.log(
+      "Migración confirmada: AddSourceFilesAndExtraction1785888000000",
+    );
     console.log(
       "Migración confirmada: AddSourceClassificationAndDescription1786060801000",
     );
     console.log("Clasificación y descripción de archivos confirmadas.");
+    console.log("Cuarentena y análisis de seguridad confirmados: 3 columnas.");
+    console.log(
+      "Migración confirmada: AddSourceSecurityQuarantine1787875200000",
+    );
+    console.log("Índice confirmado: IX_Sources_SecurityStatus");
   } finally {
     await dataSource.destroy();
   }

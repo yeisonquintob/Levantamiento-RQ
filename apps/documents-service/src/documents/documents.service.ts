@@ -7,10 +7,12 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, In, Repository } from "typeorm";
+import { DataSource, EntityManager, In, Repository } from "typeorm";
 
 import {
+  DOCUMENT_SCRUM_SECTION_DEFINITION,
   DOCUMENT_SECTION_DEFINITIONS,
+  getDocumentSectionDefinitions,
   type AppliedDocumentTemplate,
   type ApplyAiAnalysisDraftRequest,
   type ArchiveRequirementDocumentRequest,
@@ -24,6 +26,7 @@ import {
   type DocumentTransitionRequest,
   type DocumentVersionDetail,
   type DocumentVersionSummary,
+  type ProjectDomainPurgeResult,
   type ReplaceDocumentFieldsRequest,
   type RequirementDocumentDetail,
   type RequirementDocumentListResponse,
@@ -45,11 +48,36 @@ import {
   DocumentVersionEntity,
   RequirementDocumentEntity,
 } from "./document.entities";
+
+const LEGACY_DOCUMENT_SECTION_DEFINITIONS = DOCUMENT_SECTION_DEFINITIONS.filter(
+  (section) => section.key !== "solutionProposal",
+);
+
+const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS = [
+  ...LEGACY_DOCUMENT_SECTION_DEFINITIONS.slice(0, 5),
+  {
+    key: "milestones",
+    title: "Requerimientos por hito o funcionalidad",
+  },
+  {
+    key: "nonFunctionalRequirements",
+    title: "Requerimientos no funcionales",
+  },
+  ...LEGACY_DOCUMENT_SECTION_DEFINITIONS.slice(7),
+] as const;
+const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION = [
+  ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(0, 4),
+  DOCUMENT_SECTION_DEFINITIONS.find(
+    (section) => section.key === "solutionProposal",
+  )!,
+  ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(4),
+] as const;
 import {
   type DocumentProjectAccess,
   DocumentsProjectsAccessClient,
 } from "./projects-access.client";
 import { DocumentsSourcesAccessClient } from "./sources-access.client";
+import { validateDocumentSectionContent } from "./documents-input";
 
 export interface DocumentsActorContext {
   actor: AuthenticatedUser;
@@ -58,17 +86,134 @@ export interface DocumentsActorContext {
 }
 
 const PENDING = "[PENDIENTE POR DEFINIR]";
+const SQL_SERVER_WRITE_BATCH_SIZE = 100;
+const SQL_SERVER_IN_BATCH_SIZE = 500;
+
+async function deleteAcceptanceCriteriaInBatches(
+  manager: EntityManager,
+  requirementIds: readonly string[],
+): Promise<void> {
+  for (
+    let index = 0;
+    index < requirementIds.length;
+    index += SQL_SERVER_IN_BATCH_SIZE
+  ) {
+    await manager.delete(AcceptanceCriterionEntity, {
+      requirementId: In(
+        requirementIds.slice(index, index + SQL_SERVER_IN_BATCH_SIZE),
+      ),
+    });
+  }
+}
+
+/**
+ * Guarda de tipo para objetos JSON. `Array.isArray` no descarta bien las
+ * uniones con arreglos de solo lectura, así que el estrechamiento se declara.
+ */
+function isJsonObject(
+  value: DocumentJsonValue | undefined,
+): value is { readonly [key: string]: DocumentJsonValue } {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function toIso(value: Date): string {
   return value.toISOString();
 }
 
 function parseJson(value: string): DocumentJsonValue {
-  return JSON.parse(value) as DocumentJsonValue;
+  try {
+    return JSON.parse(value) as DocumentJsonValue;
+  } catch {
+    // Un JSON corrupto en BD no debe filtrarse como un 500 con SyntaxError.
+    throw new ConflictException(
+      "El documento contiene datos almacenados con formato JSON inválido.",
+    );
+  }
+}
+
+const PROTOTYPE_PLACEHOLDERS = [
+  "[pendiente por definir]",
+  "pendiente de definición",
+  "pendiente de definicion",
+];
+const PROTOTYPE_NOT_REQUESTED_PREFIX = "prototipo no solicitado en esta generación";
+
+function collectText(value: DocumentJsonValue, out: string[]): void {
+  if (typeof value === "string") out.push(value);
+  else if (Array.isArray(value)) value.forEach((item) => collectText(item, out));
+  else if (isJsonObject(value))
+    Object.values(value).forEach((item) => collectText(item, out));
+}
+
+/** Un prototipo existe solo si hay texto real en visualFormat o en solutionProposal.prototypeMarkdown. */
+export function hasPrototypeContent(content: DocumentJsonValue): boolean {
+  const texts: string[] = [];
+  collectText(content, texts);
+  return texts.some((text) => {
+    const normalized = text.trim().toLowerCase();
+    return (
+      normalized.length > 0 &&
+      !PROTOTYPE_PLACEHOLDERS.includes(normalized) &&
+      !normalized.startsWith(PROTOTYPE_NOT_REQUESTED_PREFIX)
+    );
+  });
+}
+
+/** Compatibilidad con versiones históricas: el prototipo quedó en solutionProposal.prototypeMarkdown. */
+export function hasSolutionPrototypeMarkdown(
+  content: DocumentJsonValue,
+): boolean {
+  return (
+    isJsonObject(content) &&
+    typeof content["prototypeMarkdown"] === "string" &&
+    hasPrototypeContent(content["prototypeMarkdown"])
+  );
 }
 
 function serialize(value: DocumentJsonValue): string {
   return JSON.stringify(value);
+}
+
+function appliedTemplateIncludesScrum(
+  template: AppliedDocumentTemplateEntity,
+): boolean {
+  const definition = parseJson(template.definitionJson);
+  if (
+    !definition ||
+    typeof definition !== "object" ||
+    Array.isArray(definition)
+  ) {
+    return false;
+  }
+  const scrum = (definition as Readonly<Record<string, DocumentJsonValue>>)
+    .scrum;
+  return Boolean(
+    scrum &&
+    typeof scrum === "object" &&
+    !Array.isArray(scrum) &&
+    (scrum as Readonly<Record<string, DocumentJsonValue>>).enabled === true,
+  );
+}
+
+/**
+ * Devuelve la estructura de una plantilla propia (dinámica) o `null` cuando la
+ * plantilla aplicada es canónica (o su definición no es interpretable), caso en
+ * el que rige el layout canónico/histórico de siempre.
+ */
+function customTemplateLayout(
+  template: AppliedDocumentTemplateEntity | null | undefined,
+): ResolvedTemplateLayout["sections"] | null {
+  if (!template) return null;
+  try {
+    const layout = resolveTemplateLayout(
+      parseJson(template.definitionJson),
+      appliedTemplateIncludesScrum(template),
+    );
+    return layout.custom ? layout.sections : null;
+  } catch (error) {
+    if (error instanceof ConflictException) return null;
+    throw error;
+  }
 }
 
 function templateWithoutDefinition(
@@ -81,6 +226,7 @@ function templateWithoutDefinition(
     name: template.name,
     version: template.version,
     templateType: template.templateType,
+    includesScrum: appliedTemplateIncludesScrum(template),
     appliedAt: toIso(template.appliedAt),
   };
 }
@@ -103,7 +249,23 @@ function versionSummary(
   };
 }
 
-function assertCanonicalTemplate(definition: DocumentJsonValue): void {
+interface ResolvedTemplateLayout {
+  readonly sections: readonly { readonly key: string; readonly title: string }[];
+  /** `true` cuando la plantilla es propia (estructura dinámica) y no canónica. */
+  readonly custom: boolean;
+}
+
+function assertCanonicalTemplate(
+  definition: DocumentJsonValue,
+  includesScrum: boolean,
+): readonly { readonly key: string; readonly title: string }[] {
+  return resolveTemplateLayout(definition, includesScrum).sections;
+}
+
+function resolveTemplateLayout(
+  definition: DocumentJsonValue,
+  includesScrum: boolean,
+): ResolvedTemplateLayout {
   if (
     !definition ||
     typeof definition !== "object" ||
@@ -117,48 +279,132 @@ function assertCanonicalTemplate(definition: DocumentJsonValue): void {
   const record = definition as Readonly<Record<string, DocumentJsonValue>>;
   const order = record.sectionOrder;
   const sections = record.sections;
+  const expected = getDocumentSectionDefinitions(includesScrum);
+  const legacyBaseExpected = LEGACY_DOCUMENT_SECTION_DEFINITIONS;
+  const legacyExpected = includesScrum
+    ? [...legacyBaseExpected, DOCUMENT_SCRUM_SECTION_DEFINITION]
+    : legacyBaseExpected;
+  const historicalExpected = includesScrum
+    ? [
+        ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS,
+        DOCUMENT_SCRUM_SECTION_DEFINITION,
+      ]
+    : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS;
+  const historicalWithSolutionExpected = includesScrum
+    ? [
+        ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION,
+        DOCUMENT_SCRUM_SECTION_DEFINITION,
+      ]
+    : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION;
 
-  if (
-    !Array.isArray(order) ||
-    !Array.isArray(sections) ||
-    order.length !== DOCUMENT_SECTION_DEFINITIONS.length ||
-    sections.length !== DOCUMENT_SECTION_DEFINITIONS.length
-  ) {
+  if (!Array.isArray(order) || !Array.isArray(sections)) {
     throw new ConflictException(
-      "La plantilla debe contener exactamente las 13 secciones canónicas.",
+      "La plantilla aplicada no contiene un orden de secciones válido.",
     );
   }
 
-  DOCUMENT_SECTION_DEFINITIONS.forEach((expected, index) => {
-    const rawSection = sections[index];
+  const compatibleDefinitions = [
+    expected,
+    legacyExpected,
+    historicalExpected,
+    historicalWithSolutionExpected,
+  ];
+  const definitionExpected = compatibleDefinitions.find(
+    (candidate) =>
+      sections.length === candidate.length &&
+      order.length === candidate.length &&
+      candidate.every((expectedSection, index) => {
+        const rawSection = sections[index];
+        if (
+          order[index] !== expectedSection.key ||
+          !rawSection ||
+          typeof rawSection !== "object" ||
+          Array.isArray(rawSection)
+        ) {
+          return false;
+        }
+        const section = rawSection as Readonly<
+          Record<string, DocumentJsonValue>
+        >;
+        /*
+         * La clave y sectionOrder protegen la estructura. El título y el
+         * número visual de plantillas publicadas antiguas se normalizan con
+         * `expected` al crear el documento, en lugar de bloquear el proceso.
+         */
+        return section.key === expectedSection.key;
+      }),
+  );
 
+  if (!definitionExpected) {
     if (
-      order[index] !== expected.key ||
-      !rawSection ||
-      typeof rawSection !== "object" ||
-      Array.isArray(rawSection)
+      sections.length < 1 ||
+      sections.length > 50 ||
+      order.length !== sections.length
     ) {
       throw new ConflictException(
-        "La plantilla no conserva el orden de las 13 secciones canónicas.",
+        "Cantidad de secciones de plantilla inválida.",
       );
     }
+    const scrum = record.scrum;
+    if (!isJsonObject(scrum) || scrum.enabled !== includesScrum) {
+      throw new ConflictException(
+        "Configuración Scrum inconsistente en la plantilla.",
+      );
+    }
+    const keys = new Set<string>();
+    const customSections = sections.map((raw, index) => {
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        Array.isArray(raw) ||
+        typeof raw.key !== "string" ||
+        !/^[a-z][a-zA-Z0-9]{2,63}$/.test(raw.key) ||
+        keys.has(raw.key) ||
+        raw.order !== index + 1 ||
+        order[index] !== raw.key ||
+        typeof raw.title !== "string" ||
+        !raw.title.trim() ||
+        typeof raw.required !== "boolean" ||
+        typeof raw.guidance !== "string"
+      ) {
+        throw new ConflictException(
+          "Estructura dinámica de plantilla inválida.",
+        );
+      }
+      keys.add(raw.key);
+      return { key: raw.key, title: raw.title.trim() };
+    });
+    return { sections: customSections, custom: true };
+  }
 
-    const section = rawSection as Readonly<Record<string, DocumentJsonValue>>;
-
+  if (includesScrum) {
+    const rawScrum = sections.at(-1);
     if (
-      section.key !== expected.key ||
-      section.title !== expected.title ||
-      section.order !== index + 1
+      !rawScrum ||
+      typeof rawScrum !== "object" ||
+      Array.isArray(rawScrum) ||
+      order.at(-1) !== DOCUMENT_SCRUM_SECTION_DEFINITION.key
     ) {
       throw new ConflictException(
-        "La plantilla modifica una sección canónica y no puede aplicarse al documento.",
+        "La plantilla Scrum no conserva el punto 15 esperado.",
       );
     }
-  });
+    const scrum = rawScrum as Readonly<Record<string, DocumentJsonValue>>;
+    if (
+      scrum.key !== DOCUMENT_SCRUM_SECTION_DEFINITION.key ||
+      scrum.title !== DOCUMENT_SCRUM_SECTION_DEFINITION.title
+    ) {
+      throw new ConflictException(
+        "La plantilla Scrum modifica el punto 15 canónico.",
+      );
+    }
+  }
+
+  return { sections: expected, custom: false };
 }
 
 function initialContent(
-  key: DocumentSectionKey,
+  key: string,
   project: DocumentProjectAccess["project"],
   actor: AuthenticatedUser,
   version: string,
@@ -172,13 +418,14 @@ function initialContent(
         documentVersion: version,
         createdDate: now.toISOString().slice(0, 10),
         requestingArea: project.requestingArea,
-        preparedBy: { name: actor.displayName, position: PENDING },
-        reviewedBy: { name: PENDING, position: PENDING },
-        approvedBy: { name: PENDING, position: PENDING },
         status: "BORRADOR",
       };
     case "objectives":
-      return { general: PENDING, specific: [PENDING] };
+      return {
+        general: PENDING,
+        qualitative: [PENDING],
+        quantitative: [PENDING],
+      };
     case "problemDescription":
       return { currentState: PENDING, operationalImpact: [PENDING] };
     case "scope":
@@ -186,6 +433,23 @@ function initialContent(
         included: [PENDING],
         excluded: [PENDING],
         involvedSystems: [PENDING],
+        kpis: Array.from({ length: 3 }, () => ({
+          name: PENDING,
+          relatedObjective: PENDING,
+          measurement: PENDING,
+          target: PENDING,
+        })),
+      };
+    case "solutionProposal":
+      return {
+        objective: PENDING,
+        description: PENDING,
+        involvedElements: [PENDING],
+        flowAlignment: {
+          currentState: PENDING,
+          evaluation: PENDING,
+          expectedResult: PENDING,
+        },
       };
     case "processFlow":
       return {
@@ -197,30 +461,12 @@ function initialContent(
         systems: [PENDING],
       };
     case "milestones":
-      return [
-        {
-          number: 1,
-          name: PENDING,
-          description: PENDING,
-          keyActivities: [PENDING],
-          userStory: {
-            code: "HU-1",
-            asA: PENDING,
-            iWant: PENDING,
-            soThat: PENDING,
-          },
-          acceptanceCriteria: [PENDING],
-          businessRules: [PENDING],
-          requiredFields: [
-            {
-              name: PENDING,
-              type: PENDING,
-              required: false,
-              validationOrObservation: PENDING,
-            },
-          ],
-        },
-      ];
+      return {
+        functionalRequirements: [],
+        nonFunctionalRequirements: [],
+      };
+    case "backlogStructure":
+      return { epics: [] };
     case "nonFunctionalRequirements":
       return {
         security: [PENDING],
@@ -239,11 +485,45 @@ function initialContent(
         pendingItems: [PENDING],
       };
     case "approvalsAndChangeControl":
-      return { changeControl: [], approvals: [] };
+      return {
+        approvals: [
+          {
+            name: actor.displayName,
+            position: "Responsable del documento",
+            responsibility: "Elaboración",
+            approvalMoment: "Al elaborar la versión documental",
+            status: "REGISTRADO",
+          },
+          {
+            name: PENDING,
+            position: "Líder del responsable",
+            responsibility: "Revisión",
+            approvalMoment: "Durante la validación del documento",
+            status: "PENDIENTE",
+          },
+          {
+            name: PENDING,
+            position: "Solicitante o líder de la persona solicitante",
+            responsibility: "Aprobación",
+            approvalMoment: "Al finalizar la revisión",
+            status: "PENDIENTE",
+          },
+        ],
+        changeControl: [],
+      };
     case "writingRules":
     case "visualFormat":
     case "automationInstruction":
-      return { templateControlled: true };
+      return PENDING;
+    case "scrumPlan":
+      return {
+        cadenceDays: 15,
+        scheduleBasis: "RELATIVE_DAY",
+        note: "Propuesta inicial sujeta a validación y estimación del equipo Scrum.",
+        sprints: [],
+      };
+    default:
+      return PENDING;
   }
 }
 
@@ -261,6 +541,314 @@ function requireReview(access: DocumentProjectAccess): void {
       "No tienes autorización para revisar o aprobar este documento.",
     );
   }
+}
+
+function documentRecord(
+  value: DocumentJsonValue | undefined,
+): Readonly<Record<string, DocumentJsonValue>> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Readonly<Record<string, DocumentJsonValue>>;
+}
+
+function documentRecords(value: DocumentJsonValue | undefined) {
+  return Array.isArray(value)
+    ? value
+        .map((item) => documentRecord(item))
+        .filter(
+          (item): item is Readonly<Record<string, DocumentJsonValue>> =>
+            item !== null,
+        )
+    : [];
+}
+
+/*
+ * POINT_6_7_INDEPENDENT_BACKEND
+ *
+ * Los documentos 4.1.0 se reconocen por HU-P/functionalRequirementCodes.
+ * En ese modelo no existe sincronización automática entre Punto 6 y Punto 7.
+ * Los documentos legacy 4.0.0 siguen usando las funciones de proyección de
+ * abajo para mantener compatibilidad histórica.
+ */
+function isIndependentPlanningBacklog(content: DocumentJsonValue): boolean {
+  const backlog = documentRecord(content);
+  if (!backlog) return false;
+  return documentRecords(backlog.epics).some((epic) =>
+    documentRecords(epic.features).some((feature) =>
+      documentRecords(feature.userStories).some((story) => {
+        const code = String(story.code ?? "")
+          .trim()
+          .toUpperCase();
+        return (
+          code.startsWith("HU-P-") ||
+          Array.isArray(story.functionalRequirementCodes)
+        );
+      }),
+    ),
+  );
+}
+
+/*
+ * PUNTO_7_REQUIREMENTS_SYNCHRONIZATION
+ *
+ * Punto 7 es la fuente canónica de:
+ * - Epic
+ * - Feature
+ * - código HU
+ * - título HU
+ * - descripción estructural HU
+ * - Tasks
+ *
+ * Punto 6 conserva la propiedad del detalle funcional.
+ *
+ * Esta proyección mantiene las dos secciones consistentes
+ * incluso para exportación, API y consumidores que no usan
+ * la composición visual del frontend.
+ */
+export function synchronizeBacklogStructureWithRequirements(
+  backlogContent: DocumentJsonValue,
+  requirementsContent: DocumentJsonValue,
+): DocumentJsonValue {
+  const backlog = documentRecord(backlogContent);
+
+  const requirements = documentRecord(requirementsContent);
+
+  if (!backlog || !requirements) {
+    return requirementsContent;
+  }
+
+  if (isIndependentPlanningBacklog(backlogContent)) {
+    return requirementsContent;
+  }
+
+  const existingStories = documentRecords(requirements.functionalRequirements);
+
+  const existingByCode = new Map(
+    existingStories
+      .map((story) => [String(story.code ?? "").toUpperCase(), story] as const)
+      .filter(([code]) => Boolean(code)),
+  );
+
+  const functionalRequirements = documentRecords(backlog.epics).flatMap(
+    (epic) =>
+      documentRecords(epic.features).flatMap((feature) =>
+        documentRecords(feature.userStories).map((story) => {
+          const code = String(story.code ?? "").toUpperCase();
+
+          const existing = existingByCode.get(code);
+
+          const next: Record<string, DocumentJsonValue> = {
+            /*
+             * Para nuevas HU usamos como base
+             * el backlog. Para HU existentes,
+             * preservamos primero el contenido
+             * funcional humano del Punto 6.
+             */
+            ...story,
+            ...(existing ?? {}),
+
+            /*
+             * Luego imponemos los campos cuya
+             * propiedad corresponde al Punto 7.
+             */
+            code: story.code ?? "",
+            title: story.title ?? PENDING,
+            description: story.description ?? PENDING,
+
+            requirementType: "USER_STORY",
+
+            epicCode: epic.code ?? "",
+            epicTitle: epic.title ?? PENDING,
+
+            featureCode: feature.code ?? "",
+            featureTitle: feature.title ?? PENDING,
+
+            /*
+             * HITO != FEATURE.
+             *
+             * Punto 7 conserva la estructura del proyecto,
+             * pero no puede sobrescribir la clasificación
+             * funcional por Hitos del Punto 6.
+             */
+            milestone: existing?.milestone ?? null,
+
+            functionality: existing?.functionality ?? null,
+
+            milestoneDescription: existing?.milestoneDescription ?? null,
+          };
+
+          /*
+           * category / measure / target son
+           * exclusivos de RNF.
+           */
+          delete next.category;
+          delete next.measure;
+          delete next.target;
+
+          return next;
+        }),
+      ),
+  );
+
+  return {
+    ...requirements,
+
+    functionalRequirements,
+
+    nonFunctionalRequirements: requirements.nonFunctionalRequirements ?? [],
+  };
+}
+
+/*
+ * PUNTO_6_BACKLOG_SYNCHRONIZATION
+ *
+ * Punto 7 conserva la propiedad de la estructura:
+ * Epic -> Feature -> HU -> Task.
+ *
+ * Punto 6 puede modificar exclusivamente el detalle de
+ * negocio de una HU.
+ */
+export function synchronizeRequirementStoriesWithBacklog(
+  requirementsContent: DocumentJsonValue,
+  backlogContent: DocumentJsonValue,
+): DocumentJsonValue {
+  const requirements = documentRecord(requirementsContent);
+
+  const backlog = documentRecord(backlogContent);
+
+  if (!requirements || !backlog) {
+    return backlogContent;
+  }
+
+  if (isIndependentPlanningBacklog(backlogContent)) {
+    return backlogContent;
+  }
+
+  const functionalStories = documentRecords(
+    requirements.functionalRequirements,
+  ).filter(
+    (story) =>
+      typeof story.code === "string" &&
+      typeof story.role === "string" &&
+      typeof story.want === "string" &&
+      typeof story.benefit === "string",
+  );
+
+  if (functionalStories.length === 0) {
+    return backlogContent;
+  }
+
+  const replacements = new Map(
+    functionalStories.map((story) => [String(story.code).toUpperCase(), story]),
+  );
+
+  const synchronizedCodes = new Set<string>();
+
+  /*
+   * Solo estos campos pueden sincronizarse desde Punto 6.
+   *
+   * No se copian:
+   * - Epic
+   * - Feature
+   * - código HU
+   * - tareas
+   * - dependencias
+   */
+  const editableKeys = [
+    /*
+     * Punto 6 define funcionalmente la HU.
+     * La jerarquía y el código siguen protegidos.
+     */
+    "title",
+    "description",
+    "role",
+    "want",
+    "benefit",
+    "context",
+    "premises",
+    "impactedSystems",
+    "fields",
+    "acceptanceCriteria",
+  ] as const;
+
+  const epics = documentRecords(backlog.epics).map((epic) => ({
+    ...epic,
+
+    features: documentRecords(epic.features).map((feature) => {
+      const featureCode = String(feature.code ?? "");
+
+      return {
+        ...feature,
+
+        userStories: documentRecords(feature.userStories).map((story) => {
+          const code = String(story.code ?? "").toUpperCase();
+
+          const replacement = replacements.get(code);
+
+          if (!replacement) {
+            return story;
+          }
+
+          const requestedFeatureCode = String(
+            replacement.featureCode ?? featureCode,
+          );
+
+          if (requestedFeatureCode !== featureCode) {
+            throw new ConflictException(
+              `${code} pertenece a ${featureCode}. ` +
+                "Cambia la jerarquía desde el " +
+                "punto 7 · Esquema.",
+            );
+          }
+
+          synchronizedCodes.add(code);
+
+          const next: Record<string, DocumentJsonValue> = { ...story };
+
+          for (const key of editableKeys) {
+            if (replacement[key] !== undefined) {
+              next[key] = replacement[key];
+            }
+          }
+
+          /*
+           * story.tasks permanece intacto porque
+           * partimos de ...story.
+           */
+          return next;
+        }),
+      };
+    }),
+  }));
+
+  /*
+   * Punto 6 no puede crear una HU que no exista
+   * estructuralmente en Punto 7.
+   */
+  for (const code of replacements.keys()) {
+    if (!synchronizedCodes.has(code)) {
+      throw new ConflictException(
+        `${code} no existe en el punto 7 · Esquema. ` +
+          "Crea o reorganiza la HU desde el esquema " +
+          "antes de editarla en Requerimientos.",
+      );
+    }
+  }
+
+  const synchronized = {
+    ...backlog,
+    epics,
+  } as DocumentJsonValue;
+
+  /*
+   * La sincronización pasa por la misma validación
+   * estructural del editor del Punto 7.
+   */
+  validateDocumentSectionContent("backlogStructure", synchronized);
+
+  return synchronized;
 }
 
 @Injectable()
@@ -326,7 +914,10 @@ export class DocumentsService {
     }
 
     const definition = parseJson(sourceTemplate.definitionJson);
-    assertCanonicalTemplate(definition);
+    const expectedSections = assertCanonicalTemplate(
+      definition,
+      sourceTemplate.includesScrum,
+    );
     const now = new Date();
     const documentId = randomUUID();
     const appliedTemplateId = randomUUID();
@@ -386,7 +977,7 @@ export class DocumentsService {
       );
       await manager.save(
         DocumentSectionEntity,
-        DOCUMENT_SECTION_DEFINITIONS.map((section, index) => ({
+        expectedSections.map((section, index) => ({
           id: randomUUID(),
           documentVersionId: versionId,
           key: section.key,
@@ -401,7 +992,7 @@ export class DocumentsService {
               now,
             ),
           ),
-          templateControlled: index >= 10,
+          templateControlled: false,
         })),
       );
       await this.addHistory(manager, {
@@ -413,7 +1004,7 @@ export class DocumentsService {
           projectId,
           templateId: sourceTemplate.id,
           templateVersion: sourceTemplate.version,
-          sections: 13,
+          sections: expectedSections.length,
         },
         now,
       });
@@ -432,10 +1023,56 @@ export class DocumentsService {
       order: { updatedAt: "DESC" },
     });
     const items = await Promise.all(
-      documents.map((document) => this.loadSummary(document)),
+      documents.map(async (document) => {
+        const [summary, versionCount] = await Promise.all([
+          this.loadSummary(document),
+          this.versions.countBy({ documentId: document.id }),
+        ]);
+        return { ...summary, versionCount };
+      }),
     );
 
     return { items, totalItems: items.length };
+  }
+
+  async purgeProject(
+    context: DocumentsActorContext,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    const access = await this.projectAccess(context, projectId);
+    if (access.role !== "ADMIN" && access.role !== "OWNER") {
+      throw new ForbiddenException(
+        "Solo ADMIN o el propietario pueden eliminar todos los documentos.",
+      );
+    }
+    requireEdit(access);
+    const documents = await this.documents.find({ where: { projectId } });
+    if (documents.length === 0) return { deleted: true, count: 0 };
+
+    const documentIds = documents.map((document) => document.id);
+    const appliedTemplateIds = [
+      ...new Set(documents.map((document) => document.appliedTemplateId)),
+    ];
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(AppliedAiAnalysisResultEntity, {
+        documentId: In(documentIds),
+      });
+      await manager.delete(RequirementDocumentEntity, {
+        id: In(documentIds),
+      });
+      for (const appliedTemplateId of appliedTemplateIds) {
+        const remaining = await manager.countBy(RequirementDocumentEntity, {
+          appliedTemplateId,
+        });
+        if (remaining === 0) {
+          await manager.delete(AppliedDocumentTemplateEntity, {
+            id: appliedTemplateId,
+          });
+        }
+      }
+    });
+
+    return { deleted: true, count: documents.length };
   }
 
   async getById(
@@ -445,6 +1082,19 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     await this.projectAccess(context, document.projectId);
     return this.loadDetail(documentId);
+  }
+
+  async listVersions(
+    context: DocumentsActorContext,
+    documentId: string,
+  ): Promise<readonly DocumentVersionSummary[]> {
+    const document = await this.requireDocument(documentId);
+    await this.projectAccess(context, document.projectId);
+    const versions = await this.versions.find({
+      where: { documentId },
+      order: { versionNumber: "DESC" },
+    });
+    return versions.map(versionSummary);
   }
 
   async getVersion(
@@ -458,6 +1108,98 @@ export class DocumentsService {
     return this.loadVersionDetail(version);
   }
 
+  async deleteDraftVersion(
+    context: DocumentsActorContext,
+    documentId: string,
+    versionNumber: number,
+  ): Promise<{ deleted: true; documentDeleted: boolean }> {
+    const document = await this.requireDocument(documentId);
+    const access = await this.projectAccess(context, document.projectId);
+    requireEdit(access);
+    this.requireActive(document);
+    const version = await this.requireVersion(documentId, versionNumber);
+    if (version.status !== "DRAFT") {
+      throw new ConflictException(
+        "Solo se pueden eliminar versiones en estado DRAFT.",
+      );
+    }
+    const now = new Date();
+    let documentDeleted = false;
+    await this.dataSource.transaction(async (manager) => {
+      /*
+       * La comprobación de estado se repite dentro de la transacción con
+       * bloqueo de actualización (UPDLOCK), de modo que una transición
+       * concurrente (p. ej. enviar a revisión) no deje borrar una versión
+       * que ya no es DRAFT.
+       */
+      const lockedDocument = await manager.findOne(RequirementDocumentEntity, {
+        where: { id: documentId },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!lockedDocument) throw new NotFoundException("El documento no existe.");
+      this.requireActive(lockedDocument);
+      const lockedVersion = await manager.findOne(DocumentVersionEntity, {
+        where: { id: version.id },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!lockedVersion)
+        throw new NotFoundException("La versión del documento no existe.");
+      if (lockedVersion.status !== "DRAFT") {
+        throw new ConflictException(
+          "Solo se pueden eliminar versiones en estado DRAFT.",
+        );
+      }
+      const versions = await manager.find(DocumentVersionEntity, {
+        where: { documentId },
+        order: { versionNumber: "DESC" },
+      });
+      documentDeleted = versions.length === 1;
+
+      await manager.delete(AppliedAiAnalysisResultEntity, {
+        documentVersionId: version.id,
+      });
+      // La condición de estado en el DELETE es la defensa final contra carreras.
+      const deleted = await manager.delete(DocumentVersionEntity, {
+        id: version.id,
+        status: "DRAFT",
+      });
+      if (deleted.affected !== 1) {
+        throw new ConflictException(
+          "Solo se pueden eliminar versiones en estado DRAFT.",
+        );
+      }
+      if (documentDeleted) {
+        await manager.delete(RequirementDocumentEntity, { id: documentId });
+        return;
+      }
+      if (lockedDocument.currentVersionNumber === versionNumber) {
+        const previous = versions.find(
+          (candidate) => candidate.id !== version.id,
+        );
+        if (!previous)
+          throw new ConflictException(
+            "No existe una versión anterior recuperable.",
+          );
+        await manager.update(RequirementDocumentEntity, documentId, {
+          currentVersionNumber: previous.versionNumber,
+          status: previous.status,
+          revision: () => "Revision + 1",
+          updatedByUserId: context.actor.id,
+          updatedAt: now,
+        });
+      }
+      await this.addHistory(manager, {
+        documentId,
+        versionId: null,
+        eventType: "DOCUMENT_DRAFT_DELETED",
+        actorUserId: context.actor.id,
+        details: { deletedVersionId: version.id, versionNumber },
+        now,
+      });
+    });
+    return { deleted: true, documentDeleted };
+  }
+
   async updateMetadata(
     context: DocumentsActorContext,
     documentId: string,
@@ -468,34 +1210,36 @@ export class DocumentsService {
     requireEdit(access);
     this.requireActive(document);
     const now = new Date();
-    const result = await this.documents
-      .createQueryBuilder()
-      .update(RequirementDocumentEntity)
-      .set({
-        title: request.title,
-        revision: () => "Revision + 1",
-        updatedByUserId: context.actor.id,
-        updatedAt: now,
-      })
-      .where("Id = :documentId", { documentId })
-      .andWhere("Revision = :expectedRevision", {
-        expectedRevision: request.expectedRevision,
-      })
-      .andWhere("Status <> :archived", { archived: "ARCHIVED" })
-      .execute();
+    // Actualización e historial en una sola transacción: no queda un cambio
+    // de título sin su evento de auditoría.
+    await this.dataSource.transaction(async (manager) => {
+      const result = await manager
+        .createQueryBuilder()
+        .update(RequirementDocumentEntity)
+        .set({
+          title: request.title,
+          revision: () => "Revision + 1",
+          updatedByUserId: context.actor.id,
+          updatedAt: now,
+        })
+        .where("Id = :documentId", { documentId })
+        .andWhere("Revision = :expectedRevision", {
+          expectedRevision: request.expectedRevision,
+        })
+        .andWhere("Status <> :archived", { archived: "ARCHIVED" })
+        .execute();
 
-    if (result.affected !== 1) this.stale();
+      if (result.affected !== 1) this.stale();
 
-    await this.dataSource.transaction((manager) =>
-      this.addHistory(manager, {
+      await this.addHistory(manager, {
         documentId,
         versionId: null,
         eventType: "DOCUMENT_METADATA_UPDATED",
         actorUserId: context.actor.id,
         details: { title: request.title },
         now,
-      }),
-    );
+      });
+    });
     return this.loadDetail(documentId);
   }
 
@@ -513,7 +1257,16 @@ export class DocumentsService {
         documentId,
         idempotencyKey: request.idempotencyKey,
       });
-      if (existing) return this.loadDetail(documentId);
+      if (existing) {
+        const detail = await this.loadDetail(documentId);
+        if (detail.status === "DRAFT")
+          await this.projects.documentGenerated(
+            document.projectId,
+            documentId,
+            context.accessToken,
+          );
+        return detail;
+      }
     }
     const sourceVersion = await this.requireVersion(
       documentId,
@@ -523,7 +1276,19 @@ export class DocumentsService {
       where: { documentVersionId: sourceVersion.id },
       order: { orderIndex: "ASC" },
     });
-    this.assertThirteenSections(sourceSections);
+    const appliedTemplate = await this.appliedTemplates.findOneBy({
+      id: document.appliedTemplateId,
+    });
+    if (!appliedTemplate) {
+      throw new ConflictException(
+        "El documento no conserva la plantilla aplicada.",
+      );
+    }
+    this.assertDocumentSections(sourceSections, appliedTemplate);
+    // Las plantillas propias no reciben las secciones canónicas añadidas
+    // por las migraciones de layout (solución propuesta y Plan Scrum).
+    const isCustomTemplate = customTemplateLayout(appliedTemplate) !== null;
+    const includesScrum = appliedTemplateIncludesScrum(appliedTemplate);
     const sourceFields = await this.fields.find({
       where: { documentVersionId: sourceVersion.id },
     });
@@ -587,27 +1352,96 @@ export class DocumentsService {
       );
 
       const sectionIds = new Map<string, string>();
-      await manager.save(
-        DocumentSectionEntity,
-        sourceSections.map((section) => {
-          const id = randomUUID();
-          sectionIds.set(section.key, id);
-          const content = parseJson(section.contentJson);
-          const updatedContent =
-            section.key === "header"
-              ? this.headerForNewVersion(content, nextVersion)
+      const clonedSections = sourceSections.map((section) => {
+        const id = randomUUID();
+        sectionIds.set(section.key, id);
+        const content = parseJson(section.contentJson);
+        const updatedContent =
+          section.key === "header"
+            ? this.headerForNewVersion(content, nextVersion)
+            : section.key === "approvalsAndChangeControl"
+              ? this.approvalsForNewVersion(content, context.actor)
               : content;
-          return {
-            id,
-            documentVersionId: versionId,
-            key: section.key,
-            title: section.title,
-            orderIndex: section.orderIndex,
-            contentJson: serialize(updatedContent),
-            templateControlled: section.templateControlled,
-          };
-        }),
-      );
+        return {
+          id,
+          documentVersionId: versionId,
+          key: section.key,
+          title: section.title,
+          orderIndex: section.orderIndex,
+          contentJson: serialize(updatedContent),
+          templateControlled: section.templateControlled,
+        };
+      });
+
+      if (
+        !isCustomTemplate &&
+        !sourceSections.some((section) => section.key === "solutionProposal")
+      ) {
+        const processFlowOrder =
+          sourceSections.find((section) => section.key === "processFlow")
+            ?.orderIndex ?? 5;
+        for (const section of clonedSections) {
+          if (section.orderIndex >= processFlowOrder) section.orderIndex += 1;
+        }
+        const id = randomUUID();
+        sectionIds.set("solutionProposal", id);
+        clonedSections.push({
+          id,
+          documentVersionId: versionId,
+          key: "solutionProposal",
+          title: "Solución propuesta del profesional de soluciones",
+          orderIndex: processFlowOrder,
+          contentJson: serialize(
+            initialContent(
+              "solutionProposal",
+              access.project,
+              context.actor,
+              nextVersion,
+              now,
+            ),
+          ),
+          templateControlled: false,
+        });
+        clonedSections.sort(
+          (left, right) => left.orderIndex - right.orderIndex,
+        );
+      }
+
+      if (
+        includesScrum &&
+        !isCustomTemplate &&
+        !sourceSections.some(
+          (section) => section.key === DOCUMENT_SCRUM_SECTION_DEFINITION.key,
+        )
+      ) {
+        const id = randomUUID();
+        sectionIds.set(DOCUMENT_SCRUM_SECTION_DEFINITION.key, id);
+        clonedSections.push({
+          id,
+          documentVersionId: versionId,
+          key: DOCUMENT_SCRUM_SECTION_DEFINITION.key,
+          title: DOCUMENT_SCRUM_SECTION_DEFINITION.title,
+          orderIndex:
+            Math.max(...clonedSections.map((section) => section.orderIndex)) +
+            1,
+          contentJson: serialize(
+            initialContent(
+              DOCUMENT_SCRUM_SECTION_DEFINITION.key,
+              access.project,
+              context.actor,
+              nextVersion,
+              now,
+            ),
+          ),
+          templateControlled: false,
+        });
+      }
+
+      // DOCUMENT_VERSION_CLONE_SQL_CHUNK_V1_2
+      // SQL Server admite como máximo 2.100 parámetros por solicitud.
+      // TypeORM divide aquí las inserciones masivas de una versión grande
+      // sin cambiar la transacción ni el resultado funcional.
+      await manager.save(DocumentSectionEntity, clonedSections, { chunk: 100 });
       await manager.save(
         DocumentFieldEntity,
         sourceFields.map((field) => ({
@@ -620,6 +1454,7 @@ export class DocumentsService {
           valueJson: field.valueJson,
           orderIndex: field.orderIndex,
         })),
+        { chunk: 100 },
       );
       const requirementIds = new Map<string, string>();
       await manager.save(
@@ -639,6 +1474,7 @@ export class DocumentsService {
             orderIndex: requirement.orderIndex,
           };
         }),
+        { chunk: 100 },
       );
       await manager.save(
         AcceptanceCriterionEntity,
@@ -648,6 +1484,7 @@ export class DocumentsService {
           description: criterion.description,
           orderIndex: criterion.orderIndex,
         })),
+        { chunk: 100 },
       );
       await manager.save(
         DocumentEvidenceEntity,
@@ -662,6 +1499,7 @@ export class DocumentsService {
           excerpt: item.excerpt,
           note: item.note,
         })),
+        { chunk: 100 },
       );
       await this.addHistory(manager, {
         documentId,
@@ -678,6 +1516,11 @@ export class DocumentsService {
       });
     });
 
+    await this.projects.documentGenerated(
+      document.projectId,
+      documentId,
+      context.accessToken,
+    );
     return this.loadDetail(documentId);
   }
 
@@ -694,37 +1537,41 @@ export class DocumentsService {
     this.requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
     this.requireCurrent(document, version);
-    this.requireDraft(version);
+    const editableStatus = this.requireEditable(version);
     const section = await this.sections.findOneBy({
       documentVersionId: version.id,
       key: sectionKey,
     });
 
     if (!section) throw new NotFoundException("La sección no existe.");
-    if (section.templateControlled) {
-      throw new ConflictException(
-        "Las secciones 11, 12 y 13 están controladas por la plantilla.",
-      );
-    }
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
-      await this.lockDraftVersion(
+      await this.lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
         context.actor.id,
         now,
+        editableStatus,
       );
       await manager.update(DocumentSectionEntity, section.id, {
         contentJson: serialize(request.content),
       });
+
+      await this.synchronizePlanningSections(
+        manager,
+        version.id,
+        sectionKey,
+        request.content,
+      );
+
       await this.touchDocument(
         manager,
         document,
         context.actor.id,
         now,
-        "DRAFT",
+        editableStatus,
       );
       await this.addHistory(manager, {
         documentId,
@@ -753,7 +1600,7 @@ export class DocumentsService {
     this.requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
     this.requireCurrent(document, version);
-    this.requireDraft(version);
+    const editableStatus = this.requireEditable(version);
 
     const sourceIds = [
       ...new Set(request.evidence.map((item) => item.sourceId)),
@@ -771,12 +1618,13 @@ export class DocumentsService {
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
-      await this.lockDraftVersion(
+      await this.lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
         context.actor.id,
         now,
+        editableStatus,
       );
       await manager.delete(DocumentEvidenceEntity, {
         documentVersionId: version.id,
@@ -786,9 +1634,10 @@ export class DocumentsService {
         select: { id: true },
       });
       if (oldRequirements.length) {
-        await manager.delete(AcceptanceCriterionEntity, {
-          requirementId: In(oldRequirements.map((item) => item.id)),
-        });
+        await deleteAcceptanceCriteriaInBatches(
+          manager,
+          oldRequirements.map((item) => item.id),
+        );
       }
       await manager.delete(DocumentRequirementEntity, {
         documentVersionId: version.id,
@@ -809,6 +1658,7 @@ export class DocumentsService {
           valueJson: serialize(field.value),
           orderIndex: field.order,
         })),
+        { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
 
       const clientRequirementIds = new Map<string, string>();
@@ -828,7 +1678,9 @@ export class DocumentsService {
           orderIndex: requirement.order,
         };
       });
-      await manager.save(DocumentRequirementEntity, requirementRows);
+      await manager.save(DocumentRequirementEntity, requirementRows, {
+        chunk: SQL_SERVER_WRITE_BATCH_SIZE,
+      });
 
       const criterionRows = request.requirements.flatMap((requirement, index) =>
         requirement.acceptanceCriteria.map((criterion) => ({
@@ -838,7 +1690,9 @@ export class DocumentsService {
           orderIndex: criterion.order,
         })),
       );
-      await manager.save(AcceptanceCriterionEntity, criterionRows);
+      await manager.save(AcceptanceCriterionEntity, criterionRows, {
+        chunk: SQL_SERVER_WRITE_BATCH_SIZE,
+      });
       await manager.save(
         DocumentEvidenceEntity,
         request.evidence.map((item) => ({
@@ -852,13 +1706,14 @@ export class DocumentsService {
           excerpt: item.excerpt ?? null,
           note: item.note ?? null,
         })),
+        { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
       await this.touchDocument(
         manager,
         document,
         context.actor.id,
         now,
-        "DRAFT",
+        editableStatus,
       );
       await this.addHistory(manager, {
         documentId,
@@ -887,7 +1742,19 @@ export class DocumentsService {
   ): Promise<DocumentVersionDetail> {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
-    requireEdit(access);
+    // `documents.ai.apply` habilita la acción, pero no sustituye la
+    // autorización de edición de una persona. La excepción es la identidad de
+    // carga de trabajo del servicio de IA (rol SERVICE, nunca un usuario): aplica
+    // el borrador de una solicitud cuya autorización ya se validó al crearla, y
+    // así funciona igual en todos los proyectos.
+    if (
+      !(
+        access.role === "SERVICE" &&
+        context.actor.permissions.includes("documents.ai.apply")
+      )
+    ) {
+      requireEdit(access);
+    }
     this.requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
     this.requireCurrent(document, version);
@@ -906,6 +1773,11 @@ export class DocumentsService {
           "El resultado de IA ya fue aplicado a otra versión documental.",
         );
       }
+      await this.projects.documentGenerated(
+        document.projectId,
+        documentId,
+        context.accessToken,
+      );
       return this.loadVersionDetail(version);
     }
 
@@ -925,32 +1797,88 @@ export class DocumentsService {
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
-      await this.lockDraftVersion(
+      await this.lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
         context.actor.id,
         now,
+        "DRAFT",
       );
 
       const sectionRows = await manager.find(DocumentSectionEntity, {
         where: { documentVersionId: version.id },
         order: { orderIndex: "ASC" },
       });
-      for (const [index, sectionInput] of request.sections.entries()) {
-        const section = sectionRows[index];
+      const sectionsByKey = new Map(
+        sectionRows.map((section) => [section.key, section]),
+      );
+      const allSectionKeys = sectionRows.map((section) => section.key);
+      const legacyAiSectionKeys = sectionRows
+        .filter(
+          (section) =>
+            !["writingRules", "visualFormat", "automationInstruction"].includes(
+              section.key,
+            ),
+        )
+        .map((section) => section.key);
+      const requestedSectionKeys = request.sections.map(
+        (section) => section.key,
+      );
+      const matches = (expected: readonly string[]) =>
+        requestedSectionKeys.length === expected.length &&
+        requestedSectionKeys.every((key, index) => key === expected[index]);
+      if (
+        new Set(requestedSectionKeys).size !== requestedSectionKeys.length ||
+        (!matches(allSectionKeys) && !matches(legacyAiSectionKeys))
+      ) {
+        throw new ConflictException(
+          "El borrador debe contener las secciones del documento en su orden real.",
+        );
+      }
+      for (const reference of [...request.requirements, ...request.evidence]) {
         if (
-          !section ||
-          section.key !== sectionInput.key ||
-          section.templateControlled
+          reference.sectionKey != null &&
+          !sectionsByKey.has(reference.sectionKey)
         ) {
           throw new ConflictException(
-            "El borrador de IA no coincide con las secciones editables del documento.",
+            "La trazabilidad referencia una sección ajena al documento.",
           );
         }
-        await manager.update(DocumentSectionEntity, section.id, {
-          contentJson: serialize(sectionInput.content),
+      }
+      // Se valida todo el contenido antes de escribir la primera sección.
+      const preparedSections = request.sections.map((sectionInput) => {
+        const section = sectionsByKey.get(sectionInput.key);
+        if (!section) {
+          throw new ConflictException(
+            "El borrador de IA no coincide con las secciones del documento.",
+          );
+        }
+        const content = this.contentFromAi(
+          sectionInput.key,
+          parseJson(section.contentJson),
+          sectionInput.content,
+        );
+        // Mismo esquema que exige el editor manual (updateSection).
+        validateDocumentSectionContent(
+          sectionInput.key as DocumentSectionKey,
+          content,
+        );
+        return { section, key: sectionInput.key, content };
+      });
+      for (const prepared of preparedSections) {
+        await manager.update(DocumentSectionEntity, prepared.section.id, {
+          contentJson: serialize(prepared.content),
         });
+      }
+      // Punto 6 / Punto 7 en la misma transacción, como en updateSection.
+      for (const prepared of preparedSections) {
+        await this.synchronizePlanningSections(
+          manager,
+          version.id,
+          prepared.key,
+          prepared.content,
+        );
       }
 
       await manager.delete(DocumentEvidenceEntity, {
@@ -961,9 +1889,10 @@ export class DocumentsService {
         select: { id: true },
       });
       if (oldRequirements.length) {
-        await manager.delete(AcceptanceCriterionEntity, {
-          requirementId: In(oldRequirements.map((item) => item.id)),
-        });
+        await deleteAcceptanceCriteriaInBatches(
+          manager,
+          oldRequirements.map((item) => item.id),
+        );
       }
       await manager.delete(DocumentRequirementEntity, {
         documentVersionId: version.id,
@@ -986,7 +1915,9 @@ export class DocumentsService {
           orderIndex: requirement.order,
         };
       });
-      await manager.save(DocumentRequirementEntity, requirementRows);
+      await manager.save(DocumentRequirementEntity, requirementRows, {
+        chunk: SQL_SERVER_WRITE_BATCH_SIZE,
+      });
       await manager.save(
         AcceptanceCriterionEntity,
         request.requirements.flatMap((requirement, index) =>
@@ -997,6 +1928,7 @@ export class DocumentsService {
             orderIndex: criterion.order,
           })),
         ),
+        { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
       await manager.save(
         DocumentEvidenceEntity,
@@ -1011,6 +1943,7 @@ export class DocumentsService {
           excerpt: item.excerpt ?? null,
           note: item.note ?? null,
         })),
+        { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
       await manager.save(
         manager.create(AppliedAiAnalysisResultEntity, {
@@ -1046,6 +1979,11 @@ export class DocumentsService {
       });
     });
 
+    await this.projects.documentGenerated(
+      document.projectId,
+      documentId,
+      context.accessToken,
+    );
     return this.loadVersionDetail(
       await this.requireVersion(documentId, versionNumber),
     );
@@ -1062,10 +2000,28 @@ export class DocumentsService {
       documentId,
       versionNumber,
       request,
-      "DRAFT",
+      ["DRAFT", "CHANGES_REQUESTED"],
       "IN_REVIEW",
       "VERSION_SUBMITTED_FOR_REVIEW",
       false,
+    );
+  }
+
+  async requestChanges(
+    context: DocumentsActorContext,
+    documentId: string,
+    versionNumber: number,
+    request: DocumentTransitionRequest,
+  ): Promise<DocumentVersionDetail> {
+    return this.transition(
+      context,
+      documentId,
+      versionNumber,
+      request,
+      ["IN_REVIEW"],
+      "CHANGES_REQUESTED",
+      "VERSION_CHANGES_REQUESTED",
+      true,
     );
   }
 
@@ -1080,7 +2036,7 @@ export class DocumentsService {
       documentId,
       versionNumber,
       request,
-      "IN_REVIEW",
+      ["IN_REVIEW"],
       "APPROVED",
       "VERSION_APPROVED",
       true,
@@ -1098,7 +2054,7 @@ export class DocumentsService {
       documentId,
       versionNumber,
       request,
-      "IN_REVIEW",
+      ["IN_REVIEW"],
       "REJECTED",
       "VERSION_REJECTED",
       true,
@@ -1193,7 +2149,7 @@ export class DocumentsService {
     documentId: string,
     versionNumber: number,
     request: DocumentTransitionRequest,
-    from: DocumentStatus,
+    from: readonly DocumentStatus[],
     to: DocumentStatus,
     eventType: string,
     reviewPermission: boolean,
@@ -1206,11 +2162,17 @@ export class DocumentsService {
     const version = await this.requireVersion(documentId, versionNumber);
     this.requireCurrent(document, version);
 
-    if (version.status !== from) {
+    if (!from.includes(version.status)) {
       throw new ConflictException(
-        `La transición requiere una versión en estado ${from}.`,
+        `La transición requiere una versión en estado ${from.join(" o ")}.`,
       );
     }
+
+    const customLayout = customTemplateLayout(
+      await this.appliedTemplates.findOneBy({
+        id: document.appliedTemplateId,
+      }),
+    );
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
@@ -1235,32 +2197,59 @@ export class DocumentsService {
         .andWhere("Revision = :expectedRevision", {
           expectedRevision: request.expectedRevision,
         })
-        .andWhere("Status = :from", { from })
+        .andWhere("Status IN (:...from)", { from })
         .execute();
       if (result.affected !== 1) this.stale();
 
+      /*
+       * Encabezado y aprobaciones son secciones canónicas. Una plantilla propia
+       * puede no incluirlas: en ese caso solo cambia el estado de la versión.
+       */
       const header = await manager.findOneBy(DocumentSectionEntity, {
         documentVersionId: version.id,
         key: "header",
       });
-      if (!header)
-        throw new ConflictException("El documento no contiene encabezado.");
-      await manager.update(DocumentSectionEntity, header.id, {
-        contentJson: serialize(
-          this.headerForTransition(
-            parseJson(header.contentJson),
-            to,
-            context.actor,
+      if (header) {
+        await manager.update(DocumentSectionEntity, header.id, {
+          contentJson: serialize(
+            this.headerForTransition(parseJson(header.contentJson), to),
           ),
-        ),
+        });
+      } else if (!customLayout) {
+        throw new ConflictException("El documento no contiene encabezado.");
+      }
+      const approvals = await manager.findOneBy(DocumentSectionEntity, {
+        documentVersionId: version.id,
+        key: "approvalsAndChangeControl",
       });
+      if (approvals) {
+        await manager.update(DocumentSectionEntity, approvals.id, {
+          contentJson: serialize(
+            this.approvalsForTransition(
+              parseJson(approvals.contentJson),
+              to,
+              context.actor,
+              version,
+              now,
+            ),
+          ),
+        });
+      } else if (!customLayout) {
+        throw new ConflictException(
+          "El documento no contiene la sección de aprobaciones.",
+        );
+      }
       await this.touchDocument(manager, document, context.actor.id, now, to);
       await this.addHistory(manager, {
         documentId,
         versionId: version.id,
         eventType,
         actorUserId: context.actor.id,
-        details: { from, to, comment: request.comment ?? null },
+        details: {
+          from: version.status,
+          to,
+          comment: request.comment ?? null,
+        },
         now,
       });
     });
@@ -1276,19 +2265,20 @@ export class DocumentsService {
   ): DocumentJsonValue {
     if (!content || typeof content !== "object" || Array.isArray(content))
       return content;
+    const normalized = { ...content } as Record<string, DocumentJsonValue>;
+    delete normalized.preparedBy;
+    delete normalized.reviewedBy;
+    delete normalized.approvedBy;
     return {
-      ...content,
+      ...normalized,
       documentVersion: version,
       status: "BORRADOR",
-      reviewedBy: { name: PENDING, position: PENDING },
-      approvedBy: { name: PENDING, position: PENDING },
     };
   }
 
   private headerForTransition(
     content: DocumentJsonValue,
     status: DocumentStatus,
-    actor: AuthenticatedUser,
   ): DocumentJsonValue {
     if (!content || typeof content !== "object" || Array.isArray(content))
       return content;
@@ -1297,19 +2287,207 @@ export class DocumentsService {
         ? "EN VALIDACIÓN"
         : status === "APPROVED"
           ? "APROBADO"
-          : status === "REJECTED"
-            ? "BORRADOR"
-            : "BORRADOR";
-    const changes: Record<string, DocumentJsonValue> = {
-      status: visibleStatus,
+          : status === "CHANGES_REQUESTED"
+            ? "CORRECCIONES SOLICITADAS"
+            : status === "REJECTED"
+              ? "BORRADOR"
+              : "BORRADOR";
+    const normalized = { ...content } as Record<string, DocumentJsonValue>;
+    delete normalized.preparedBy;
+    delete normalized.reviewedBy;
+    delete normalized.approvedBy;
+    return { ...normalized, status: visibleStatus };
+  }
+
+  private contentFromAi(
+    key: string,
+    current: DocumentJsonValue,
+    proposed: DocumentJsonValue,
+  ): DocumentJsonValue {
+    if (key === "header") {
+      if (!proposed || typeof proposed !== "object" || Array.isArray(proposed))
+        return proposed;
+      const normalized = { ...proposed } as Record<string, DocumentJsonValue>;
+      delete normalized.preparedBy;
+      delete normalized.reviewedBy;
+      delete normalized.approvedBy;
+      return normalized;
+    }
+    if (key !== "approvalsAndChangeControl") return proposed;
+    const proposedRecord = documentRecord(proposed);
+    const currentRecord = documentRecord(current);
+    const proposedApprovals = documentRecords(proposedRecord?.approvals);
+    const currentApprovals = documentRecords(currentRecord?.approvals);
+    const proposedByResponsibility = new Map(
+      proposedApprovals.map((approval) => [
+        String(approval.responsibility),
+        approval,
+      ]),
+    );
+    const currentByResponsibility = new Map(
+      currentApprovals.map((approval) => [
+        String(approval.responsibility),
+        approval,
+      ]),
+    );
+    const responsibilities = ["Elaboración", "Revisión", "Aprobación"];
+    return {
+      approvals: responsibilities.map((responsibility) => {
+        const currentApproval = currentByResponsibility.get(responsibility);
+        const proposedApproval = proposedByResponsibility.get(responsibility);
+        const workflowHasDecided =
+          currentApproval && currentApproval.status !== "PENDIENTE";
+        return {
+          ...(proposedApproval ?? currentApproval ?? {}),
+          ...(responsibility === "Elaboración" || workflowHasDecided
+            ? (currentApproval ?? {})
+            : {}),
+          responsibility,
+        };
+      }),
+      // Generar o regenerar contenido no constituye un cambio aprobado.
+      changeControl: [],
     };
+  }
+
+  private approvalsForNewVersion(
+    content: DocumentJsonValue,
+    actor: AuthenticatedUser,
+  ): DocumentJsonValue {
+    const record = documentRecord(content);
+    const approvals = documentRecords(record?.approvals);
+    const byResponsibility = new Map(
+      approvals.map((approval) => [String(approval.responsibility), approval]),
+    );
+    return {
+      approvals: [
+        {
+          ...(byResponsibility.get("Elaboración") ?? {}),
+          name: actor.displayName,
+          position: "Responsable del documento",
+          responsibility: "Elaboración",
+          approvalMoment: "Al elaborar la versión documental",
+          status: "REGISTRADO",
+        },
+        {
+          ...(byResponsibility.get("Revisión") ?? {}),
+          responsibility: "Revisión",
+          approvalMoment: "Durante la validación del documento",
+          status: "PENDIENTE",
+        },
+        {
+          ...(byResponsibility.get("Aprobación") ?? {}),
+          responsibility: "Aprobación",
+          approvalMoment: "Al finalizar la revisión",
+          status: "PENDIENTE",
+        },
+      ],
+      changeControl: [],
+    };
+  }
+
+  private approvalsForTransition(
+    content: DocumentJsonValue,
+    status: DocumentStatus,
+    actor: AuthenticatedUser,
+    version: DocumentVersionEntity,
+    now: Date,
+  ): DocumentJsonValue {
+    const record = documentRecord(content);
+    const approvals = documentRecords(record?.approvals).map((item) => ({
+      ...item,
+    }));
+    const update = (
+      responsibility: "Revisión" | "Aprobación",
+      changes: Readonly<Record<string, DocumentJsonValue>>,
+    ) => {
+      const index = approvals.findIndex(
+        (approval) => approval.responsibility === responsibility,
+      );
+      if (index >= 0) {
+        approvals[index] = { ...approvals[index], ...changes };
+        return;
+      }
+      approvals.push({
+        name: PENDING,
+        position:
+          responsibility === "Revisión"
+            ? "Líder del responsable"
+            : "Solicitante o líder de la persona solicitante",
+        responsibility,
+        approvalMoment:
+          responsibility === "Revisión"
+            ? "Durante la validación del documento"
+            : "Al finalizar la revisión",
+        status: "PENDIENTE",
+        ...changes,
+      });
+    };
+
     if (status === "IN_REVIEW") {
-      changes.reviewedBy = { name: actor.displayName, position: PENDING };
+      const elaborationIndex = approvals.findIndex(
+        (approval) => approval.responsibility === "Elaboración",
+      );
+      const elaboration = {
+        name: actor.displayName,
+        position: "Responsable del documento",
+        responsibility: "Elaboración",
+        approvalMoment: now.toISOString(),
+        status: "REGISTRADO",
+      };
+      if (elaborationIndex >= 0) {
+        approvals[elaborationIndex] = {
+          ...approvals[elaborationIndex],
+          ...elaboration,
+        };
+      } else {
+        approvals.push(elaboration);
+      }
+      update("Revisión", {
+        approvalMoment: "Durante la validación del documento",
+        status: "EN REVISIÓN",
+      });
+    } else if (status === "CHANGES_REQUESTED") {
+      update("Revisión", {
+        name: actor.displayName,
+        position: "Líder del responsable",
+        approvalMoment: now.toISOString(),
+        status: "CAMBIOS SOLICITADOS",
+      });
+    } else if (status === "APPROVED") {
+      update("Aprobación", {
+        name: actor.displayName,
+        position: "Solicitante o líder de la persona solicitante",
+        approvalMoment: now.toISOString(),
+        status: "APROBADO",
+      });
     }
-    if (status === "APPROVED") {
-      changes.approvedBy = { name: actor.displayName, position: PENDING };
-    }
-    return { ...content, ...changes };
+
+    return {
+      approvals: ["Elaboración", "Revisión", "Aprobación"].map(
+        (responsibility) =>
+          approvals.find(
+            (approval) => approval.responsibility === responsibility,
+          ) ?? {
+            name: PENDING,
+            position: PENDING,
+            responsibility,
+            approvalMoment: PENDING,
+            status: "PENDIENTE",
+          },
+      ),
+      changeControl:
+        status === "APPROVED" && version.versionNumber > 1
+          ? [
+              {
+                version: version.version,
+                date: now.toISOString().slice(0, 10),
+                description: version.changeSummary,
+                approvedBy: actor.displayName,
+              },
+            ]
+          : (record?.changeControl ?? []),
+    };
   }
 
   private async projectAccess(
@@ -1356,6 +2534,17 @@ export class DocumentsService {
     }
   }
 
+  private requireEditable(
+    version: DocumentVersionEntity,
+  ): "DRAFT" | "CHANGES_REQUESTED" {
+    if (version.status !== "DRAFT" && version.status !== "CHANGES_REQUESTED") {
+      throw new ConflictException(
+        "Solo una versión en borrador o con correcciones solicitadas puede editarse.",
+      );
+    }
+    return version.status;
+  }
+
   private stale(): never {
     throw new ConflictException(
       "La revisión enviada está desactualizada. Recarga el documento antes de guardar.",
@@ -1398,6 +2587,18 @@ export class DocumentsService {
         "El documento tiene referencias internas incompletas.",
       );
     }
+    const prototypeSections = await this.sections.find({
+      where: {
+        documentVersionId: version.id,
+        key: In(["visualFormat", "solutionProposal"]),
+      },
+    });
+    const hasPrototype = prototypeSections.some((section) => {
+      const content = parseJson(section.contentJson);
+      return section.key === "visualFormat"
+        ? hasPrototypeContent(content)
+        : hasSolutionPrototypeMarkdown(content);
+    });
 
     return {
       id: document.id,
@@ -1407,6 +2608,7 @@ export class DocumentsService {
       revision: document.revision,
       currentVersionNumber: document.currentVersionNumber,
       currentVersion: version.version,
+      hasPrototype,
       template: templateWithoutDefinition(template),
       createdByUserId: document.createdByUserId,
       createdAt: toIso(document.createdAt),
@@ -1423,8 +2625,15 @@ export class DocumentsService {
       this.loadSummary(document),
       this.requireVersion(documentId, document.currentVersionNumber),
     ]);
+    const applied = await this.appliedTemplates.findOneByOrFail({
+      id: document.appliedTemplateId,
+    });
     return {
       ...summary,
+      appliedTemplate: {
+        ...templateWithoutDefinition(applied),
+        definition: parseJson(applied.definitionJson),
+      },
       currentVersionDetail: await this.loadVersionDetail(version),
     };
   }
@@ -1447,7 +2656,10 @@ export class DocumentsService {
       }),
       this.evidence.find({ where: { documentVersionId: version.id } }),
     ]);
-    this.assertThirteenSections(sections);
+    this.assertDocumentSections(
+      sections,
+      await this.appliedTemplateOfVersion(version),
+    );
     const criteria = requirements.length
       ? await this.criteria.find({
           where: { requirementId: In(requirements.map((item) => item.id)) },
@@ -1502,35 +2714,182 @@ export class DocumentsService {
     };
   }
 
-  private assertThirteenSections(
+  /**
+   * Plantilla efectiva de una versión: la aplicada (snapshot) al documento.
+   */
+  private async appliedTemplateOfVersion(
+    version: DocumentVersionEntity,
+  ): Promise<AppliedDocumentTemplateEntity | null> {
+    const document = await this.documents.findOneBy({ id: version.documentId });
+    if (!document) return null;
+    return this.appliedTemplates.findOneBy({ id: document.appliedTemplateId });
+  }
+
+  private assertDocumentSections(
     sections: readonly DocumentSectionEntity[],
+    appliedTemplate?: AppliedDocumentTemplateEntity | null,
   ): void {
-    if (sections.length !== DOCUMENT_SECTION_DEFINITIONS.length) {
+    /*
+     * Plantillas propias: el layout válido es el de la plantilla efectiva del
+     * documento, no el canónico fijo. Los documentos canónicos conservan la
+     * validación histórica de abajo.
+     */
+    const customLayout = customTemplateLayout(appliedTemplate);
+    if (customLayout) {
+      if (sections.length !== customLayout.length) {
+        throw new ConflictException(
+          `El documento debe contener ${customLayout.length} secciones según su plantilla aplicada.`,
+        );
+      }
+      customLayout.forEach((expectedSection, index) => {
+        const actual = sections[index];
+        if (
+          !actual ||
+          actual.key !== expectedSection.key ||
+          actual.orderIndex !== index + 1
+        ) {
+          throw new ConflictException(
+            "El documento no conserva el orden de las secciones configuradas.",
+          );
+        }
+      });
+      return;
+    }
+    const includesScrum = sections.at(-1)?.key === "scrumPlan";
+    const withoutScrum = includesScrum ? sections.slice(0, -1) : sections;
+    const hasSolutionProposal = withoutScrum.some(
+      (section) => section.key === "solutionProposal",
+    );
+    const historicalLayout = withoutScrum.some(
+      (section) => section.key === "nonFunctionalRequirements",
+    );
+    const baseDefinitions = historicalLayout
+      ? hasSolutionProposal
+        ? HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION
+        : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS
+      : hasSolutionProposal
+        ? DOCUMENT_SECTION_DEFINITIONS
+        : LEGACY_DOCUMENT_SECTION_DEFINITIONS;
+    const expected = includesScrum
+      ? [...baseDefinitions, DOCUMENT_SCRUM_SECTION_DEFINITION]
+      : baseDefinitions;
+
+    if (
+      sections.length !== baseDefinitions.length &&
+      sections.length !== baseDefinitions.length + 1
+    ) {
       throw new ConflictException(
-        "El documento no contiene exactamente 13 secciones.",
+        `El documento debe contener ${baseDefinitions.length} secciones base${includesScrum ? " y Plan Scrum" : ""}.`,
       );
     }
-    DOCUMENT_SECTION_DEFINITIONS.forEach((expected, index) => {
+
+    expected.forEach((expectedSection, index) => {
       const actual = sections[index];
       if (
         !actual ||
-        actual.key !== expected.key ||
-        actual.title !== expected.title ||
+        actual.key !== expectedSection.key ||
         actual.orderIndex !== index + 1
       ) {
         throw new ConflictException(
-          "El documento no conserva el orden de las 13 secciones canónicas.",
+          "El documento no conserva el orden de las secciones configuradas.",
         );
       }
     });
   }
 
-  private async lockDraftVersion(
+  /*
+   * Sincroniza Punto 6 / Punto 7 en la misma transacción que escribe la
+   * sección editada. Lo comparten `updateSection` y `applyAiDraft`.
+   */
+  private async synchronizePlanningSections(
+    manager: DataSource["manager"],
+    versionId: string,
+    sectionKey: string,
+    content: DocumentJsonValue,
+  ): Promise<void> {
+    /*
+     * PUNTO_7_SYNC_IN_TRANSACTION
+     *
+     * Al editar el esquema proyectamos de inmediato
+     * Epic / Feature / HU sobre el Punto 6.
+     *
+     * La operación usa la misma transacción:
+     * nunca queda un Punto 6 actualizado y un Punto 7
+     * anterior, ni al contrario.
+     */
+    if (sectionKey === "backlogStructure") {
+      const requirementsSection = await manager.findOne(
+        DocumentSectionEntity,
+        {
+          where: {
+            documentVersionId: versionId,
+            key: "milestones",
+          },
+        },
+      );
+
+      if (requirementsSection) {
+        const currentRequirements = parseJson(
+          requirementsSection.contentJson,
+        );
+
+        const synchronizedRequirements =
+          synchronizeBacklogStructureWithRequirements(
+            content,
+            currentRequirements,
+          );
+
+        if (
+          serialize(synchronizedRequirements) !==
+          serialize(currentRequirements)
+        ) {
+          await manager.update(
+            DocumentSectionEntity,
+            requirementsSection.id,
+            {
+              contentJson: serialize(synchronizedRequirements),
+            },
+          );
+        }
+      }
+    }
+
+    /*
+     * Al editar Punto 6 sincronizamos solamente
+     * el detalle de las HU con Punto 7.
+     */
+    if (sectionKey === "milestones") {
+      const backlogSection = await manager.findOne(DocumentSectionEntity, {
+        where: {
+          documentVersionId: versionId,
+          key: "backlogStructure",
+        },
+      });
+
+      if (backlogSection) {
+        const currentBacklog = parseJson(backlogSection.contentJson);
+
+        const synchronizedBacklog = synchronizeRequirementStoriesWithBacklog(
+          content,
+          currentBacklog,
+        );
+
+        if (serialize(synchronizedBacklog) !== serialize(currentBacklog)) {
+          await manager.update(DocumentSectionEntity, backlogSection.id, {
+            contentJson: serialize(synchronizedBacklog),
+          });
+        }
+      }
+    }
+  }
+
+  private async lockEditableVersion(
     manager: DataSource["manager"],
     version: DocumentVersionEntity,
     expectedRevision: number,
     actorUserId: string,
     now: Date,
+    status: "DRAFT" | "CHANGES_REQUESTED",
   ): Promise<void> {
     const result = await manager
       .createQueryBuilder()
@@ -1542,7 +2901,7 @@ export class DocumentsService {
       })
       .where("Id = :versionId", { versionId: version.id })
       .andWhere("Revision = :expectedRevision", { expectedRevision })
-      .andWhere("Status = :draft", { draft: "DRAFT" })
+      .andWhere("Status = :status", { status })
       .execute();
     if (result.affected !== 1) this.stale();
   }

@@ -3,7 +3,14 @@ name: ${COMPOSE_PROJECT_NAME:-levantamiento-rq}
 services:
   redis:
     image: redis:8.2.8-alpine
+    user: "999:1000"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
     command:
       - redis-server
       - --appendonly
@@ -29,7 +36,11 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.3.4-management-alpine
+    user: "100:101"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
@@ -52,8 +63,14 @@ services:
       start_period: 15s
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:3.36.0
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
     command:
       - azurite
       - --blobHost

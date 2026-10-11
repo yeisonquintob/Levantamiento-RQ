@@ -1,6 +1,7 @@
 import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 
 import type {
+  AiProviderConfigurationPurpose,
   AiProviderConfigurationType,
   AiProviderTestStatus,
 } from "@levantamiento-rq/shared-contracts";
@@ -20,6 +21,9 @@ export class AiProviderConfigurationEntity {
 
   @Column("nvarchar", { name: "ProviderType", length: 40 })
   providerType!: AiProviderConfigurationType;
+
+  @Column("nvarchar", { name: "Purpose", length: 16, default: "TEXT" })
+  purpose!: AiProviderConfigurationPurpose;
 
   @Column("nvarchar", { name: "Model", length: 120 })
   model!: string;

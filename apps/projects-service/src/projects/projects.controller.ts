@@ -57,6 +57,29 @@ function requireAccessToken(request: ProjectsRequest): string {
 export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
+  @Post(":projectId/documents/:documentId/generated")
+  @HttpCode(204)
+  documentGenerated(
+    @Req() request: ProjectsRequest,
+    @Param("projectId") projectId: string,
+    @Param("documentId") documentId: string,
+  ) {
+    return this.projects.documentGenerated(
+      requireActor(request),
+      parseProjectId(projectId),
+      parseProjectId(documentId),
+      requireAccessToken(request),
+    );
+  }
+
+  @Get("audit-events")
+  auditHistory(
+    @Req() request: ProjectsRequest,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    return this.projects.auditHistory(requireActor(request), query);
+  }
+
   @ApiOperation({ summary: "Consultar indicadores de proyectos accesibles" })
   @ApiResponse({ status: 200, description: "Indicadores calculados." })
   @Get("summary")
@@ -133,6 +156,20 @@ export class ProjectsController {
       requireActor(request),
       parseProjectId(projectId),
       parseUpdateProject(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Eliminar definitivamente un proyecto vacío" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Delete(":projectId")
+  @HttpCode(200)
+  deleteProject(
+    @Req() request: ProjectsRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.projects.deleteProject(
+      requireActor(request),
+      parseProjectId(projectId),
     );
   }
 

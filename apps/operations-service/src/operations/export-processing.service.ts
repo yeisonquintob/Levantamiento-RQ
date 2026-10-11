@@ -9,7 +9,11 @@ import { getRuntimeMetrics } from "@levantamiento-rq/shared-observability";
 
 import { OperationsDocumentsAccessClient } from "./documents-access.client";
 import { ExportArtifactStorage } from "./export-artifact-storage.service";
-import { renderDocx, renderPdf } from "./export-document.renderer";
+import {
+  renderDocx,
+  renderMarkdown,
+  renderPdf,
+} from "./export-document.renderer";
 import {
   AuditEventEntity,
   ExportArtifactEntity,
@@ -83,8 +87,11 @@ export class ExportProcessingService {
 
     try {
       const accessToken = await this.serviceToken.issue();
-      const [{ document, version }, project] = await Promise.all([
-        this.documents.requireApprovedVersion(
+      const [
+        { document, version, templateLogo, templateDescription },
+        project,
+      ] = await Promise.all([
+        this.documents.requireVersion(
           request.projectId,
           request.documentId,
           request.versionNumber,
@@ -103,12 +110,33 @@ export class ExportProcessingService {
       ) {
         throw new Error("La versión aprobada no coincide con la solicitud.");
       }
+      const shareableDraft = [
+        "DRAFT",
+        "IN_REVIEW",
+        "CHANGES_REQUESTED",
+      ].includes(version.status);
+      if (
+        version.status !== "APPROVED" &&
+        !(request.format === "DOCX" && shareableDraft)
+      ) {
+        throw new Error("La versión ya no está disponible para exportación.");
+      }
 
       const generatedAt = new Date();
+      const rendererInput = {
+        project,
+        document,
+        version,
+        generatedAt,
+        templateLogo,
+        templateDescription,
+      };
       const rendered =
         request.format === "PDF"
-          ? await renderPdf({ project, document, version, generatedAt })
-          : await renderDocx({ project, document, version, generatedAt });
+          ? await renderPdf(rendererInput)
+          : request.format === "DOCX"
+            ? await renderDocx(rendererInput)
+            : await renderMarkdown(rendererInput);
       const fileName = `${safeFilePart(project.code)}-${safeFilePart(document.title)}-v${safeFilePart(version.version)}.${rendered.extension}`;
       const blobPath = [
         "projects",

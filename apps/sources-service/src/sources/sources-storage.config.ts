@@ -7,6 +7,12 @@ export interface SourcesStorageConfig {
   maxFilesPerUpload: number;
   maxBatchBytes: number;
   maxExtractedTextChars: number;
+  parserTimeoutMs: number;
+  maxPdfPages: number;
+  maxSpreadsheetSheets: number;
+  maxSpreadsheetRows: number;
+  maxSpreadsheetColumns: number;
+  maxSpreadsheetCells: number;
 }
 
 function requiredText(value: string | undefined, name: string): string {
@@ -89,5 +95,11 @@ export function loadSourcesStorageConfig(
       10_000_000,
       "SOURCES_MAX_EXTRACTED_TEXT_CHARS",
     ),
+    parserTimeoutMs: readPositiveInteger(environment.SOURCES_PARSER_TIMEOUT_MS, 60_000, 1_000, 300_000, "SOURCES_PARSER_TIMEOUT_MS"),
+    maxPdfPages: readPositiveInteger(environment.SOURCES_MAX_PDF_PAGES, 500, 1, 2_000, "SOURCES_MAX_PDF_PAGES"),
+    maxSpreadsheetSheets: readPositiveInteger(environment.SOURCES_MAX_XLSX_SHEETS, 50, 1, 200, "SOURCES_MAX_XLSX_SHEETS"),
+    maxSpreadsheetRows: readPositiveInteger(environment.SOURCES_MAX_XLSX_ROWS, 100_000, 1, 1_000_000, "SOURCES_MAX_XLSX_ROWS"),
+    maxSpreadsheetColumns: readPositiveInteger(environment.SOURCES_MAX_XLSX_COLUMNS, 1_000, 1, 16_384, "SOURCES_MAX_XLSX_COLUMNS"),
+    maxSpreadsheetCells: readPositiveInteger(environment.SOURCES_MAX_XLSX_CELLS, 1_000_000, 1, 10_000_000, "SOURCES_MAX_XLSX_CELLS"),
   };
 }

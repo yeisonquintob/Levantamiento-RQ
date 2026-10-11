@@ -14,6 +14,10 @@ import {
   type AiAnalysisProcessingConfig,
 } from "./ai-analysis-processing.config";
 import { AI_ANALYSIS_JOB, type AiAnalysisJobData } from "./ai-analysis.queue";
+import { AiUsageGuardService } from "../security/ai-usage-guard.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { AnalysisRequestEntity } from "../analysis/analysis-request.entity";
 
 @Injectable()
 export class AiAnalysisWorker implements OnModuleInit, OnModuleDestroy {
@@ -24,7 +28,20 @@ export class AiAnalysisWorker implements OnModuleInit, OnModuleDestroy {
     @Inject(AI_ANALYSIS_PROCESSING_CONFIG)
     private readonly config: AiAnalysisProcessingConfig,
     private readonly execution: AiAnalysisExecutionService,
+    private readonly usageGuard: AiUsageGuardService,
+    @InjectRepository(AnalysisRequestEntity)
+    private readonly requests: Repository<AnalysisRequestEntity>,
   ) {}
+
+  private async release(job: { data: AiAnalysisJobData }): Promise<void> {
+    const request = await this.requests.findOneBy({ id: job.data.analysisRequestId });
+    if (!request) return;
+    await this.usageGuard.release({
+      requestId: request.id,
+      userId: request.requestedByUserId,
+      projectId: request.projectId,
+    });
+  }
 
   onModuleInit(): void {
     const metrics = getRuntimeMetrics("ai-analysis-service");
@@ -53,12 +70,16 @@ export class AiAnalysisWorker implements OnModuleInit, OnModuleDestroy {
     this.worker.on("closed", () =>
       metrics.setQueueWorkerConnected(this.config.queueName, false),
     );
-    this.worker.on("completed", () =>
-      metrics.recordQueueJob(this.config.queueName, "completed"),
-    );
-    this.worker.on("failed", () =>
-      metrics.recordQueueJob(this.config.queueName, "failed"),
-    );
+    this.worker.on("completed", (job) => {
+      metrics.recordQueueJob(this.config.queueName, "completed");
+      void this.release(job);
+    });
+    this.worker.on("failed", (job) => {
+      metrics.recordQueueJob(this.config.queueName, "failed");
+      if (job && job.attemptsMade >= Number(job.opts.attempts ?? 1)) {
+        void this.release(job);
+      }
+    });
     this.worker.on("error", (error) => {
       metrics.setQueueWorkerConnected(this.config.queueName, false);
       this.logger.error(error.message);

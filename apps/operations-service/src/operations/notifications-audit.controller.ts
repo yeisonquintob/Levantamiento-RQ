@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -46,6 +47,14 @@ function context(request: OperationsRequest) {
 export class NotificationsAuditController {
   constructor(private readonly service: NotificationsAuditService) {}
 
+  @Get("admin/audit/approvals")
+  approvalsHistory(
+    @Req() request: OperationsRequest,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    return this.service.approvalsHistory(context(request), query);
+  }
+
   @ApiOperation({
     summary: "Listar las notificaciones del usuario autenticado",
   })
@@ -71,6 +80,13 @@ export class NotificationsAuditController {
       context(request),
       parseNotificationId(notificationId),
     );
+  }
+
+  @ApiOperation({ summary: "Eliminar todas las notificaciones propias" })
+  @Delete("notifications")
+  @HttpCode(200)
+  clearNotifications(@Req() request: OperationsRequest) {
+    return this.service.clearNotifications(context(request));
   }
 
   @ApiOperation({ summary: "Consultar la auditoría de un proyecto accesible" })

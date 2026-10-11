@@ -1,3 +1,4 @@
+import { UsersClientService } from "../users/users-client.service";
 import {
   Body,
   Controller,
@@ -25,9 +26,15 @@ import type {
   AddProjectParticipantRequest,
   CreateProjectRequest,
   UpdateProjectRequest,
+  ProjectDeleteResult,
 } from "@levantamiento-rq/shared-contracts";
 
+import { AiAnalysisClientService } from "../analysis/ai-analysis-client.service";
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
+import { DocumentsClientService } from "../documents/documents-client.service";
+import { OperationsClientService } from "../operations/operations-client.service";
+import { SourcesClientService } from "../sources/sources-client.service";
+import { WorkflowClientService } from "../workflow/workflow-client.service";
 import { ProjectsClientService } from "./projects-client.service";
 
 interface RequestLike {
@@ -58,12 +65,38 @@ function requireAccessToken(request: RequestLike): string {
   return match[1];
 }
 
+function correlationId(request: RequestLike): string {
+  return (
+    firstHeader(request.headers["x-correlation-id"])?.trim() || randomUUID()
+  );
+}
+
 @ApiTags("projects")
 @ApiCookieAuth("rq_access")
 @ApiBearerAuth()
 @Controller("projects")
 export class ProjectsGatewayController {
-  constructor(private readonly projects: ProjectsClientService) {}
+  constructor(
+    private readonly projects: ProjectsClientService,
+    private readonly users: UsersClientService,
+    private readonly sources: SourcesClientService,
+    private readonly documents: DocumentsClientService,
+    private readonly analysis: AiAnalysisClientService,
+    private readonly workflow: WorkflowClientService,
+    private readonly operations: OperationsClientService,
+  ) {}
+
+  @Get("audit-events")
+  async auditHistory(
+    @Req() request: RequestLike,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    const token = requireAccessToken(request);
+    return this.users.resolveAuditActors(
+      await this.projects.auditHistory(token, query),
+      token,
+    );
+  }
 
   @ApiOperation({ summary: "Consultar indicadores de proyectos" })
   @ApiResponse({ status: 200, description: "Indicadores disponibles." })
@@ -126,6 +159,56 @@ export class ProjectsGatewayController {
     return this.projects.update(requireAccessToken(request), projectId, body);
   }
 
+  @ApiOperation({
+    summary:
+      "Eliminar definitivamente el proyecto y todos sus datos relacionados",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Delete(":projectId")
+  @HttpCode(200)
+  async deleteProject(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ): Promise<ProjectDeleteResult> {
+    const accessToken = requireAccessToken(request);
+    const correlation = correlationId(request);
+    const analysis = await this.analysis.purgeProject(
+      accessToken,
+      correlation,
+      projectId,
+    );
+    const workflow = await this.workflow.purgeProject(
+      accessToken,
+      correlation,
+      projectId,
+    );
+    const operations = await this.operations.purgeProject(
+      accessToken,
+      correlation,
+      projectId,
+    );
+    const documents = await this.documents.purgeProject(
+      accessToken,
+      correlation,
+      projectId,
+    );
+    const sources = await this.sources.purgeProject(accessToken, projectId);
+    const project = await this.projects.deleteProject(accessToken, projectId);
+
+    return {
+      deleted: true,
+      projectId: project.projectId,
+      code: project.code,
+      removed: {
+        sources: sources.count,
+        documents: documents.count,
+        analysisRequests: analysis.count,
+        reviews: workflow.count,
+        operations: operations.count,
+      },
+    };
+  }
+
   @ApiOperation({ summary: "Agregar participante" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @Post(":projectId/participants")
@@ -158,3 +241,4 @@ export class ProjectsGatewayController {
     );
   }
 }
+import { randomUUID } from "node:crypto";

@@ -1,3 +1,4 @@
+import type { AuditHistoryResponse } from "@levantamiento-rq/shared-contracts";
 import {
   HttpException,
   Inject,
@@ -7,10 +8,13 @@ import {
 
 import type {
   AuditEventListResponse,
+  ExecutionTaskStatusListResponse,
   ExportRequestDetail,
   ExportRequestListResponse,
   NotificationDetail,
+  NotificationClearResult,
   NotificationListResponse,
+  ProjectDomainPurgeResult,
 } from "@levantamiento-rq/shared-contracts";
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
@@ -90,6 +94,20 @@ export class OperationsClientService {
     );
   }
 
+  purgeProject(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/operations`,
+      "DELETE",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
   listNotifications(
     accessToken: string,
     correlationId: string,
@@ -112,6 +130,19 @@ export class OperationsClientService {
     return this.request(
       `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
       "POST",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  clearNotifications(
+    accessToken: string,
+    correlationId: string,
+  ): Promise<NotificationClearResult> {
+    return this.request(
+      "/api/v1/notifications",
+      "DELETE",
       accessToken,
       correlationId,
       null,
@@ -181,9 +212,58 @@ export class OperationsClientService {
     };
   }
 
+  listExecutionTasks(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+  ): Promise<ExecutionTaskStatusListResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/execution/tasks`,
+      "GET",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
+  updateExecutionTasks(
+    accessToken: string,
+    correlationId: string,
+    projectId: string,
+    body: unknown,
+  ): Promise<ExecutionTaskStatusListResponse> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/execution/tasks`,
+      "PUT",
+      accessToken,
+      correlationId,
+      null,
+      body,
+    );
+  }
+
+  auditHistory(
+    accessToken: string,
+    query: Readonly<Record<string, unknown>>,
+    correlationId: string,
+  ): Promise<AuditHistoryResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === "string" || typeof value === "number")
+        params.set(key, String(value));
+    }
+    return this.request(
+      `/api/v1/admin/audit/approvals?${params}`,
+      "GET",
+      accessToken,
+      correlationId,
+      null,
+    );
+  }
+
   private async request<T>(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT" | "DELETE",
     accessToken: string,
     correlationId: string,
     idempotencyKey: string | null,

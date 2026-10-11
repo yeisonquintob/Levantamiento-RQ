@@ -247,6 +247,44 @@ export class IntegrationEventInboxEntity {
   errorMessage!: string | null;
 }
 
+
+@Entity({ name: "ExecutionTaskStatuses" })
+@Index("UQ_ExecutionTaskStatuses_Project_Task", ["projectId", "taskCode"], {
+  unique: true,
+})
+@Index("IX_ExecutionTaskStatuses_Project_State", ["projectId", "state"])
+export class ExecutionTaskStatusEntity {
+  @PrimaryColumn("uniqueidentifier", { name: "Id" })
+  id!: string;
+
+  @Column("uniqueidentifier", { name: "ProjectId" })
+  projectId!: string;
+
+  @Column("nvarchar", { name: "TaskCode", length: 120 })
+  taskCode!: string;
+
+  @Column("nvarchar", { name: "State", length: 20 })
+  state!: string;
+
+  @Column("nvarchar", { name: "Source", length: 20 })
+  source!: string;
+
+  @Column("nvarchar", { name: "Note", length: 1000, nullable: true })
+  note!: string | null;
+
+  @Column("datetime2", { name: "CompletedAt", precision: 7, nullable: true })
+  completedAt!: Date | null;
+
+  @Column("uniqueidentifier", { name: "UpdatedByUserId" })
+  updatedByUserId!: string;
+
+  @Column("datetime2", { name: "CreatedAt", precision: 7 })
+  createdAt!: Date;
+
+  @Column("datetime2", { name: "UpdatedAt", precision: 7 })
+  updatedAt!: Date;
+}
+
 export const operationEntities = [
   ExportRequestEntity,
   ExportArtifactEntity,
@@ -254,4 +292,5 @@ export const operationEntities = [
   NotificationDeliveryEntity,
   AuditEventEntity,
   IntegrationEventInboxEntity,
+  ExecutionTaskStatusEntity,
 ];

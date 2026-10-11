@@ -5,4 +5,5 @@ export interface AiAnalysisRequest {
   authPrincipal?: AuthenticatedUser;
   accessToken?: string;
   correlationId?: string;
+  serviceIdentity?: string;
 }

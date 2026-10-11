@@ -20,10 +20,14 @@ import {
   RqTableShell,
 } from "@levantamiento-rq/shared-ui";
 
+import { WorkspaceKpiIcon } from "../../workspace-kpi-icon";
 import { useDialogAccessibility } from "../../../use-dialog-accessibility";
+import { useAutoDismiss } from "../../../use-auto-dismiss";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 const EMPTY_LIST: IdentityUserListResponse = {
   items: [],
@@ -102,6 +106,7 @@ export function UsersWorkspace({
   const [status, setStatus] = useState("");
   const [roleCode, setRoleCode] = useState("");
   const [alert, setAlert] = useState(initialError ?? "");
+  useAutoDismiss(alert, () => setAlert(""));
   const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<ModalMode | null>(null);
@@ -329,25 +334,19 @@ export function UsersWorkspace({
         <RqKpiGrid label="Resumen de usuarios">
           <RqKpiCard
             description="Cuentas registradas"
-            icon="U"
+            icon={<WorkspaceKpiIcon name="users" />}
             title="Total"
             value={String(metrics.total)}
           />
           <RqKpiCard
-            description="Acceso habilitado"
-            icon="A"
-            title="Activos"
-            value={String(metrics.active)}
-          />
-          <RqKpiCard
-            description="Acceso bloqueado"
-            icon="I"
-            title="Inactivos"
-            value={String(metrics.inactive)}
+            description="Acceso habilitado / acceso bloqueado"
+            icon={<WorkspaceKpiIcon name="check" />}
+            title="Activos / inactivos"
+            value={`${metrics.active} / ${metrics.inactive}`}
           />
           <RqKpiCard
             description="Rol global ADMIN"
-            icon="R"
+            icon={<WorkspaceKpiIcon name="key" />}
             title="Administradores"
             value={String(metrics.administrators)}
           />
@@ -380,7 +379,7 @@ export function UsersWorkspace({
       ) : null}
 
       <form
-        className="rq-filter-bar rq-users-filter"
+        className="rq-projects-filters"
         onSubmit={(event) => {
           event.preventDefault();
           setBusy(true);
@@ -394,17 +393,41 @@ export function UsersWorkspace({
             .finally(() => setBusy(false));
         }}
       >
-        <label className="rq-field">
-          <span>Buscar</span>
+        <label className="rq-projects-filter rq-projects-filter--search">
+          <span>Buscar:</span>
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="17"
+            viewBox="0 0 24 24"
+            width="17"
+          >
+            <circle
+              cx="10.5"
+              cy="10.5"
+              r="6.5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            />
+            <path
+              d="m15.5 15.5 5 5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.8"
+            />
+          </svg>
           <input
+            aria-label="Buscar usuario por nombre o correo"
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Nombre o correo"
+            type="search"
             value={search}
           />
         </label>
-        <label className="rq-field">
-          <span>Estado</span>
+        <label className="rq-projects-filter">
+          <span>Estado:</span>
           <select
+            aria-label="Estado"
             onChange={(event) => setStatus(event.target.value)}
             value={status}
           >
@@ -413,9 +436,10 @@ export function UsersWorkspace({
             <option value="INACTIVE">Inactivo</option>
           </select>
         </label>
-        <label className="rq-field">
-          <span>Rol</span>
+        <label className="rq-projects-filter">
+          <span>Rol:</span>
           <select
+            aria-label="Rol"
             onChange={(event) => setRoleCode(event.target.value)}
             value={roleCode}
           >
@@ -427,22 +451,21 @@ export function UsersWorkspace({
             ))}
           </select>
         </label>
-        <div className="rq-filter-bar__actions">
-          <RqActionButton disabled={busy} tone="consult" type="submit">
-            Consultar
-          </RqActionButton>
-          <RqActionButton
-            disabled={busy}
-            onClick={() => {
-              setSearch("");
-              setStatus("");
-              setRoleCode("");
-              void refresh("", "", "");
-            }}
-          >
-            Limpiar
-          </RqActionButton>
-        </div>
+        <RqActionButton disabled={busy} tone="consult" type="submit">
+          Consultar
+        </RqActionButton>
+        <RqActionButton
+          disabled={busy}
+          onClick={() => {
+            setSearch("");
+            setStatus("");
+            setRoleCode("");
+            void refresh("", "", "");
+          }}
+          tone="secondary"
+        >
+          Limpiar
+        </RqActionButton>
       </form>
 
       <RqTableShell
@@ -497,12 +520,13 @@ export function UsersWorkspace({
                   <td>
                     <div className="rq-users-table__actions">
                       <RqActionButton
+                        className="rq-row-open"
                         compact
                         disabled={busy}
                         onClick={() => void load(user, "view")}
                         tone="consult"
                       >
-                        Ver
+                        Abrir
                       </RqActionButton>
                       <RqActionButton
                         compact
@@ -738,6 +762,7 @@ export function UsersWorkspace({
                       }))
                     }
                     required
+                    spellCheck={false}
                     type="email"
                     value={form.email}
                   />

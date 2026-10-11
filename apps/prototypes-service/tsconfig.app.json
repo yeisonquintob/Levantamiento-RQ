@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node"],
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "es2021",
+    "strictNullChecks": true,
+    "noImplicitAny": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["eslint.config.mjs"],
+  "references": [
+    { "path": "../../libs/shared/persistence/tsconfig.lib.json" },
+    { "path": "../../libs/shared/observability/tsconfig.lib.json" },
+    { "path": "../../libs/shared/http/tsconfig.lib.json" },
+    { "path": "../../libs/shared/contracts/tsconfig.lib.json" },
+    { "path": "../../libs/shared/config/tsconfig.lib.json" }
+  ]
+}

@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-} from "typeorm";
+import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 
 import type {
   DocumentTemplateStatus,
@@ -47,6 +42,31 @@ export class DocumentTemplateEntity {
 
   @Column("nvarchar", { name: "DefinitionJson", length: "MAX" })
   definitionJson!: string;
+
+  @Column("nvarchar", { name: "LogoFileName", length: 260, nullable: true })
+  logoFileName!: string | null;
+
+  @Column("nvarchar", { name: "LogoMediaType", length: 80, nullable: true })
+  logoMediaType!: "image/png" | "image/jpeg" | null;
+
+  @Column("int", { name: "LogoSizeBytes", nullable: true })
+  logoSizeBytes!: number | null;
+
+  @Column("varbinary", { name: "LogoData", length: "MAX", nullable: true })
+  logoData!: Buffer | null;
+
+  @Column("datetime2", {
+    name: "LogoUpdatedAt",
+    precision: 7,
+    nullable: true,
+  })
+  logoUpdatedAt!: Date | null;
+
+  @Column("uniqueidentifier", {
+    name: "LogoUpdatedByUserId",
+    nullable: true,
+  })
+  logoUpdatedByUserId!: string | null;
 
   @Column("uniqueidentifier", {
     name: "SourceTemplateId",

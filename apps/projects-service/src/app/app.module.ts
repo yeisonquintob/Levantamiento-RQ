@@ -1,3 +1,4 @@
+import { ProjectAuditEntity } from "../projects/project-audit.entity";
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
@@ -8,7 +9,13 @@ import {
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
-import { ProjectEntity, ProjectParticipantEntity } from "../projects/entities";
+import {
+  ProjectAreaEntity,
+  ProjectEntity,
+  ProjectParticipantEntity,
+} from "../projects/entities";
+import { ProjectAreasController } from "../projects/project-areas.controller";
+import { ProjectAreasService } from "../projects/project-areas.service";
 import { DocumentTemplatesAccessClient } from "../projects/document-templates-access.client";
 import {
   loadProjectsAuthConfig,
@@ -23,7 +30,12 @@ const databaseConfig = loadSqlServerDatabaseConfig({
   defaultDatabaseName: "RqProjectsDb",
 });
 
-const projectEntities = [ProjectEntity, ProjectParticipantEntity];
+const projectEntities = [
+  ProjectEntity,
+  ProjectParticipantEntity,
+  ProjectAuditEntity,
+  ProjectAreaEntity,
+];
 
 @Module({
   imports: [
@@ -37,7 +49,9 @@ const projectEntities = [ProjectEntity, ProjectParticipantEntity];
   ],
   controllers: [
     AppController,
-    ...(databaseConfig.enabled ? [ProjectsController] : []),
+    ...(databaseConfig.enabled
+      ? [ProjectsController, ProjectAreasController]
+      : []),
   ],
   providers: [
     AppService,
@@ -50,6 +64,7 @@ const projectEntities = [ProjectEntity, ProjectParticipantEntity];
           ProjectsAccessTokenGuard,
           DocumentTemplatesAccessClient,
           ProjectsService,
+          ProjectAreasService,
         ]
       : []),
   ],

@@ -1,3 +1,5 @@
+import { loadSettingsUser } from "../settings-user";
+import { canManageSystem } from "../settings-access";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -6,7 +8,9 @@ import type { ProjectListResponse } from "@levantamiento-rq/shared-contracts";
 import { AuditWorkspace } from "../../audit/audit-workspace";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 async function loadProjects(): Promise<{
   projects?: ProjectListResponse;
@@ -32,6 +36,9 @@ async function loadProjects(): Promise<{
 }
 
 export default async function AuditPage() {
+  const user = await loadSettingsUser();
+  if (!canManageSystem(user))
+    return <p role="alert">La auditoría requiere permiso de administración.</p>;
   const initial = await loadProjects();
   return (
     <AuditWorkspace

@@ -7,10 +7,7 @@ test("Gateway configura URL y timeout de AI Analysis", async () => {
     "apps/gateway/src/config/gateway-config.ts",
     "utf8",
   );
-  const environment = await readFile(
-    "apps/gateway/.env.example",
-    "utf8",
-  );
+  const environment = await readFile("apps/gateway/.env.example", "utf8");
 
   assert.match(config, /aiAnalysisServiceUrl: string/);
   assert.match(config, /aiAnalysisTimeoutMs: number/);
@@ -45,6 +42,9 @@ test("controlador acepta cookie, Bearer y propaga correlación", async () => {
   for (const fragment of [
     '@Controller("projects/:projectId/analysis-requests")',
     "@Post()",
+    '@Get("discussion/capabilities")',
+    '@Post("discussion/process")',
+    '@Post("discussion/cancel")',
     "@Get()",
     '@Get(":analysisRequestId")',
     '@Post(":analysisRequestId/cancel")',
@@ -67,6 +67,8 @@ test("cliente reenvía token, correlación, query y errores HTTP", async () => {
   assert.match(client, /URLSearchParams/);
   assert.match(client, /AiAnalysisRequestListResponse/);
   assert.match(client, /AiAnalysisRequestDetail/);
+  assert.match(client, /processDiscussion/);
+  assert.match(client, /getDiscussionCapabilities/);
   assert.match(client, /HttpException/);
   assert.match(client, /ServiceUnavailableException/);
 });
@@ -88,10 +90,7 @@ test("servicios locales incorporan el puerto 3005", async () => {
 
 test("Gateway no ejecuta ni conecta un proveedor de IA", async () => {
   const [client, controller] = await Promise.all([
-    readFile(
-      "apps/gateway/src/analysis/ai-analysis-client.service.ts",
-      "utf8",
-    ),
+    readFile("apps/gateway/src/analysis/ai-analysis-client.service.ts", "utf8"),
     readFile(
       "apps/gateway/src/analysis/ai-analysis-gateway.controller.ts",
       "utf8",

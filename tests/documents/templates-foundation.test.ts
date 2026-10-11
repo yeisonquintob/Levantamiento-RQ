@@ -12,7 +12,13 @@ import {
   parseCreateDocumentTemplate,
   parseDocumentTemplateListQuery,
   parseUpdateDocumentTemplate,
+  parseUpdateDocumentTemplateLogo,
 } from "../../apps/documents-service/src/templates/document-templates-input.js";
+import {
+  defaultSidebarConfiguration,
+  SIDEBAR_MENU_DEFINITIONS,
+} from "../../apps/web/src/app/sidebar-navigation.js";
+
 test("el contrato publica tipos y estados controlados", () => {
   assert.deepEqual(DOCUMENT_TEMPLATE_TYPES, [
     "SMALL_REQUIREMENT",
@@ -73,8 +79,88 @@ test("pequeño, mediano y grande exigen Scrum", () => {
   );
 });
 
+test("las plantillas Scrum incorporan el punto 15 de planificación", async () => {
+  const service = await readFile(
+    "apps/documents-service/src/templates/document-templates.service.ts",
+    "utf8",
+  );
+  assert.match(service, /DOCUMENT_SCRUM_SECTION_DEFINITION/);
+  assert.match(service, /15 días calendario/i);
+  assert.match(service, /synchronizeScrumPlanSection/);
+});
+
+test("las cuatro plantillas publican una versión actualizada con el estándar vigente", async () => {
+  const migration = await readFile(
+    "apps/documents-service/src/database/migrations/1787007601000-PublishCurrentDocumentTemplateVersions.ts",
+    "utf8",
+  );
+
+  for (const code of ["RQ-SMALL", "RQ-MEDIUM", "RQ-LARGE", "ERP-FDD"]) {
+    assert.match(migration, new RegExp(code));
+  }
+  assert.match(migration, /N'1\.1\.0'/);
+  assert.match(
+    migration,
+    /objetivos específicos cualitativos y cuantitativos/i,
+  );
+  assert.match(migration, /exactamente tres KPI/i);
+  assert.match(migration, /quién elabora, quién revisa, quién aprueba/i);
+  assert.match(migration, /SET Status = N'RETIRED'/);
+});
+
+test("la versión 1.3 agrega solución y mueve Scrum al punto 15", async () => {
+  const migration = await readFile(
+    "apps/documents-service/src/database/migrations/1788470400000-AddSolutionProposalSection.ts",
+    "utf8",
+  );
+
+  assert.match(migration, /Version = N'1\.3\.0'/u);
+  assert.match(migration, /solutionProposal/u);
+  assert.match(migration, /Solución propuesta del profesional de soluciones/u);
+  assert.match(migration, /OrderIndex BETWEEN 1 AND 15/u);
+  assert.match(
+    migration,
+    /responsables se registran exclusivamente en Aprobaciones/u,
+  );
+  assert.match(
+    migration,
+    /un único control de cambio solo cuando la versión sea aprobada/u,
+  );
+});
+
 test("la actualización exige al menos un campo", () => {
   assert.throws(() => parseUpdateDocumentTemplate({}), /al menos un campo/i);
+});
+
+test("el logo de plantilla valida formato, firma y límite antes de persistir", async () => {
+  assert.deepEqual(
+    parseUpdateDocumentTemplateLogo({
+      fileName: " marca.png ",
+      mediaType: "image/png",
+      dataBase64: "iVBORw0KGgo=",
+    }),
+    {
+      fileName: "marca.png",
+      mediaType: "image/png",
+      dataBase64: "iVBORw0KGgo=",
+    },
+  );
+  assert.throws(
+    () =>
+      parseUpdateDocumentTemplateLogo({
+        fileName: "marca.jpg",
+        mediaType: "image/jpeg",
+        dataBase64: "iVBORw0KGgo=",
+      }),
+    /no coincide/i,
+  );
+
+  const migration = await readFile(
+    "apps/documents-service/src/database/migrations/1787007602000-AddDocumentTemplateLogos.ts",
+    "utf8",
+  );
+  assert.match(migration, /LogoData varbinary\(max\)/);
+  assert.match(migration, /524288/);
 });
 
 test("los puntos se pueden editar, agregar, eliminar y reordenar", () => {
@@ -268,6 +354,14 @@ test("Gateway y Configuración exponen Plantillas sin duplicar su lógica", asyn
     "apps/gateway/src/templates/document-templates-gateway.controller.ts",
     "utf8",
   );
+  const documentsController = await readFile(
+    "apps/documents-service/src/templates/document-templates.controller.ts",
+    "utf8",
+  );
+  const documentsService = await readFile(
+    "apps/documents-service/src/templates/document-templates.service.ts",
+    "utf8",
+  );
   const page = await readFile(
     "apps/web/src/app/workspace/settings/templates/page.tsx",
     "utf8",
@@ -280,6 +374,10 @@ test("Gateway y Configuración exponen Plantillas sin duplicar su lógica", asyn
 
   assert.match(gatewayModule, /DocumentTemplatesGatewayController/);
   assert.match(gatewayController, /@Controller\("templates"\)/);
+  assert.match(gatewayController, /@Get\(":templateId\/logo"\)/);
+  assert.match(gatewayController, /@Put\(":templateId\/logo"\)/);
+  assert.match(documentsController, /@Put\(":templateId\/logo"\)/);
+  assert.match(documentsService, /async updateLogo/);
   assert.match(page, /DocumentTemplateListResponse/);
   assert.match(workspace, /Nueva plantilla/);
   assert.match(workspace, /Nueva versión/);
@@ -291,12 +389,30 @@ test("Gateway y Configuración exponen Plantillas sin duplicar su lógica", asyn
   assert.match(workspace, /moveSection/);
   assert.match(workspace, /removeSection/);
   assert.match(workspace, /payload\.detail/);
+  assert.match(workspace, /Editar logo de plantilla/);
+  assert.match(workspace, /Guardar logo/);
   assert.match(workspace, /credentials: "include"/);
   assert.doesNotMatch(shell, /href="\/workspace\/templates"/);
-  assert.match(shell, /href="\/workspace\/settings"/);
   assert.match(shell, /Catálogo de plantillas/);
+  // El menú ya no está escrito en app-shell.tsx: Configuración (que contiene
+  // Plantillas) es un menú definido y colocado en la sección Administración,
+  // después de Validación, en la configuración del menú lateral.
+  assert.match(shell, /SIDEBAR_MENU_DEFINITIONS/);
+  const definitions = new Map(
+    SIDEBAR_MENU_DEFINITIONS.map((menu) => [menu.id, menu.href]),
+  );
+  assert.equal(definitions.get("settings"), "/workspace/settings");
   assert.ok(
-    shell.indexOf('href="/workspace/validation"') <
-      shell.indexOf('<span className="rq-nav__label">Administración</span>'),
+    ![...definitions.values()].includes("/workspace/templates"),
+    "Plantillas no debe ser un menú propio del sidebar",
+  );
+  const configuration = defaultSidebarConfiguration();
+  const sectionOrder = configuration.sections.map((section) => section.id);
+  const sectionOf = (id: string) =>
+    configuration.menus.find((menu) => menu.id === id)?.sectionId ?? "";
+  assert.equal(sectionOf("settings"), "administration");
+  assert.ok(
+    sectionOrder.indexOf(sectionOf("validation")) <
+      sectionOrder.indexOf("administration"),
   );
 });

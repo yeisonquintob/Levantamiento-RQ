@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Req,
@@ -79,6 +81,21 @@ export class ExportRequestsController {
       parseDocumentId(documentId),
       parseVersionNumber(versionNumber),
       parseCreateExport(body),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Eliminar definitivamente las operaciones del proyecto",
+  })
+  @Delete("projects/:projectId/operations")
+  @HttpCode(200)
+  purgeProject(
+    @Req() request: OperationsRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.exports.purgeProject(
+      context(request),
+      parseProjectId(projectId),
     );
   }
 

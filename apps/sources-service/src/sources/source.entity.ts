@@ -68,6 +68,15 @@ export class SourceEntity {
   })
   processingStatus!: SourceProcessingStatus;
 
+  @Column("nvarchar", { name: "SecurityStatus", length: 24, default: "CLEAN" })
+  securityStatus!: "UPLOADED" | "QUARANTINED" | "SCANNING" | "CLEAN" | "INFECTED";
+
+  @Column("nvarchar", { name: "SecurityScanner", length: 100, nullable: true })
+  securityScanner!: string | null;
+
+  @Column("datetime2", { name: "SecurityScannedAt", precision: 7, nullable: true })
+  securityScannedAt!: Date | null;
+
   @Column("nvarchar", {
     name: "ProcessingMessage",
     length: 2000,

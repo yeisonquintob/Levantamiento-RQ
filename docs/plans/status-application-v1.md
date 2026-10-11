@@ -298,3 +298,19 @@ Ninguno exige modificar el flujo local validado con Fake AI.
 | `6982449` | accesibilidad y dependencias seguras     |
 
 El commit de documentación y cierre se consulta en el `HEAD` de `main`.
+
+## Capacidades posteriores a V1 (en validación)
+
+Estas capacidades **no forman parte del cierre técnico del 2026-08-09** y no se
+declaran cerradas: dependen de cambios locales todavía sin integrar y de
+validación pendiente.
+
+| Capacidad                                                                     | Estado        | Evidencia y pendientes                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prototypes Service (`apps/prototypes-service`, puerto 3009, `RqPrototypesDb`) | En validación | Código, migraciones, cola BullMQ, almacenamiento Blob, planificación e imágenes (OpenAI Images, ComfyUI, Ollama Images) y pruebas propias (`pnpm test:prototypes`). Pendiente: incluirlo en `test:unit`, CI, Dockerfile, Docker Compose y Bicep; validación end-to-end con proveedores reales. |
+| Generación local `LOCAL_ONLY_V2`                                              | En validación | Pipeline por puntos con checkpoints y reintentos localizados; sus fronteras históricas (`docs/architecture/local-only-v2-protected-boundaries.json`) no se han re-baselineado: la prueba de fronteras protegidas sigue señalando diferencias frente al inventario histórico.                   |
+| Exportación (PDF/DOCX/Markdown) con numeración y diagramas ajustados          | En validación | Corrección de numeración consecutiva y del diagrama entidad-relación; sin validación visual de DOCX en Word.                                                                                                                                                                                   |
+
+Prototypes respeta la propiedad de datos: base y almacenamiento propios, sin
+conexiones a bases ajenas ni dependencia directa entre aplicaciones (verificado
+con `pnpm check:architecture`).

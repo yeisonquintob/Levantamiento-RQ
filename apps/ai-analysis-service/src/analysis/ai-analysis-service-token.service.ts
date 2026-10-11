@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Inject, Injectable } from "@nestjs/common";
-import { SignJWT } from "jose";
+import { importJWK, SignJWT } from "jose";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 
@@ -16,8 +16,13 @@ export const AI_ANALYSIS_SERVICE_ACTOR: AuthenticatedUser = {
   id: SERVICE_USER_ID,
   email: "ai-analysis-service@internal.local",
   displayName: "AI Analysis Service",
-  roles: ["ADMIN"],
-  permissions: ["system.admin"],
+  roles: ["SERVICE"],
+  permissions: [
+    "projects.read.all",
+    "documents.read.all",
+    "documents.ai.apply",
+    "sources.internal-image.read",
+  ],
   mustChangePassword: false,
 };
 
@@ -28,8 +33,14 @@ export class AiAnalysisServiceToken {
     private readonly config: AiAnalysisAuthConfig,
   ) {}
 
-  issue(): Promise<string> {
+  async issue(): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
+    const privateKey = await importJWK(
+      JSON.parse(
+        Buffer.from(this.config.workloadPrivateJwk, "base64").toString("utf8"),
+      ),
+      "EdDSA",
+    );
     return new SignJWT({
       typ: "access",
       sid: randomUUID(),
@@ -40,13 +51,17 @@ export class AiAnalysisServiceToken {
       mustChangePassword: false,
       service: "ai-analysis-service",
     })
-      .setProtectedHeader({ alg: "HS256" })
+      .setProtectedHeader({
+        alg: "EdDSA",
+        kid: this.config.workloadKeyId,
+        typ: "JWT",
+      })
       .setSubject(SERVICE_USER_ID)
       .setIssuer(this.config.issuer)
       .setAudience(this.config.audience)
       .setIssuedAt(now)
       .setExpirationTime(now + 300)
       .setJti(randomUUID())
-      .sign(new TextEncoder().encode(this.config.accessSecret));
+      .sign(privateKey);
   }
 }

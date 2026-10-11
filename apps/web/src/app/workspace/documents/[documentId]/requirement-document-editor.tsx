@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type {
+  AiAnalysisDraft,
+  AiAnalysisLocalOnlyV2Draft,
   AiAnalysisRequestDetail,
   AiAnalysisRequestListResponse,
   AiProviderCode,
@@ -12,19 +20,229 @@ import type {
   DocumentSectionKey,
   DocumentStatus,
   DocumentVersionDetail,
+  ExportRequestDetail,
   ProjectDetail,
+  ProjectStatus,
   RequirementDocumentDetail,
-  SourceListResponse,
+  SourceBatchProcessingResponse,
+  SourceDetail,
+  SourceUploadBatchResponse,
   WorkflowReviewDetail,
   WorkflowReviewListResponse,
 } from "@levantamiento-rq/shared-contracts";
-import { RqActionButton, RqStatusBadge } from "@levantamiento-rq/shared-ui";
+import {
+  RqActionButton,
+  RqKpiCard,
+  RqKpiGrid,
+  RqStatusBadge,
+} from "@levantamiento-rq/shared-ui";
 
+import { WorkspaceKpiIcon } from "../../workspace-kpi-icon";
+
+import { createBrowserUuid } from "../../../browser-uuid";
 import { useDialogAccessibility } from "../../../use-dialog-accessibility";
+import {
+  buildColombianBusinessSprintSchedule,
+  colombianBusinessDateAt,
+  formatColombianCalendarDate,
+} from "./colombian-business-calendar";
+import {
+  DocumentHumanValue,
+  DocumentSectionBusinessEditor,
+  DocumentSectionView,
+  IntegratedPoint6Point7Panel,
+  composeRequirementsContent,
+  presentSectionContent,
+} from "./document-section-presenter";
+import { useAutoDismiss } from "../../../use-auto-dismiss";
+import { AiEngineChips, useAiEngineSelection } from "../../ai-engine-selection";
+import { useRouter } from "next/navigation";
+import { useConfirm } from "../../../confirm-dialog";
+import { jsonEqual } from "./json-equal";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 const PENDING = "[PENDIENTE POR DEFINIR]";
+const AI_EVIDENCE_FILE_ACCEPT =
+  ".pdf,.docx,.xlsx,.txt,.vtt,.csv,.png,.jpg,.jpeg,.webp";
+
+function visibleSectionTitle(
+  section: Pick<DocumentSection, "key" | "title">,
+): string {
+  if (section.key === "writingRules") return "Plantilla aplicada";
+  if (section.key === "visualFormat") return "Prototipo";
+  if (section.key === "automationInstruction") return "KPIs";
+  if (section.key === "scrumPlan") return "Plan de trabajo";
+  return section.title;
+}
+
+const RETURNED_WORD_INSTRUCTION =
+  "El archivo Word adjunto es una revisión humana del borrador exportado de esta misma versión. Compáralo con el consolidado actual y aplica únicamente las adiciones, correcciones y eliminaciones realizadas por la persona revisora. Conserva sin cambios todo contenido que no haya sido modificado. No trates rótulos, encabezados, pies de página, instrucciones del documento ni campos vacíos como evidencia nueva. Si una modificación es ambigua, consérvala como pendiente explícito en lugar de inventar información.";
+
+type AiVersionMode = "general" | "returned-word";
+const DIAGRAM_EXPORT_STYLE_PROPERTIES = [
+  "color",
+  "dominant-baseline",
+  "fill",
+  "fill-opacity",
+  "filter",
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "letter-spacing",
+  "opacity",
+  "paint-order",
+  "stroke",
+  "stroke-dasharray",
+  "stroke-dashoffset",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "stroke-opacity",
+  "stroke-width",
+  "text-anchor",
+  "vector-effect",
+] as const;
+
+function functionalStoryTargetFromValidation(error: string): string | null {
+  if (!/functional\s+requirements/iu.test(error)) return null;
+  const match = error.match(/Registro\s+(\d+)/iu);
+  if (!match?.[1]) return null;
+  const index = Number(match[1]) - 1;
+  return Number.isInteger(index) && index >= 0
+    ? `functional-story-${index}`
+    : null;
+}
+
+function revealFunctionalStory(targetId: string): void {
+  const target = document.getElementById(targetId);
+  if (!(target instanceof HTMLDetailsElement)) return;
+  const milestone = target.closest<HTMLDetailsElement>(
+    ".rq-requirement-milestone",
+  );
+  if (milestone) milestone.open = true;
+  target.open = true;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target
+      .querySelector<HTMLElement>("summary")
+      ?.focus({ preventScroll: true });
+  });
+}
+
+function diagramExportFileName(value: string): string {
+  return (
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/gu, "")
+      .replace(/[^a-zA-Z0-9]+/gu, "-")
+      .replace(/^-+|-+$/gu, "")
+      .toLowerCase() || "diagrama"
+  );
+}
+
+function inlineDiagramStyles(
+  source: SVGSVGElement,
+  target: SVGSVGElement,
+): void {
+  const sourceElements: SVGElement[] = [
+    source,
+    ...source.querySelectorAll<SVGElement>("*"),
+  ];
+  const targetElements: SVGElement[] = [
+    target,
+    ...target.querySelectorAll<SVGElement>("*"),
+  ];
+
+  sourceElements.forEach((sourceElement, index) => {
+    const targetElement = targetElements[index];
+    if (!targetElement) return;
+    const computed = window.getComputedStyle(sourceElement);
+    for (const property of DIAGRAM_EXPORT_STYLE_PROPERTIES) {
+      const value = computed.getPropertyValue(property);
+      if (value) targetElement.style.setProperty(property, value);
+    }
+  });
+}
+
+async function exportDiagramAsPng(
+  source: SVGSVGElement,
+  fileName: string,
+): Promise<void> {
+  const viewBox = source.viewBox.baseVal;
+  const width = viewBox.width || source.getBoundingClientRect().width;
+  const height = viewBox.height || source.getBoundingClientRect().height;
+  if (width <= 0 || height <= 0) {
+    throw new Error("El diagrama seleccionado no tiene dimensiones válidas.");
+  }
+
+  const clone = source.cloneNode(true) as SVGSVGElement;
+  inlineDiagramStyles(source, clone);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+
+  const viewport = source.closest<HTMLElement>(".rq-process-flow__viewport");
+  const viewportBackground = viewport
+    ? window.getComputedStyle(viewport).backgroundColor
+    : "rgb(255, 255, 255)";
+  const background =
+    !viewportBackground || viewportBackground === "rgba(0, 0, 0, 0)"
+      ? "rgb(255, 255, 255)"
+      : viewportBackground;
+  const svgBlob = new Blob([new XMLSerializer().serializeToString(clone)], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () =>
+        reject(new Error("No fue posible preparar la imagen."));
+      image.src = svgUrl;
+    });
+
+    const maximumCanvasDimension = 8192;
+    const scale = Math.min(
+      2,
+      maximumCanvasDimension / width,
+      maximumCanvasDimension / height,
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("El navegador no permitió crear la imagen.");
+    context.fillStyle = background;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("No fue posible convertir el diagrama a PNG."));
+      }, "image/png");
+    });
+    const pngUrl = URL.createObjectURL(pngBlob);
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = pngUrl;
+      anchor.download = `${diagramExportFileName(fileName)}.png`;
+      anchor.click();
+    } finally {
+      URL.revokeObjectURL(pngUrl);
+    }
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
 
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   title: "Título",
@@ -79,7 +297,60 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   changeControl: "Control de cambios",
   approvals: "Aprobaciones",
   templateControlled: "Controlado por plantilla",
+  features: "Funcionalidades",
+  userStories: "Historias de usuario",
+  inScope: "Incluye",
+  outOfScope: "Fuera de alcance",
+  sourceIds: "Evidencias",
+  scenarios: "Escenarios de prueba",
+  sprints: "Sprints",
+  tasks: "Tareas",
+  dependencyCodes: "Dependencias",
+  deliverables: "Entregables",
+  functionalRequirements: "Requerimientos funcionales",
+  nonFunctionalRequirements: "Requerimientos no funcionales",
+  epics: "Épicas",
+  sourceNumber: "Número de origen",
+  documentationObservation: "Observación de documentación",
+  assignmentObservation: "Observación de asignación",
 };
+
+const TECHNICAL_CONTENT_KEYS = new Set([
+  "sourceIds",
+  "sourceIdsA",
+  "sourceIdsB",
+  "clientId",
+  "structuredAnalysis",
+  "id",
+  "from",
+  "to",
+  "kind",
+  "scheduleBasis",
+  "startDay",
+  "endDay",
+  "startDate",
+  "endDate",
+  "period",
+]);
+const NULLABLE_CONTENT_KEYS = new Set([
+  "label",
+  "laneId",
+  "confirmedStartDate",
+  "startDate",
+  "endDate",
+]);
+const FUNCTIONAL_REQUIREMENT_NULLABLE_KEYS = new Set([
+  "category",
+  "measure",
+  "target",
+]);
+
+const NON_FUNCTIONAL_REQUIREMENT_NULLABLE_KEYS = new Set([
+  "milestone",
+  "functionality",
+]);
+
+const REQUIRED_COLLECTION_KEYS = new Set(["nodes", "acceptanceCriteria"]);
 
 export interface ContentStats {
   total: number;
@@ -94,12 +365,57 @@ interface AiVersionGenerationDetails {
   contradictions: readonly string[];
 }
 
+function isLocalOnlyV2Draft(
+  draft: AiAnalysisDraft | AiAnalysisLocalOnlyV2Draft,
+): draft is AiAnalysisLocalOnlyV2Draft {
+  return "pipelineId" in draft && draft.pipelineId === "LOCAL_ONLY_V2";
+}
+
+function contradictionLabel(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "Contradicción estructurada pendiente de decisión.";
+  }
+  const record = value as Readonly<Record<string, unknown>>;
+  return `A: ${String(record.statementA ?? "Sin información")} · B: ${String(record.statementB ?? "Sin información")} · Decisión: ${String(record.decision ?? PENDING)}`;
+}
+
 function fieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
+function humanContentPath(path: readonly string[]): string {
+  if (path.length === 0) return "Campo";
+  return path
+    .map((part, index) => {
+      if (!/^\d+$/u.test(part)) return fieldLabel(part);
+      const parent = path[index - 1] ?? "Registro";
+      const singular =
+        parent === "features"
+          ? "Funcionalidad"
+          : parent === "userStories"
+            ? "Historia"
+            : parent === "acceptanceCriteria"
+              ? "Criterio"
+              : parent === "scenarios"
+                ? "Escenario"
+                : parent === "sprints"
+                  ? "Sprint"
+                  : parent === "tasks"
+                    ? "Tarea"
+                    : "Registro";
+      return `${singular} ${part}`;
+    })
+    .filter(
+      (part, index, items) =>
+        !/^\d+$/u.test(path[index] ?? "") || part !== items[index - 1],
+    )
+    .join(" · ");
+}
+
 function statusLabel(status: DocumentStatus): string {
   if (status === "IN_REVIEW") return "En validación";
+  if (status === "CHANGES_REQUESTED") return "Correcciones solicitadas";
   if (status === "APPROVED") return "Aprobado";
   if (status === "REJECTED") return "Rechazado";
   if (status === "ARCHIVED") return "Archivado";
@@ -111,6 +427,7 @@ function statusTone(
 ): "success" | "process" | "pending" | "danger" | "inactive" {
   if (status === "APPROVED") return "success";
   if (status === "IN_REVIEW") return "process";
+  if (status === "CHANGES_REQUESTED") return "pending";
   if (status === "REJECTED") return "danger";
   if (status === "ARCHIVED") return "inactive";
   return "pending";
@@ -145,26 +462,48 @@ export function analyzeContent(
       completed: empty || pending ? 0 : 1,
       pending: pending ? 1 : 0,
       errors: empty
-        ? [`${path.map(fieldLabel).join(" · ") || "Campo"} es obligatorio.`]
-        : [],
+        ? [`${humanContentPath(path)} requiere definición.`]
+        : pending
+          ? [`${humanContentPath(path)} está pendiente por definir.`]
+          : [],
     };
   }
   if (typeof value === "number" || typeof value === "boolean") {
     return { total: 1, completed: 1, pending: 0, errors: [] };
   }
   if (value === null) {
+    const key = path.at(-1) ?? "";
+    const optionalForFunctionalRequirement =
+      path.includes("functionalRequirements") &&
+      FUNCTIONAL_REQUIREMENT_NULLABLE_KEYS.has(key);
+
+    const optionalForNonFunctionalRequirement =
+      path.includes("nonFunctionalRequirements") &&
+      NON_FUNCTIONAL_REQUIREMENT_NULLABLE_KEYS.has(key);
+
+    if (
+      NULLABLE_CONTENT_KEYS.has(key) ||
+      TECHNICAL_CONTENT_KEYS.has(key) ||
+      optionalForFunctionalRequirement ||
+      optionalForNonFunctionalRequirement
+    ) {
+      return {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        errors: [],
+      };
+    }
     return {
       total: 1,
       completed: 0,
       pending: 0,
-      errors: [
-        `${path.map(fieldLabel).join(" · ") || "Campo"} es obligatorio.`,
-      ],
+      errors: [`${humanContentPath(path)} requiere definición.`],
     };
   }
   if (Array.isArray(value)) {
     const key = path.at(-1);
-    const emptyAllowed = key === "changeControl" || key === "approvals";
+    const emptyAllowed = !key || !REQUIRED_COLLECTION_KEYS.has(key);
     if (value.length === 0) {
       return {
         total: 1,
@@ -172,9 +511,7 @@ export function analyzeContent(
         pending: 0,
         errors: emptyAllowed
           ? []
-          : [
-              `${path.map(fieldLabel).join(" · ")} requiere al menos un elemento.`,
-            ],
+          : [`${humanContentPath(path)} requiere al menos un elemento.`],
       };
     }
     return value.reduce<ContentStats>(
@@ -192,6 +529,7 @@ export function analyzeContent(
   }
   return Object.entries(value).reduce<ContentStats>(
     (result, [key, item]) => {
+      if (TECHNICAL_CONTENT_KEYS.has(key)) return result;
       const next = analyzeContent(item, [...path, key]);
       return {
         total: result.total + next.total,
@@ -204,10 +542,224 @@ export function analyzeContent(
   );
 }
 
+function contentRecord(
+  value: DocumentJsonValue | undefined,
+): Readonly<Record<string, DocumentJsonValue>> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Readonly<Record<string, DocumentJsonValue>>)
+    : null;
+}
+
+function contentRecords(
+  value: DocumentJsonValue | undefined,
+): readonly Readonly<Record<string, DocumentJsonValue>>[] {
+  return Array.isArray(value)
+    ? value.map(contentRecord).filter((item) => item !== null)
+    : [];
+}
+
+function codeValue(value: DocumentJsonValue | undefined): string {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+function duplicateCodes(values: readonly string[]): readonly string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values.filter(Boolean)) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates];
+}
+
+/** Advertencias informativas: no cambian por sí solas la política de aprobación. */
+export function documentSemanticWarnings(
+  version: DocumentVersionDetail,
+): readonly string[] {
+  const warnings: string[] = [];
+  const process = contentRecord(
+    version.sections.find((section) => section.key === "processFlow")?.content,
+  );
+  const nodes = contentRecords(process?.nodes);
+  const edges = contentRecords(process?.edges);
+  const nodeCodes = nodes.map((node) => codeValue(node.id));
+  const nodeIds = new Set(nodeCodes);
+  const nodeName = (nodeId: string): string => {
+    const index = nodeCodes.indexOf(nodeId);
+    const label = nodes[index]?.label;
+    return typeof label === "string" && label.trim()
+      ? label.trim()
+      : `Paso ${index + 1}`;
+  };
+  if (nodes.length > 0 && !nodes.some((node) => node.kind === "START")) {
+    warnings.push("Diagrama de flujo · falta un paso de inicio.");
+  }
+  if (nodes.length > 0 && !nodes.some((node) => node.kind === "END")) {
+    warnings.push("Diagrama de flujo · falta un paso de fin.");
+  }
+  for (const duplicate of duplicateCodes(nodeCodes)) {
+    warnings.push(
+      `Diagrama de flujo · ${nodeName(duplicate)} está definido más de una vez.`,
+    );
+  }
+  for (const [index, edge] of edges.entries()) {
+    if (
+      !nodeIds.has(codeValue(edge.from)) ||
+      !nodeIds.has(codeValue(edge.to))
+    ) {
+      warnings.push(
+        `Diagrama de flujo · la conexión ${index + 1} referencia un paso inexistente.`,
+      );
+    }
+  }
+  for (const [index, node] of nodes.entries()) {
+    if (node.kind !== "DECISION") continue;
+    const outgoing = edges.filter(
+      (edge) => codeValue(edge.from) === nodeCodes[index],
+    );
+    if (
+      outgoing.length > 1 &&
+      outgoing.some(
+        (edge) => typeof edge.label !== "string" || !edge.label.trim(),
+      )
+    ) {
+      warnings.push(
+        `Diagrama de flujo · la decisión “${nodeName(nodeCodes[index] ?? "")}” tiene ramas sin condición funcional.`,
+      );
+    }
+  }
+  const connectedNodeIds = new Set(
+    edges.flatMap((edge) => [codeValue(edge.from), codeValue(edge.to)]),
+  );
+  nodes.forEach((node, index) => {
+    const id = codeValue(node.id);
+    if (nodes.length > 1 && id && !connectedNodeIds.has(id)) {
+      warnings.push(
+        `Diagrama de flujo · ${typeof node.label === "string" ? node.label : `Paso ${index + 1}`} está desconectado.`,
+      );
+    }
+  });
+
+  const milestones = contentRecord(
+    version.sections.find((section) => section.key === "milestones")?.content,
+  );
+  const features = contentRecords(milestones?.features);
+  const stories = contentRecords(milestones?.userStories);
+  const featureCodes = features.map((feature) => codeValue(feature.code));
+  const storyCodes = stories.map((story) => codeValue(story.code));
+  for (const duplicate of duplicateCodes(featureCodes)) {
+    warnings.push(
+      `Requerimientos · Funcionalidad ${duplicate} está duplicada.`,
+    );
+  }
+  for (const duplicate of duplicateCodes(storyCodes)) {
+    warnings.push(`Requerimientos · HU ${duplicate} está duplicada.`);
+  }
+  const featureSet = new Set(featureCodes);
+  const storySet = new Set(storyCodes);
+  const criterionCodes = stories.flatMap((story) =>
+    contentRecords(story.acceptanceCriteria).map((criterion) =>
+      codeValue(criterion.code),
+    ),
+  );
+  const criterionSet = new Set(criterionCodes);
+  for (const duplicate of duplicateCodes(criterionCodes)) {
+    warnings.push(`Requerimientos · criterio ${duplicate} está duplicado.`);
+  }
+  for (const story of stories) {
+    const storyCode = codeValue(story.code) || "sin código";
+    if (!featureSet.has(codeValue(story.featureCode))) {
+      warnings.push(
+        `Requerimientos · ${storyCode} referencia una funcionalidad inexistente.`,
+      );
+    }
+    if (contentRecords(story.acceptanceCriteria).length === 0) {
+      warnings.push(
+        `Requerimientos · ${storyCode} no contiene criterios de aceptación.`,
+      );
+    }
+  }
+  for (const feature of features) {
+    const featureCode = codeValue(feature.code) || "sin código";
+    const referenced = Array.isArray(feature.userStoryCodes)
+      ? feature.userStoryCodes.map(codeValue)
+      : [];
+    if (referenced.length === 0) {
+      warnings.push(
+        `Requerimientos · Funcionalidad ${featureCode} no agrupa historias de usuario.`,
+      );
+    }
+    for (const storyCode of referenced) {
+      if (!storySet.has(storyCode)) {
+        warnings.push(
+          `Requerimientos · Funcionalidad ${featureCode} referencia ${storyCode} inexistente.`,
+        );
+      }
+    }
+  }
+
+  const tests = contentRecord(
+    version.sections.find((section) => section.key === "tests")?.content,
+  );
+  for (const scenario of contentRecords(tests?.scenarios)) {
+    const testCode = codeValue(scenario.code) || "sin código";
+    const referencedStories = Array.isArray(scenario.userStoryCodes)
+      ? scenario.userStoryCodes.map(codeValue)
+      : [];
+    const referencedCriteria = Array.isArray(scenario.acceptanceCriterionCodes)
+      ? scenario.acceptanceCriterionCodes.map(codeValue)
+      : [];
+    if (referencedStories.length === 0) {
+      warnings.push(`Pruebas · ${testCode} no referencia ninguna HU.`);
+    }
+    for (const storyCode of referencedStories) {
+      if (!storySet.has(storyCode)) {
+        warnings.push(
+          `Pruebas · ${testCode} referencia ${storyCode} inexistente.`,
+        );
+      }
+    }
+    for (const criterionCode of referencedCriteria) {
+      if (!criterionSet.has(criterionCode)) {
+        warnings.push(
+          `Pruebas · ${testCode} referencia ${criterionCode} inexistente.`,
+        );
+      }
+    }
+  }
+
+  for (const requirement of version.requirements) {
+    if (requirement.acceptanceCriteria.length === 0) {
+      warnings.push(
+        `Requerimientos estructurados · ${requirement.code} no contiene criterios.`,
+      );
+    }
+  }
+  for (const duplicate of duplicateCodes(
+    version.requirements.map((item) => item.code.toUpperCase()),
+  )) {
+    warnings.push(
+      `Requerimientos estructurados · ${duplicate} está duplicado.`,
+    );
+  }
+
+  const scrum = contentRecord(
+    version.sections.find((section) => section.key === "scrumPlan")?.content,
+  );
+  if (scrum && scrum.cadenceDays !== 15) {
+    warnings.push(
+      "Plan de trabajo · la cadencia debe ser de 15 días calendario.",
+    );
+  }
+  return warnings;
+}
+
 function versionStats(version: DocumentVersionDetail): ContentStats {
-  return version.sections.reduce<ContentStats>(
+  const content = version.sections.reduce<ContentStats>(
     (result, section) => {
-      const next = analyzeContent(section.content, [section.title]);
+      const next = analyzeContent(presentSectionContent(section.content), [
+        section.title,
+      ]);
       return {
         total: result.total + next.total,
         completed: result.completed + next.completed,
@@ -217,20 +769,10 @@ function versionStats(version: DocumentVersionDetail): ContentStats {
     },
     { total: 0, completed: 0, pending: 0, errors: [] },
   );
-}
-
-function cloneForNewItem(
-  value: DocumentJsonValue | undefined,
-): DocumentJsonValue {
-  if (value === undefined) return PENDING;
-  if (typeof value === "string") return PENDING;
-  if (typeof value === "number") return value + 1;
-  if (typeof value === "boolean") return false;
-  if (value === null) return PENDING;
-  if (Array.isArray(value)) return value.map((item) => cloneForNewItem(item));
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, cloneForNewItem(item)]),
-  );
+  return {
+    ...content,
+    errors: [...content.errors, ...documentSemanticWarnings(version)],
+  };
 }
 
 async function responseError(response: Response): Promise<string> {
@@ -261,182 +803,40 @@ async function responseError(response: Response): Promise<string> {
   }
 }
 
-interface JsonValueEditorProps {
-  value: DocumentJsonValue;
-  label: string;
-  path: string;
-  readOnly: boolean;
-  onChange: (value: DocumentJsonValue) => void;
-}
-
-function JsonValueEditor({
-  value,
-  label,
-  path,
-  readOnly,
-  onChange,
-}: JsonValueEditorProps) {
-  if (typeof value === "string") {
-    const multiline =
-      value.length > 80 ||
-      !["code", "status", "notation"].includes(path.split(".").at(-1) ?? "");
-    return (
-      <label className="rq-document-json-field">
-        <span>{label}</span>
-        {multiline ? (
-          <textarea
-            aria-invalid={!value.trim()}
-            disabled={readOnly}
-            onChange={(event) => onChange(event.target.value)}
-            rows={Math.min(8, Math.max(2, Math.ceil(value.length / 90)))}
-            value={value}
-          />
-        ) : (
-          <input
-            aria-invalid={!value.trim()}
-            disabled={readOnly}
-            onChange={(event) => onChange(event.target.value)}
-            value={value}
-          />
-        )}
-        {value.includes(PENDING) ? (
-          <small data-pending="true">Pendiente de definición</small>
-        ) : null}
-      </label>
-    );
-  }
-  if (typeof value === "number") {
-    return (
-      <label className="rq-document-json-field">
-        <span>{label}</span>
-        <input
-          disabled={readOnly}
-          min={1}
-          onChange={(event) => onChange(Number(event.target.value))}
-          type="number"
-          value={value}
-        />
-      </label>
-    );
-  }
-  if (typeof value === "boolean") {
-    return (
-      <label className="rq-document-json-check">
-        <input
-          checked={value}
-          disabled={readOnly}
-          onChange={(event) => onChange(event.target.checked)}
-          type="checkbox"
-        />
-        <span>{label}</span>
-      </label>
-    );
-  }
-  if (value === null) {
-    return (
-      <label className="rq-document-json-field">
-        <span>{label}</span>
-        <input
-          disabled={readOnly}
-          onChange={(event) => onChange(event.target.value)}
-          value=""
-        />
-      </label>
-    );
-  }
-  if (Array.isArray(value)) {
-    return (
-      <fieldset className="rq-document-json-group rq-document-json-array">
-        <legend>{label}</legend>
-        {value.length === 0 ? <p>Sin registros en esta versión.</p> : null}
-        {value.map((item, index) => (
-          <section
-            className="rq-document-json-array__item"
-            key={`${path}-${index}`}
-          >
-            <header>
-              <strong>
-                {label} {index + 1}
-              </strong>
-              {!readOnly && value.length > 1 ? (
-                <button
-                  aria-label={`Eliminar ${label} ${index + 1}`}
-                  onClick={() =>
-                    onChange(
-                      value.filter((_, itemIndex) => itemIndex !== index),
-                    )
-                  }
-                  type="button"
-                >
-                  Eliminar
-                </button>
-              ) : null}
-            </header>
-            <JsonValueEditor
-              label={`${label} ${index + 1}`}
-              onChange={(next) =>
-                onChange(
-                  value.map((current, itemIndex) =>
-                    itemIndex === index ? next : current,
-                  ),
-                )
-              }
-              path={`${path}.${index}`}
-              readOnly={readOnly}
-              value={item}
-            />
-          </section>
-        ))}
-        {!readOnly ? (
-          <button
-            className="rq-document-add-item"
-            onClick={() => onChange([...value, cloneForNewItem(value[0])])}
-            type="button"
-          >
-            Agregar elemento
-          </button>
-        ) : null}
-      </fieldset>
-    );
-  }
-  return (
-    <fieldset className="rq-document-json-group">
-      <legend>{label}</legend>
-      <div className="rq-document-json-grid">
-        {Object.entries(value).map(([key, item]) => (
-          <JsonValueEditor
-            key={`${path}.${key}`}
-            label={fieldLabel(key)}
-            onChange={(next) => onChange({ ...value, [key]: next })}
-            path={`${path}.${key}`}
-            readOnly={readOnly}
-            value={item}
-          />
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
 interface RequirementDocumentEditorProps {
   initialDocument: RequirementDocumentDetail;
+  initialVersion?: DocumentVersionDetail;
   project: ProjectDetail;
+  returnToAllProjects?: boolean;
 }
 
 export function RequirementDocumentEditor({
   initialDocument,
+  initialVersion,
   project,
+  returnToAllProjects = false,
 }: RequirementDocumentEditorProps) {
+  const confirm = useConfirm();
+  const router = useRouter();
+  const selectedInitialVersion =
+    initialVersion ?? initialDocument.currentVersionDetail;
   const [documentState, setDocumentState] = useState(initialDocument);
-  const [version, setVersion] = useState(initialDocument.currentVersionDetail);
+  const [version, setVersion] = useState(selectedInitialVersion);
   const [activeKey, setActiveKey] = useState<DocumentSectionKey>(
-    initialDocument.currentVersionDetail.sections[0]?.key ?? "header",
+    selectedInitialVersion.sections[0]?.key ?? "header",
   );
   const [draftContent, setDraftContent] = useState<DocumentJsonValue>(
-    initialDocument.currentVersionDetail.sections[0]?.content ?? {},
+    selectedInitialVersion.sections[0]?.content ?? {},
   );
+  const [editingSection, setEditingSection] = useState(false);
+  const [exportingDiagram, setExportingDiagram] = useState(false);
+  const [wordExportBusy, setWordExportBusy] = useState(false);
+  const [validationExpanded, setValidationExpanded] = useState(false);
+  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
+  useAutoDismiss(alert, () => setAlert(null));
   const [alertTone, setAlertTone] = useState<"success" | "danger" | "warning">(
     "success",
   );
@@ -460,12 +860,22 @@ export function RequirementDocumentEditor({
   const [review, setReview] = useState<WorkflowReviewDetail | null>(null);
   const [reviewComment, setReviewComment] = useState("");
   const [aiVersionOpen, setAiVersionOpen] = useState(false);
-  const [aiHistoryOpen, setAiHistoryOpen] = useState(false);
-  const [aiSources, setAiSources] = useState<SourceListResponse["items"]>([]);
-  const [selectedAiSourceIds, setSelectedAiSourceIds] = useState<Set<string>>(
-    () => new Set(),
+  // La nube nunca se preselecciona: los motores salen de la elección explícita
+  // de la persona. Solo se consulta cuando el diálogo está abierto.
+  const aiEngines = useAiEngineSelection(
+    aiVersionOpen ? project.id : "",
+    "document-ai-version",
   );
+  const aiEnginesMissing = aiEngines.engines.length === 0;
+  const [aiVersionMode, setAiVersionMode] = useState<AiVersionMode>("general");
+  const [aiHistoryOpen, setAiHistoryOpen] = useState(false);
   const [aiInstruction, setAiInstruction] = useState("");
+  const [aiSectionInstructions, setAiSectionInstructions] = useState<
+    Partial<Record<DocumentSectionKey, string>>
+  >({});
+  const [aiAdditionalInformation, setAiAdditionalInformation] = useState("");
+  const [aiEvidenceFiles, setAiEvidenceFiles] = useState<readonly File[]>([]);
+  const [aiGenerationStage, setAiGenerationStage] = useState("");
   const [aiHistory, setAiHistory] = useState<
     readonly AiAnalysisRequestDetail[]
   >([]);
@@ -475,6 +885,58 @@ export function RequirementDocumentEditor({
   const [aiVersionGenerationDetails, setAiVersionGenerationDetails] = useState<
     Map<string, AiVersionGenerationDetails>
   >(() => new Map());
+  const sectionEditorRef = useRef<HTMLElement>(null);
+  const syncedProjectStatusRef = useRef<ProjectStatus>(project.status);
+
+  useEffect(() => {
+    // Consultar una versión histórica no modifica el estado actual del proyecto.
+    if (
+      version.versionNumber !== documentState.currentVersionNumber ||
+      project.status === "ARCHIVED"
+    )
+      return;
+    let targetStatus: ProjectStatus | null = null;
+
+    if (version.status === "APPROVED") {
+      targetStatus = "APPROVED";
+    } else if (
+      ["IN_REVIEW", "CHANGES_REQUESTED", "REJECTED"].includes(version.status)
+    ) {
+      targetStatus = "VALIDATION";
+    } else {
+      targetStatus = "DOCUMENT_GENERATED";
+    }
+
+    if (!targetStatus || targetStatus === syncedProjectStatusRef.current) {
+      return;
+    }
+
+    syncedProjectStatusRef.current = targetStatus;
+    void fetch(
+      `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ status: targetStatus }),
+      },
+    )
+      .then((response) => {
+        if (!response.ok) syncedProjectStatusRef.current = project.status;
+      })
+      .catch(() => {
+        syncedProjectStatusRef.current = project.status;
+      });
+  }, [
+    documentState.currentVersionNumber,
+    project.id,
+    project.status,
+    version.status,
+    version.versionNumber,
+  ]);
   const versionDialogRef = useDialogAccessibility<HTMLElement>(
     versionOpen,
     () => {
@@ -499,25 +961,210 @@ export function RequirementDocumentEditor({
     compareOpen && Boolean(leftVersion) && Boolean(rightVersion),
     () => setCompareOpen(false),
   );
+  const validationDialogRef = useDialogAccessibility<HTMLElement>(
+    validationExpanded,
+    () => setValidationExpanded(false),
+  );
 
   const activeSection =
     version.sections.find((section) => section.key === activeKey) ??
     version.sections[0];
-  const unsaved =
-    Boolean(activeSection) &&
-    JSON.stringify(draftContent) !== JSON.stringify(activeSection.content);
+  // Comparación profunda con salida temprana: no serializa el contenido en cada pulsación.
+  const unsaved = useMemo(
+    () =>
+      Boolean(activeSection) && !jsonEqual(draftContent, activeSection?.content),
+    [activeSection, draftContent],
+  );
   const currentVersion =
     version.versionNumber === documentState.currentVersionNumber;
   const readOnly =
     !currentVersion ||
-    version.status !== "DRAFT" ||
-    documentState.status === "ARCHIVED" ||
-    Boolean(activeSection?.templateControlled);
+    (version.status !== "DRAFT" && version.status !== "CHANGES_REQUESTED") ||
+    documentState.status === "ARCHIVED";
+  const activeScrumPlan =
+    activeSection?.key === "scrumPlan"
+      ? contentRecord(activeSection.content)
+      : null;
+  const scrumStartDate =
+    typeof activeScrumPlan?.confirmedStartDate === "string"
+      ? activeScrumPlan.confirmedStartDate
+      : "";
+  const legacyNonFunctionalSection = version.sections.find(
+    (section) => section.key === "nonFunctionalRequirements",
+  );
+  const legacyRequirementTabs: DocumentJsonValue | null =
+    activeSection?.key === "milestones" && legacyNonFunctionalSection
+      ? ({
+          functionalRequirements:
+            version.requirements.filter(
+              (item) => item.sectionKey === "milestones",
+            ).length > 0
+              ? version.requirements.filter(
+                  (item) => item.sectionKey === "milestones",
+                )
+              : Array.isArray(activeSection.content)
+                ? activeSection.content
+                : (() => {
+                    const legacyMilestones = activeSection.content as Record<
+                      string,
+                      DocumentJsonValue
+                    >;
+                    const stories = legacyMilestones.userStories;
+                    return Array.isArray(stories) ? stories : [];
+                  })(),
+          nonFunctionalRequirements:
+            version.requirements.filter(
+              (item) => item.sectionKey === "nonFunctionalRequirements",
+            ).length > 0
+              ? version.requirements.filter(
+                  (item) => item.sectionKey === "nonFunctionalRequirements",
+                )
+              : Object.entries(
+                  (legacyNonFunctionalSection.content ?? {}) as Record<
+                    string,
+                    DocumentJsonValue
+                  >,
+                ).flatMap(([category, values]) =>
+                  (Array.isArray(values) ? values : [values]).map(
+                    (description, index) => ({
+                      code: `RNF-${String(index + 1).padStart(3, "0")}`,
+                      category,
+                      title: category,
+                      description,
+                      requirementType: "NON_FUNCTIONAL",
+                      acceptanceCriteria: [],
+                      sourceIds: [],
+                    }),
+                  ),
+                ),
+        } as unknown as DocumentJsonValue)
+      : null;
+  const backlogStructureSection = version.sections.find(
+    (section) => section.key === "backlogStructure",
+  );
+  const scopeSection = version.sections.find(
+    (section) => section.key === "scope",
+  );
+  const solutionProposalSection = version.sections.find(
+    (section) => section.key === "solutionProposal",
+  );
+
+  /*
+   * POINT_7_INTEGRATED_VIEW_CONTEXT_V4_7_7
+   *
+   * La vista y el editor reciben simultáneamente Punto 6 y Punto 7 para mostrar
+   * la raíz común Epic/Hito sin mezclar HU-F con HU-P ni alterar persistencia.
+   */
+  const milestonesSection = version.sections.find(
+    (section) => section.key === "milestones",
+  );
+
+  /*
+   * PUNTO_6_CURRENT_DOCUMENT_ENRICHMENT
+   *
+   * También corrige la versión que ya está guardada:
+   * no obliga al usuario a gastar otra generación de IA.
+   */
+  const requirementsPresentationContent = useMemo(
+    () =>
+      activeSection?.key === "milestones" && backlogStructureSection
+        ? composeRequirementsContent(
+            draftContent,
+            backlogStructureSection.content,
+          )
+        : draftContent,
+    [activeSection?.key, backlogStructureSection, draftContent],
+  );
+
+  /*
+   * PUNTO_6_CANONICAL_VIEW_CONTENT
+   *
+   * Vista normal y Editar deben consumir la misma representación
+   * cuando el Punto 6 ya está persistido en el formato moderno:
+   *
+   * {
+   *   functionalRequirements: [...],
+   *   nonFunctionalRequirements: [...]
+   * }
+   *
+   * legacyRequirementTabs se conserva exclusivamente como fallback
+   * para documentos históricos que todavía no tienen ese formato.
+   */
+  const requirementsContentRecord =
+    activeSection?.key === "milestones" &&
+    draftContent !== null &&
+    typeof draftContent === "object" &&
+    !Array.isArray(draftContent)
+      ? (draftContent as Record<string, DocumentJsonValue>)
+      : null;
+
+  const hasCanonicalRequirementTabs =
+    Array.isArray(requirementsContentRecord?.functionalRequirements) &&
+    Array.isArray(requirementsContentRecord?.nonFunctionalRequirements);
+
+  const requirementsViewContent =
+    activeSection?.key === "milestones" && hasCanonicalRequirementTabs
+      ? requirementsPresentationContent
+      : (legacyRequirementTabs ?? requirementsPresentationContent);
+
+  // Las estadísticas recorren todo el contenido: se calculan con un valor diferido para que
+  // escribir no espere a recalcularlas.
+  const deferredPresentationContent = useDeferredValue(
+    requirementsPresentationContent,
+  );
   const activeStats = useMemo(
-    () => analyzeContent(draftContent),
-    [draftContent],
+    () =>
+      analyzeContent(presentSectionContent(deferredPresentationContent), [
+        activeSection?.title ?? "Sección",
+      ]),
+    [activeSection?.title, deferredPresentationContent],
+  );
+  // Referencia estable: sin esto el editor de la sección recibía un objeto nuevo en cada render.
+  const businessEditorContext = useMemo(
+    () => ({
+      projectId: documentState.projectId,
+      backlogStructure: backlogStructureSection?.content ?? null,
+      milestones: milestonesSection?.content ?? null,
+      scope: scopeSection?.content ?? null,
+      solutionProposal: solutionProposalSection?.content ?? null,
+      templateName: documentState.template.name,
+      templateVersion: documentState.template.version,
+    }),
+    [
+      documentState.projectId,
+      documentState.template.name,
+      documentState.template.version,
+      backlogStructureSection,
+      milestonesSection,
+      scopeSection,
+      solutionProposalSection,
+    ],
   );
   const overallStats = useMemo(() => versionStats(version), [version]);
+  const validationGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const issue of overallStats.errors) {
+      const [group = "Documento"] = issue.split(" · ");
+      groups.set(group, [...(groups.get(group) ?? []), issue]);
+    }
+    return [...groups.entries()];
+  }, [overallStats.errors]);
+  const sectionStatusSummary = useMemo(
+    () =>
+      version.sections.reduce(
+        (summary, section) => {
+          const stats = analyzeContent(presentSectionContent(section.content), [
+            section.title,
+          ]);
+          if (stats.pending > 0) summary.pending += 1;
+          else if (stats.errors.length > 0) summary.needsReview += 1;
+          else summary.complete += 1;
+          return summary;
+        },
+        { complete: 0, needsReview: 0, pending: 0 },
+      ),
+    [version],
+  );
   const progress = overallStats.total
     ? Math.round((overallStats.completed / overallStats.total) * 100)
     : 0;
@@ -572,6 +1219,42 @@ export function RequirementDocumentEditor({
     setAlertTone(tone);
   }
 
+  async function exportSelectedDiagram(): Promise<void> {
+    const root =
+      sectionEditorRef.current?.querySelector<HTMLElement>(
+        ".rq-diagram-models",
+      );
+    const selectedTab = root?.querySelector<HTMLButtonElement>(
+      '[role="tab"][aria-selected="true"]',
+    );
+    const activePanel = root?.querySelector<HTMLElement>('[role="tabpanel"]');
+    const svg = activePanel?.querySelector<SVGSVGElement>("svg");
+    if (!svg) {
+      showAlert(
+        "El modelo seleccionado no contiene un diagrama para exportar.",
+        "warning",
+      );
+      return;
+    }
+
+    setExportingDiagram(true);
+    try {
+      const modelName = selectedTab?.textContent?.trim() || "diagrama";
+      await exportDiagramAsPng(
+        svg,
+        `${project.code}-${modelName}-v${version.version}`,
+      );
+      showAlert(`Se descargó ${modelName} como imagen PNG.`, "success");
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setExportingDiagram(false);
+    }
+  }
+
   function synchronizeAiVersionDetails(
     items: readonly AiAnalysisRequestDetail[],
   ): void {
@@ -584,13 +1267,20 @@ export function RequirementDocumentEditor({
         completed.flatMap((item) => {
           const execution = item.executions.at(-1);
           if (!execution) return [];
+
+          const draft = item.result?.draft;
+          const legacyDraft =
+            draft && !isLocalOnlyV2Draft(draft) ? draft : null;
+
           return [
             [
               item.documentVersionId.toLowerCase(),
               {
                 provider: execution.provider,
-                pendingQuestions: item.result?.draft.pendingQuestions ?? [],
-                contradictions: item.result?.draft.contradictions ?? [],
+                pendingQuestions: legacyDraft?.pendingQuestions ?? [],
+                contradictions: (legacyDraft?.contradictions ?? []).map(
+                  contradictionLabel,
+                ),
               },
             ] as const,
           ];
@@ -599,16 +1289,20 @@ export function RequirementDocumentEditor({
     );
   }
 
-  function chooseSection(section: DocumentSection): void {
+  async function chooseSection(section: DocumentSection): Promise<void> {
     if (
       unsaved &&
-      !window.confirm(
-        "Hay cambios sin guardar. ¿Deseas descartarlos y cambiar de sección?",
-      )
+      !(await confirm({
+        title: "Cambios sin guardar",
+        message: "Hay cambios sin guardar. ¿Deseas descartarlos y cambiar de sección?",
+        confirmLabel: "Descartar y cambiar",
+        destructive: true,
+      }))
     )
       return;
     setActiveKey(section.key);
     setDraftContent(section.content);
+    setEditingSection(false);
     setAlert(null);
     setConflict(false);
   }
@@ -632,6 +1326,7 @@ export function RequirementDocumentEditor({
         setActiveKey(section.key);
         setDraftContent(section.content);
       }
+      setEditingSection(false);
       setConflict(false);
       if (message) showAlert(message, "success");
     } catch (error) {
@@ -682,7 +1377,121 @@ export function RequirementDocumentEditor({
         (item) => item.key === activeSection.key,
       );
       if (savedSection) setDraftContent(savedSection.content);
+      setEditingSection(false);
       showAlert("La sección se guardó correctamente.", "success");
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveScrumStartDate(startDate: string): Promise<void> {
+    if (!activeSection || activeSection.key !== "scrumPlan" || readOnly) return;
+    const plan = contentRecord(activeSection.content);
+    const sprints = contentRecords(plan?.sprints);
+    if (!plan || sprints.length === 0) {
+      showAlert(
+        "El plan de trabajo no contiene Sprints para calendarizar.",
+        "warning",
+      );
+      return;
+    }
+
+    let scheduledContent: DocumentJsonValue;
+    let effectiveStartDate = startDate;
+    try {
+      const schedule = buildColombianBusinessSprintSchedule(
+        startDate,
+        sprints.length,
+        15,
+      );
+      effectiveStartDate = schedule[0]?.startDate ?? startDate;
+      scheduledContent = {
+        ...plan,
+        cadenceDays: 15,
+        scheduleBasis: "CONFIRMED_DATE",
+        confirmedStartDate: startDate,
+        calendarMode: "COLOMBIA_BUSINESS_DAYS",
+        calendarCountry: "CO",
+        calendarTimeZone: "America/Bogota",
+        sprints: sprints.map((sprint, index) => {
+          const dates = schedule[index];
+          if (!dates) return sprint;
+          return {
+            ...sprint,
+            startDate: dates.startDate,
+            endDate: dates.endDate,
+            period: `${dates.startDate} al ${dates.endDate}`,
+            tasks: contentRecords(sprint.tasks).map((task) => {
+              const taskStartDay =
+                typeof task.startDay === "number" ? task.startDay : null;
+              const taskEndDay =
+                typeof task.endDay === "number" ? task.endDay : null;
+              return taskStartDay !== null && taskEndDay !== null
+                ? {
+                    ...task,
+                    startDate: colombianBusinessDateAt(startDate, taskStartDay),
+                    endDate: colombianBusinessDateAt(startDate, taskEndDay),
+                  }
+                : task;
+            }),
+            calendarExcludedDates: dates.excludedDays.map((day) => ({
+              date: day.date,
+              reason: day.reason,
+            })),
+          };
+        }),
+      };
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+      return;
+    }
+
+    setBusy(true);
+    setConflict(false);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/sections/${encodeURIComponent(activeSection.key)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expectedRevision: version.revision,
+            content: scheduledContent,
+          }),
+        },
+      );
+      if (!response.ok) {
+        const message = await responseError(response);
+        if (response.status === 409) setConflict(true);
+        throw new Error(message);
+      }
+      const saved = (await response.json()) as DocumentVersionDetail;
+      setVersion(saved);
+      setDocumentState((current) => ({
+        ...current,
+        revision: current.revision + 1,
+        updatedAt: new Date().toISOString(),
+        currentVersionDetail: saved,
+      }));
+      const savedSection = saved.sections.find(
+        (item) => item.key === activeSection.key,
+      );
+      if (savedSection) setDraftContent(savedSection.content);
+      showAlert(
+        effectiveStartDate === startDate
+          ? `Calendario colombiano aplicado desde el ${formatColombianCalendarDate(startDate)}.`
+          : `La fecha seleccionada no es laborable. El inicio operativo se ajustó al ${formatColombianCalendarDate(effectiveStartDate)}.`,
+        "success",
+      );
     } catch (error) {
       showAlert(
         error instanceof Error ? error.message : String(error),
@@ -696,9 +1505,12 @@ export function RequirementDocumentEditor({
   async function loadVersion(versionNumber: number): Promise<void> {
     if (
       unsaved &&
-      !window.confirm(
-        "Hay cambios sin guardar. ¿Deseas descartarlos y abrir otra versión?",
-      )
+      !(await confirm({
+        title: "Cambios sin guardar",
+        message: "Hay cambios sin guardar. ¿Deseas descartarlos y abrir otra versión?",
+        confirmLabel: "Descartar y abrir",
+        destructive: true,
+      }))
     )
       return;
     if (versionNumber === documentState.currentVersionNumber) {
@@ -711,6 +1523,10 @@ export function RequirementDocumentEditor({
         setActiveKey(section.key);
         setDraftContent(section.content);
       }
+      setEditingSection(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("version");
+      window.history.replaceState(null, "", url);
       return;
     }
     setBusy(true);
@@ -729,7 +1545,11 @@ export function RequirementDocumentEditor({
         setActiveKey(section.key);
         setDraftContent(section.content);
       }
+      setEditingSection(false);
       setAlert(null);
+      const url = new URL(window.location.href);
+      url.searchParams.set("version", String(versionNumber));
+      window.history.replaceState(null, "", url);
     } catch (error) {
       showAlert(
         error instanceof Error ? error.message : String(error),
@@ -785,6 +1605,7 @@ export function RequirementDocumentEditor({
         setActiveKey(first.key);
         setDraftContent(first.content);
       }
+      setEditingSection(false);
       setVersionOpen(false);
       setReview(null);
       showAlert(`Se creó la versión ${next.currentVersion}.`, "success");
@@ -840,7 +1661,18 @@ export function RequirementDocumentEditor({
       );
       return;
     }
-    if (!window.confirm("¿Deseas enviar esta versión a validación?")) return;
+    const reviewQuestion =
+      documentaryPending > 0
+        ? `La validación documental detectó ${documentaryPending} advertencia(s) o pendiente(s). Revisa su ubicación en el panel antes de aprobar. ¿Deseas enviar de todos modos esta versión a validación?`
+        : "¿Deseas enviar esta versión a validación?";
+    if (
+      !(await confirm({
+        title: "Enviar a validación",
+        message: reviewQuestion,
+        confirmLabel: "Enviar a validación",
+      }))
+    )
+      return;
     setBusy(true);
     try {
       const response = await fetch(
@@ -850,7 +1682,7 @@ export function RequirementDocumentEditor({
           credentials: "include",
           headers: {
             "content-type": "application/json",
-            "x-idempotency-key": crypto.randomUUID(),
+            "x-idempotency-key": createBrowserUuid(),
           },
           body: JSON.stringify({
             expectedDocumentRevision: version.revision,
@@ -891,7 +1723,7 @@ export function RequirementDocumentEditor({
           credentials: "include",
           headers: {
             "content-type": "application/json",
-            "x-idempotency-key": crypto.randomUUID(),
+            "x-idempotency-key": createBrowserUuid(),
           },
           body: JSON.stringify({
             expectedReviewRevision: review.revision,
@@ -931,7 +1763,15 @@ export function RequirementDocumentEditor({
       reject: "rechazar definitivamente esta versión",
     } as const;
 
-    if (!window.confirm(`¿Deseas ${labels[action]}?`)) return;
+    if (
+      !(await confirm({
+        title: "Confirmar decisión de validación",
+        message: `¿Deseas ${labels[action]}?`,
+        confirmLabel: action === "approve" ? "Aprobar" : action === "reject" ? "Rechazar" : "Solicitar correcciones",
+        destructive: action === "reject",
+      }))
+    )
+      return;
 
     setBusy(true);
     try {
@@ -942,7 +1782,7 @@ export function RequirementDocumentEditor({
           credentials: "include",
           headers: {
             "content-type": "application/json",
-            "x-idempotency-key": crypto.randomUUID(),
+            "x-idempotency-key": createBrowserUuid(),
           },
           body: JSON.stringify({
             expectedReviewRevision: review.revision,
@@ -1075,7 +1915,37 @@ export function RequirementDocumentEditor({
     }
   }
 
-  async function openAiVersionDialog(): Promise<void> {
+  async function retryAiGeneration(analysisRequestId: string): Promise<void> {
+    setBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests/${encodeURIComponent(analysisRequestId)}/retry`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      const items = await loadAiRequests(true);
+      setAiHistory(items);
+      synchronizeAiVersionDetails(items);
+      showAlert(
+        "La generación se reintentará sobre la misma versión. No se creó otro borrador vacío.",
+        "success",
+      );
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openAiVersionDialog(
+    mode: AiVersionMode = "general",
+  ): Promise<void> {
     if (unsaved) {
       showAlert(
         "Guarda o descarta los cambios antes de generar una versión con IA.",
@@ -1100,15 +1970,14 @@ export function RequirementDocumentEditor({
           "Ya existe una generación de IA en curso para este documento.",
         );
       }
-      const response = await fetch(
-        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources?page=1&pageSize=100&status=ACTIVE&processingStatus=READY`,
-        { credentials: "include", cache: "no-store" },
+      setAiVersionMode(mode);
+      setAiInstruction(
+        mode === "returned-word" ? RETURNED_WORD_INSTRUCTION : "",
       );
-      if (!response.ok) throw new Error(await responseError(response));
-      const list = (await response.json()) as SourceListResponse;
-      setAiSources(list.items);
-      setSelectedAiSourceIds(new Set());
-      setAiInstruction("");
+      setAiSectionInstructions({});
+      setAiAdditionalInformation("");
+      setAiEvidenceFiles([]);
+      setAiGenerationStage("");
       setAiVersionOpen(true);
     } catch (error) {
       showAlert(
@@ -1120,23 +1989,266 @@ export function RequirementDocumentEditor({
     }
   }
 
-  function toggleAiSource(sourceId: string): void {
-    setSelectedAiSourceIds((current) => {
-      const next = new Set(current);
-      if (next.has(sourceId)) next.delete(sourceId);
-      else next.add(sourceId);
-      return next;
-    });
+  function selectAiEvidenceFiles(files: FileList | null): void {
+    if (!files) return;
+    const selectedFiles = Array.from(files);
+    if (
+      aiVersionMode === "returned-word" &&
+      (selectedFiles.length !== 1 ||
+        !selectedFiles[0]?.name.toLocaleLowerCase().endsWith(".docx"))
+    ) {
+      setAiEvidenceFiles([]);
+      showAlert(
+        "Selecciona un único documento Word en formato .docx.",
+        "warning",
+      );
+      return;
+    }
+    setAiEvidenceFiles(
+      selectedFiles.slice(0, aiVersionMode === "returned-word" ? 1 : 20),
+    );
+  }
+
+  function removeAiEvidenceFile(index: number): void {
+    setAiEvidenceFiles((current) =>
+      current.filter((_, currentIndex) => currentIndex !== index),
+    );
+  }
+
+  async function prepareNewAiEvidence(
+    traceableChangeRequest: string,
+  ): Promise<readonly string[]> {
+    const sourceIds: string[] = [];
+    const traceableInformation =
+      aiAdditionalInformation.trim() ||
+      (aiEvidenceFiles.length === 0 ? traceableChangeRequest : "");
+    if (traceableInformation) {
+      setAiGenerationStage("Guardando la nueva información…");
+      const textResponse = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            sourceType: "NOTE",
+            title: `Cambio solicitado para versión IA ${new Date().toISOString()}`,
+            content: traceableInformation,
+          }),
+        },
+      );
+      if (!textResponse.ok) throw new Error(await responseError(textResponse));
+      const textSource = (await textResponse.json()) as SourceDetail;
+      sourceIds.push(textSource.id);
+    }
+    if (aiEvidenceFiles.length === 0) return sourceIds;
+    setAiGenerationStage("Almacenando la nueva evidencia…");
+    const data = new FormData();
+    data.append(
+      "metadata",
+      JSON.stringify(
+        aiEvidenceFiles.map((file) => ({
+          fileName: file.name,
+          classification: "EVIDENCE",
+          description: "Evidencia agregada para una nueva versión con IA.",
+          ...(aiVersionMode === "returned-word"
+            ? {
+                description:
+                  "Borrador Word devuelto con correcciones de revisión humana.",
+              }
+            : {}),
+        })),
+      ),
+    );
+    for (const file of aiEvidenceFiles) data.append("files", file, file.name);
+
+    const uploadResponse = await fetch(
+      `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources/files`,
+      { method: "POST", credentials: "include", body: data },
+    );
+    if (!uploadResponse.ok)
+      throw new Error(await responseError(uploadResponse));
+    const uploaded = (await uploadResponse.json()) as SourceUploadBatchResponse;
+    const rejectedWithoutExistingSource = uploaded.rejected.filter(
+      (item) => !item.duplicateSourceId,
+    );
+    if (rejectedWithoutExistingSource.length > 0) {
+      throw new Error(
+        rejectedWithoutExistingSource
+          .map((item) => `${item.fileName}: ${item.reason}`)
+          .join(" "),
+      );
+    }
+    const uploadedSourceIds = [
+      ...uploaded.accepted.map((source) => source.id),
+      ...uploaded.rejected.flatMap((item) =>
+        item.duplicateSourceId ? [item.duplicateSourceId] : [],
+      ),
+    ];
+    // El endpoint omite de forma segura las fuentes READY. Incluir también los
+    // duplicados permite recuperar una carga anterior que todavía esté PENDING.
+    const pendingIds = uploadedSourceIds;
+
+    if (pendingIds.length > 0) {
+      setAiGenerationStage("Procesando la nueva evidencia…");
+      const processingResponse = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources/process`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sourceIds: pendingIds }),
+        },
+      );
+      if (!processingResponse.ok)
+        throw new Error(await responseError(processingResponse));
+      const processing =
+        (await processingResponse.json()) as SourceBatchProcessingResponse;
+      if (processing.failed > 0 && processing.enqueued === 0) {
+        throw new Error(
+          processing.results.map((item) => item.message).join(" "),
+        );
+      }
+    }
+
+    const deadline = Date.now() + 180_000;
+    for (const sourceId of uploadedSourceIds) {
+      let source: SourceDetail | null = null;
+      while (Date.now() < deadline) {
+        const detailResponse = await fetch(
+          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/sources/${encodeURIComponent(sourceId)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!detailResponse.ok)
+          throw new Error(await responseError(detailResponse));
+        source = (await detailResponse.json()) as SourceDetail;
+        if (source.processingStatus === "READY") break;
+        if (source.processingStatus === "FAILED") {
+          throw new Error(
+            `${source.title}: ${source.processingMessage || "el procesamiento falló."}`,
+          );
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      if (source?.processingStatus !== "READY") {
+        throw new Error(
+          "La nueva evidencia continúa procesándose. Intenta generar la versión nuevamente cuando esté lista.",
+        );
+      }
+    }
+    return [...sourceIds, ...uploadedSourceIds];
+  }
+
+  async function downloadWordDocument(): Promise<void> {
+    if (unsaved) {
+      showAlert(
+        "Guarda los cambios de la sección antes de generar el documento Word.",
+        "warning",
+      );
+      return;
+    }
+    setWordExportBusy(true);
+    try {
+      const response = await fetch(
+        `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/documents/${encodeURIComponent(documentState.id)}/versions/${version.versionNumber}/exports`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            "x-idempotency-key": createBrowserUuid(),
+          },
+          body: JSON.stringify({ format: "DOCX" }),
+        },
+      );
+      if (!response.ok) throw new Error(await responseError(response));
+      let exportRequest = (await response.json()) as ExportRequestDetail;
+      const deadline = Date.now() + 90_000;
+      while (
+        exportRequest.status === "PENDING" ||
+        exportRequest.status === "PROCESSING"
+      ) {
+        if (Date.now() >= deadline) {
+          throw new Error(
+            "El documento sigue procesándose. Puedes descargarlo desde Validación cuando termine.",
+          );
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const statusResponse = await fetch(
+          `${GATEWAY_URL}/api/v1/exports/${encodeURIComponent(exportRequest.id)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!statusResponse.ok)
+          throw new Error(await responseError(statusResponse));
+        exportRequest = (await statusResponse.json()) as ExportRequestDetail;
+      }
+      if (exportRequest.status !== "COMPLETED") {
+        throw new Error(
+          exportRequest.errorMessage ||
+            "No fue posible generar el documento Word.",
+        );
+      }
+      window.location.assign(
+        `${GATEWAY_URL}/api/v1/exports/${encodeURIComponent(exportRequest.id)}/download`,
+      );
+      showAlert("Documento Word generado correctamente.", "success");
+    } catch (error) {
+      showAlert(
+        error instanceof Error ? error.message : String(error),
+        "danger",
+      );
+    } finally {
+      setWordExportBusy(false);
+    }
   }
 
   async function createAiVersion(): Promise<void> {
-    if (selectedAiSourceIds.size === 0) {
-      showAlert("Selecciona al menos una fuente READY.", "warning");
+    const sectionInstructions = version.sections.flatMap((section) => {
+      const instruction = aiSectionInstructions[section.key]?.trim();
+      return instruction ? [{ sectionKey: section.key, instruction }] : [];
+    });
+    if (aiVersionMode === "returned-word" && aiEvidenceFiles.length !== 1) {
+      showAlert(
+        "Selecciona el documento Word corregido antes de crear la versión.",
+        "warning",
+      );
       return;
     }
-    const operationKey = crypto.randomUUID();
+    if (
+      aiEvidenceFiles.length === 0 &&
+      !aiAdditionalInformation.trim() &&
+      !aiInstruction.trim() &&
+      sectionInstructions.length === 0
+    ) {
+      showAlert(
+        "Agrega una instrucción, nueva información o un archivo.",
+        "warning",
+      );
+      return;
+    }
+    if (aiEngines.engines.length === 0) {
+      showAlert(
+        "Selecciona al menos un motor de IA (local o nube) antes de crear la versión.",
+        "warning",
+      );
+      return;
+    }
+    const operationKey = createBrowserUuid();
     setBusy(true);
     try {
+      const traceableChangeRequest = [
+        aiInstruction.trim(),
+        ...sectionInstructions.map(
+          (item) => `${item.sectionKey}: ${item.instruction}`,
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      const newEvidenceSourceIds = await prepareNewAiEvidence(
+        traceableChangeRequest,
+      );
+      const sourceIds = [...new Set(newEvidenceSourceIds)];
+      setAiGenerationStage("Creando una revisión desde el consolidado actual…");
       const versionResponse = await fetch(
         `${GATEWAY_URL}/api/v1/documents/${encodeURIComponent(documentState.id)}/versions`,
         {
@@ -1146,7 +2258,9 @@ export function RequirementDocumentEditor({
           body: JSON.stringify({
             expectedRevision: documentState.revision,
             changeSummary:
-              "Nueva versión generada con IA a partir de fuentes seleccionadas",
+              aiVersionMode === "returned-word"
+                ? "Nueva versión creada desde un borrador Word corregido por revisión humana"
+                : "Nueva versión con IA basada en el consolidado actual y priorizando la nueva evidencia e instrucciones",
             idempotencyKey: operationKey,
           }),
         },
@@ -1161,6 +2275,7 @@ export function RequirementDocumentEditor({
         setActiveKey(first.key);
         setDraftContent(first.content);
       }
+      setEditingSection(false);
 
       const analysisResponse = await fetch(
         `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests`,
@@ -1172,50 +2287,24 @@ export function RequirementDocumentEditor({
             analysisType: "REQUIREMENT_DOCUMENT",
             documentId: next.id,
             documentVersionId: next.currentVersionDetail.id,
-            sourceIds: [...selectedAiSourceIds],
+            sourceIds,
+            engines: aiEngines.engines,
+            providerSelections: aiEngines.providerSelections,
             purpose: "AI_VERSION",
             instruction: aiInstruction.trim() || null,
+            sectionInstructions,
             idempotencyKey: operationKey,
           }),
         },
       );
       if (!analysisResponse.ok)
         throw new Error(await responseError(analysisResponse));
-      let analysis = (await analysisResponse.json()) as AiAnalysisRequestDetail;
-      const deadline = Date.now() + 180_000;
-      while (
-        analysis.status !== "COMPLETED" &&
-        analysis.status !== "FAILED" &&
-        Date.now() < deadline
-      ) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        const detailResponse = await fetch(
-          `${GATEWAY_URL}/api/v1/projects/${encodeURIComponent(project.id)}/analysis-requests/${encodeURIComponent(analysis.id)}`,
-          { credentials: "include", cache: "no-store" },
-        );
-        if (!detailResponse.ok)
-          throw new Error(await responseError(detailResponse));
-        analysis = (await detailResponse.json()) as AiAnalysisRequestDetail;
-      }
-      if (analysis.status === "FAILED") {
-        throw new Error(
-          analysis.errorMessage ||
-            "La IA falló. La nueva versión DRAFT se conservó sin sobrescribir la anterior.",
-        );
-      }
-      if (analysis.status !== "COMPLETED") {
-        throw new Error(
-          "La generación continúa en segundo plano. Revisa Historial IA.",
-        );
-      }
-      setAiGeneratedVersionIds((current) => {
-        const updated = new Set(current);
-        updated.add(next.currentVersionDetail.id.toLowerCase());
-        return updated;
-      });
+      const analysis =
+        (await analysisResponse.json()) as AiAnalysisRequestDetail;
       setAiVersionOpen(false);
-      await reloadDocument(
-        `La versión ${next.currentVersion} fue generada con IA y requiere revisión humana.`,
+      setAiGenerationStage("Abriendo el seguimiento en Fuentes…");
+      window.location.assign(
+        `/workspace/sources?projectId=${encodeURIComponent(project.id)}&analysisRequestId=${encodeURIComponent(analysis.id)}`,
       );
     } catch (error) {
       showAlert(
@@ -1223,6 +2312,7 @@ export function RequirementDocumentEditor({
         "danger",
       );
     } finally {
+      setAiGenerationStage("");
       setBusy(false);
     }
   }
@@ -1230,132 +2320,152 @@ export function RequirementDocumentEditor({
   return (
     <section className="rq-document-editor">
       <header className="rq-document-editor__header">
-        <div>
-          <span>Editor documental versionado</span>
-          <h1>{documentState.title}</h1>
-          <p>
-            {project.code} · {project.title}
-          </p>
+        <div className="rq-document-editor__kpis">
+          <RqKpiGrid label="Datos del documento">
+            <RqKpiCard
+              description={project.requestingArea}
+              icon={<WorkspaceKpiIcon name="projects" />}
+              title="Proyecto"
+              value={project.title}
+            />
+            <RqKpiCard
+              description={`Versión ${documentState.template.version}`}
+              icon={<WorkspaceKpiIcon name="drafts" />}
+              title="Plantilla"
+              value={documentState.template.name}
+            />
+            <RqKpiCard
+              description={`Revisión ${version.revision}`}
+              icon={<WorkspaceKpiIcon name="clock" />}
+              title="Última modificación"
+              value={formatDate(version.updatedAt)}
+            />
+          </RqKpiGrid>
         </div>
         <div className="rq-document-editor__header-actions">
-          <a
-            href={`/workspace/documents?projectId=${encodeURIComponent(project.id)}`}
-            onClick={(event) => {
-              if (
-                unsaved &&
-                !window.confirm(
-                  "Hay cambios sin guardar. ¿Deseas salir del editor?",
-                )
-              )
-                event.preventDefault();
-            }}
-          >
-            Volver
-          </a>
-          <RqActionButton
-            disabled={busy}
-            onClick={() => void openHistory()}
-            tone="consult"
-          >
-            Historial
-          </RqActionButton>
-          <RqActionButton
-            disabled={busy || documentState.currentVersionNumber < 2}
-            onClick={() => void loadComparison()}
-            tone="operation"
-          >
-            Comparar versiones
-          </RqActionButton>
-          <RqActionButton
-            disabled={busy}
-            onClick={() => void openAiHistory()}
-            tone="consult"
-          >
-            Historial IA
-          </RqActionButton>
-          <RqActionButton
-            disabled={busy || documentState.status === "ARCHIVED"}
-            onClick={openVersionDialog}
-            tone="affirmative"
-          >
-            Nueva versión
-          </RqActionButton>
           <RqActionButton
             disabled={
               busy ||
+              wordExportBusy ||
               unsaved ||
-              !currentVersion ||
-              documentState.status === "ARCHIVED"
+              !["DRAFT", "IN_REVIEW", "CHANGES_REQUESTED", "APPROVED"].includes(
+                version.status,
+              )
             }
-            onClick={() => void openAiVersionDialog()}
-            tone="operation"
+            onClick={() => void downloadWordDocument()}
+            tone="consult"
           >
-            Nueva versión con IA
+            {wordExportBusy ? "Generando Word…" : "Descargar borrador Word"}
           </RqActionButton>
+          <details
+            className="rq-document-overflow-menu"
+            onBlur={(event) => {
+              // Al perder el foco el menú se minimiza.
+              if (
+                !event.currentTarget.contains(
+                  event.relatedTarget as Node | null,
+                )
+              ) {
+                event.currentTarget.open = false;
+              }
+            }}
+          >
+            <summary aria-label="Más acciones" title="Más acciones">
+              <span
+                aria-hidden="true"
+                className="rq-document-overflow-menu__icon"
+              >
+                <i />
+                <i />
+                <i />
+              </span>
+            </summary>
+            <div>
+              <button
+                disabled={
+                  busy ||
+                  wordExportBusy ||
+                  unsaved ||
+                  !currentVersion ||
+                  documentState.status === "ARCHIVED"
+                }
+                onClick={() => void openAiVersionDialog("returned-word")}
+                type="button"
+              >
+                Importar Word corregido
+              </button>
+              <button
+                disabled={
+                  busy ||
+                  wordExportBusy ||
+                  unsaved ||
+                  !currentVersion ||
+                  documentState.status === "ARCHIVED"
+                }
+                onClick={() => void openAiVersionDialog()}
+                type="button"
+              >
+                Nueva versión con IA
+              </button>
+              <a
+                href={
+                  returnToAllProjects
+                    ? "/workspace/documents"
+                    : `/workspace/documents?projectId=${encodeURIComponent(project.id)}`
+                }
+                onClick={(event) => {
+                  if (!unsaved) return;
+                  // El cuadro es asíncrono: se detiene el enlace y se navega al confirmar.
+                  event.preventDefault();
+                  const destination = returnToAllProjects
+                    ? "/workspace/documents"
+                    : `/workspace/documents?projectId=${encodeURIComponent(project.id)}`;
+                  void confirm({
+                    title: "Cambios sin guardar",
+                    message: "Hay cambios sin guardar. ¿Deseas salir del editor?",
+                    confirmLabel: "Salir sin guardar",
+                    destructive: true,
+                  }).then((leave) => {
+                    if (leave) router.push(destination);
+                  });
+                }}
+              >
+                Volver a documentos
+              </a>
+              <button
+                disabled={busy}
+                onClick={() => void openHistory()}
+                type="button"
+              >
+                Historial
+              </button>
+              <button
+                disabled={busy || documentState.currentVersionNumber < 2}
+                onClick={() => void loadComparison()}
+                type="button"
+              >
+                Comparar versiones
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => void openAiHistory()}
+                type="button"
+              >
+                Historial IA
+              </button>
+              <button
+                disabled={
+                  busy || wordExportBusy || documentState.status === "ARCHIVED"
+                }
+                onClick={openVersionDialog}
+                type="button"
+              >
+                Nueva versión
+              </button>
+            </div>
+          </details>
         </div>
       </header>
-
-      <section
-        className="rq-document-editor__metadata"
-        aria-label="Datos del documento"
-      >
-        <article>
-          <span>Proyecto</span>
-          <strong>{project.code}</strong>
-          <small>{project.requestingArea}</small>
-        </article>
-        <article>
-          <span>Plantilla</span>
-          <strong>{documentState.template.name}</strong>
-          <small>v{documentState.template.version}</small>
-        </article>
-        <article>
-          <span>Versión consultada</span>
-          <select
-            aria-label="Versión consultada"
-            disabled={busy || unsaved}
-            onChange={(event) => void loadVersion(Number(event.target.value))}
-            value={version.versionNumber}
-          >
-            {Array.from(
-              { length: documentState.currentVersionNumber },
-              (_, index) => index + 1,
-            ).map((item) => (
-              <option key={item} value={item}>
-                Versión {item}
-                {item === documentState.currentVersionNumber ? " · actual" : ""}
-              </option>
-            ))}
-          </select>
-          <small>SemVer {version.version}</small>
-        </article>
-        <article>
-          <span>Estado</span>
-          <RqStatusBadge tone={statusTone(version.status)}>
-            {statusLabel(version.status)}
-          </RqStatusBadge>
-          <small>
-            {version.status === "APPROVED"
-              ? "Versión inmutable"
-              : "Control de cambios activo"}
-          </small>
-        </article>
-        <article>
-          <span>Última modificación</span>
-          <strong>{formatDate(version.updatedAt)}</strong>
-          <small>Revisión {version.revision}</small>
-        </article>
-        <article className="rq-document-progress-card">
-          <span>Completitud estructural</span>
-          <strong>{progress}%</strong>
-          <progress
-            aria-label={`Completitud estructural ${progress}%`}
-            max={100}
-            value={progress}
-          />
-          <small>{documentaryPending} pendientes por resolver</small>
-        </article>
-      </section>
 
       {alert ? (
         <div className="rq-document-alert" data-tone={alertTone} role="alert">
@@ -1381,24 +2491,42 @@ export function RequirementDocumentEditor({
         </div>
       ) : null}
 
-      {aiGeneratedVersionIds.has(version.id.toLowerCase()) ? (
+      <section
+        aria-label="Asistencia del documento"
+        className="rq-document-status-row"
+      >
+        {aiGeneratedVersionIds.has(version.id.toLowerCase()) ? (
+          <div
+            className="rq-document-ai-disclosure"
+            data-provider={currentAiGeneration?.provider ?? "UNKNOWN"}
+            role="status"
+          >
+            <strong>
+              {currentAiGeneration?.provider === "FAKE"
+                ? "Generado en modo de prueba · contenido simulado"
+                : "Generado con IA · requiere revisión humana"}
+            </strong>
+            <span>
+              {currentAiGeneration?.provider === "FAKE"
+                ? "Este borrador valida el pipeline y no representa un análisis semántico real."
+                : "Revisa la evidencia, las contradicciones y los pendientes antes de enviarlo a validación."}
+            </span>
+          </div>
+        ) : null}
+
         <div
-          className="rq-document-ai-disclosure"
-          data-provider={currentAiGeneration?.provider ?? "UNKNOWN"}
+          className="rq-document-completeness"
           role="status"
+          style={
+            {
+              "--rq-completeness-hue": `${Math.round(Math.min(Math.max(progress, 0), 100) * 1.2)}`,
+            } as React.CSSProperties
+          }
         >
-          <strong>
-            {currentAiGeneration?.provider === "FAKE"
-              ? "Generado en modo de prueba · contenido simulado"
-              : "Generado con IA · requiere revisión humana"}
-          </strong>
-          <span>
-            {currentAiGeneration?.provider === "FAKE"
-              ? "Este borrador valida el pipeline y no representa un análisis semántico real."
-              : "Revisa la evidencia, las contradicciones y los pendientes antes de enviarlo a validación."}
-          </span>
+          <strong>Completitud estructural · {progress}%</strong>
+          <span>{documentaryPending} pendientes por resolver</span>
         </div>
-      ) : null}
+      </section>
 
       {!currentVersion ? (
         <div className="rq-document-version-banner" role="status">
@@ -1407,130 +2535,311 @@ export function RequirementDocumentEditor({
             ? " Esta versión fue aprobada y es inmutable."
             : ""}
         </div>
-      ) : version.status === "APPROVED" ? (
-        <div
-          className="rq-document-version-banner"
-          data-approved="true"
-          role="status"
-        >
-          Esta versión está aprobada y bloqueada. Usa “Nueva versión” para
-          realizar cambios posteriores.
-        </div>
       ) : null}
 
-      <div className="rq-document-editor__layout">
-        <nav
-          aria-label="Secciones del documento"
-          className="rq-document-sections"
+      <section className="rq-document-section-bar">
+        <div
+          className="rq-projects-filter rq-document-section-select"
+          onBlur={(event) => {
+            // Al perder el foco la lista se minimiza.
+            if (
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
+            ) {
+              setSectionMenuOpen(false);
+            }
+          }}
         >
-          <header>
-            <strong>13 secciones</strong>
-            <span>{overallStats.pending} pendientes</span>
-          </header>
-          <ol>
-            {version.sections.map((section) => {
-              const stats = analyzeContent(section.content);
-              return (
-                <li key={section.key}>
+          <span>Sección:</span>
+          <button
+            aria-expanded={sectionMenuOpen}
+            aria-haspopup="listbox"
+            aria-label="Seleccionar sección del documento"
+            className="rq-doc-select__button"
+            onClick={() => setSectionMenuOpen((current) => !current)}
+            type="button"
+          >
+            <strong>
+              {activeSection
+                ? `${activeSection.order}. ${
+                    activeSection.key === "milestones" &&
+                    legacyNonFunctionalSection
+                      ? "Requerimientos"
+                      : visibleSectionTitle(activeSection)
+                  }`
+                : "Elegir sección"}
+            </strong>
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="16"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+              width="16"
+            >
+              <path d="m5 9 7 7 7-7" />
+            </svg>
+          </button>
+          {sectionMenuOpen ? (
+            <ul
+              aria-label="Secciones del documento"
+              className="rq-doc-select__list"
+              role="listbox"
+            >
+              {version.sections.map((section) => (
+                <li
+                  aria-selected={activeKey === section.key}
+                  key={section.key}
+                  role="option"
+                >
                   <button
-                    aria-current={
-                      activeKey === section.key ? "step" : undefined
-                    }
-                    onClick={() => chooseSection(section)}
+                    onClick={() => {
+                      chooseSection(section);
+                      setSectionMenuOpen(false);
+                    }}
                     type="button"
                   >
                     <span>{section.order}</span>
-                    <span>
-                      <strong>{section.title}</strong>
-                      <small>
-                        {stats.pending > 0
-                          ? `${stats.pending} pendientes`
-                          : stats.errors.length > 0
-                            ? `${stats.errors.length} errores`
-                            : "Completa"}
-                      </small>
-                    </span>
+                    {section.key === "milestones" && legacyNonFunctionalSection
+                      ? "Requerimientos"
+                      : visibleSectionTitle(section)}
                   </button>
                 </li>
-              );
-            })}
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <nav
+          aria-label="Secciones del documento"
+          className="rq-document-section-strip"
+        >
+          <ol>
+            {version.sections.map((section) => (
+              <li key={section.key}>
+                <button
+                  aria-current={activeKey === section.key ? "step" : undefined}
+                  aria-label={`Sección ${section.order}: ${
+                    section.key === "milestones" && legacyNonFunctionalSection
+                      ? "Requerimientos"
+                      : visibleSectionTitle(section)
+                  }`}
+                  onClick={() => chooseSection(section)}
+                  title={visibleSectionTitle(section)}
+                  type="button"
+                >
+                  <span>{section.order}</span>
+                  <strong>
+                    {section.key === "milestones" && legacyNonFunctionalSection
+                      ? "Requerimientos"
+                      : visibleSectionTitle(section)}
+                  </strong>
+                </button>
+              </li>
+            ))}
+            {validationGroups.length > 0 ? (
+              <li className="rq-document-section-strip__details-item">
+                <button
+                  aria-expanded={validationExpanded}
+                  aria-label={
+                    validationExpanded
+                      ? "Ocultar detalles del documento"
+                      : "Mostrar detalles del documento"
+                  }
+                  className="rq-document-section-bar__details"
+                  onClick={() => setValidationExpanded((current) => !current)}
+                  title={
+                    validationExpanded ? "Ocultar detalles" : "Ver detalles"
+                  }
+                  type="button"
+                >
+                  <span aria-hidden="true">!</span>
+                  <strong>Detalles</strong>
+                </button>
+              </li>
+            ) : null}
           </ol>
         </nav>
+        <span className="rq-document-section-bar__summary">
+          {version.sections.length} secciones · {sectionStatusSummary.complete}{" "}
+          completas · {sectionStatusSummary.pending} pendientes
+        </span>
+      </section>
 
-        <main className="rq-document-section-editor">
+      <div className="rq-document-editor__layout">
+        <main
+          className="rq-document-section-editor"
+          ref={sectionEditorRef}
+          tabIndex={-1}
+        >
           {activeSection ? (
             <>
               <header>
                 <div>
-                  <span>Sección {activeSection.order} de 13</span>
-                  <h2>{activeSection.title}</h2>
+                  <span>
+                    Sección {activeSection.order} de {version.sections.length}
+                  </span>
+                  <h2>
+                    {legacyRequirementTabs
+                      ? "Requerimientos"
+                      : visibleSectionTitle(activeSection)}
+                  </h2>
                   <p>
-                    {activeSection.templateControlled
-                      ? "Contenido institucional controlado por la plantilla."
-                      : "Edita los campos obligatorios y guarda esta sección."}
+                    {editingSection
+                      ? "Edita la información funcional y guarda esta sección."
+                      : "Consulta el contenido consolidado en lenguaje de negocio."}
                   </p>
                 </div>
                 <div className="rq-document-section-editor__status">
                   {unsaved ? (
                     <span data-unsaved="true">Cambios sin guardar</span>
                   ) : (
-                    <span>Sin cambios pendientes</span>
+                    <small>Guardado</small>
                   )}
                   {activeStats.pending > 0 ? (
                     <small>{activeStats.pending} datos pendientes</small>
+                  ) : null}
+                  {editingSection ? (
+                    <div className="rq-document-section-editor__actions">
+                      <RqActionButton
+                        disabled={busy}
+                        onClick={() => {
+                          setDraftContent(activeSection.content);
+                          setEditingSection(false);
+                        }}
+                      >
+                        Cancelar
+                      </RqActionButton>
+                      <RqActionButton
+                        disabled={
+                          readOnly ||
+                          busy ||
+                          !unsaved ||
+                          activeStats.errors.length > 0
+                        }
+                        onClick={() => void saveSection()}
+                        tone="affirmative"
+                      >
+                        {busy ? "Guardando…" : "Guardar"}
+                      </RqActionButton>
+                    </div>
+                  ) : activeSection.key === "processFlow" || !readOnly ? (
+                    <div className="rq-document-section-editor__actions">
+                      {activeSection.key === "processFlow" ? (
+                        <RqActionButton
+                          aria-label="Exportar como imagen el diagrama seleccionado"
+                          disabled={busy || exportingDiagram}
+                          onClick={() => void exportSelectedDiagram()}
+                          tone="consult"
+                        >
+                          {exportingDiagram ? "Exportando…" : "Exportar imagen"}
+                        </RqActionButton>
+                      ) : null}
+                      {!readOnly && activeSection.key === "scrumPlan" ? (
+                        <label className="rq-document-calendar-picker">
+                          <span aria-hidden="true">📅</span>
+                          <span>Fecha de inicio</span>
+                          <input
+                            aria-label="Fecha de inicio del plan de trabajo"
+                            disabled={busy || exportingDiagram}
+                            onChange={(event) => {
+                              if (event.target.value) {
+                                void saveScrumStartDate(event.target.value);
+                              }
+                            }}
+                            type="date"
+                            value={scrumStartDate}
+                          />
+                        </label>
+                      ) : null}
+                      {!readOnly ? (
+                        <RqActionButton
+                          disabled={busy || exportingDiagram}
+                          onClick={() => setEditingSection(true)}
+                          tone="operation"
+                        >
+                          Editar sección
+                        </RqActionButton>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               </header>
 
               {activeStats.errors.length > 0 ? (
-                <section
-                  className="rq-document-validation"
-                  aria-labelledby="document-validation-title"
-                >
-                  <strong id="document-validation-title">
-                    Campos obligatorios por corregir
-                  </strong>
+                <details className="rq-document-validation">
+                  <summary>
+                    <strong>Campos obligatorios por corregir</strong>
+                    <span>{activeStats.errors.length}</span>
+                  </summary>
                   <ul>
-                    {activeStats.errors.slice(0, 12).map((error) => (
-                      <li key={error}>{error}</li>
-                    ))}
+                    {activeStats.errors.slice(0, 12).map((error) => {
+                      const targetId =
+                        functionalStoryTargetFromValidation(error);
+                      return (
+                        <li key={error}>
+                          <span>{error}</span>
+                          {targetId ? (
+                            <button
+                              aria-label={`Ver historia relacionada con: ${error}`}
+                              onClick={() => revealFunctionalStory(targetId)}
+                              title="Ver historia de usuario"
+                              type="button"
+                            >
+                              <span aria-hidden="true">👁</span>
+                              Ver
+                            </button>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
-                </section>
+                </details>
               ) : null}
 
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void saveSection();
-                }}
-              >
-                <JsonValueEditor
-                  label={activeSection.title}
-                  onChange={setDraftContent}
-                  path={activeSection.key}
-                  readOnly={readOnly || busy}
-                  value={draftContent}
-                />
-                <footer>
-                  <span>
-                    {readOnly
-                      ? "Edición bloqueada para esta versión o sección."
-                      : "Los marcadores pendientes se conservan hasta que exista información real."}
-                  </span>
-                  <RqActionButton
-                    disabled={
-                      readOnly ||
-                      busy ||
-                      !unsaved ||
-                      activeStats.errors.length > 0
-                    }
-                    tone="affirmative"
-                    type="submit"
-                  >
-                    {busy ? "Guardando…" : "Guardar sección"}
-                  </RqActionButton>
-                </footer>
-              </form>
+              {editingSection ? (
+                <form
+                  className="rq-document-business-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveSection();
+                  }}
+                >
+                  <DocumentSectionBusinessEditor
+                    context={businessEditorContext}
+                    onChange={setDraftContent}
+                    readOnly={readOnly || busy}
+                    sectionKey={activeSection.key}
+                    value={requirementsPresentationContent}
+                  />
+                  <footer>
+                    <span>
+                      Los datos técnicos y la trazabilidad se conservan sin
+                      mostrarse en el formulario.
+                    </span>
+                  </footer>
+                </form>
+              ) : (
+                <section className="rq-document-business-view">
+                  <DocumentSectionView
+                    context={{
+                      projectId: documentState.projectId,
+                      backlogStructure:
+                        backlogStructureSection?.content ?? null,
+                      milestones: milestonesSection?.content ?? null,
+                      scope: scopeSection?.content ?? null,
+                      solutionProposal:
+                        solutionProposalSection?.content ?? null,
+                      templateName: documentState.template.name,
+                      templateVersion: documentState.template.version,
+                    }}
+                    sectionKey={activeSection.key}
+                    templateControlled={activeSection.templateControlled}
+                    value={requirementsViewContent}
+                  />
+                </section>
+              )}
 
               {version.fields.some(
                 (field) => field.sectionKey === activeSection.key,
@@ -1565,6 +2874,14 @@ export function RequirementDocumentEditor({
                   </p>
                 </section>
               ) : null}
+
+              {activeSection.key === "milestones" ? (
+                <IntegratedPoint6Point7Panel
+                  backlogValue={backlogStructureSection?.content ?? null}
+                  collapsed
+                  requirementsValue={requirementsViewContent}
+                />
+              ) : null}
             </>
           ) : null}
 
@@ -1583,128 +2900,301 @@ export function RequirementDocumentEditor({
             </div>
           </aside>
         </main>
+        <div className="rq-document-editor__side">
+          <aside
+            aria-label="Versión consultada"
+            className="rq-document-workflow rq-document-version-card"
+          >
+            <div
+              className="rq-projects-filter rq-document-version-select"
+              onBlur={(event) => {
+                // Al perder el foco la lista se minimiza.
+                if (
+                  !event.currentTarget.contains(
+                    event.relatedTarget as Node | null,
+                  )
+                ) {
+                  setVersionMenuOpen(false);
+                }
+              }}
+            >
+              <span>Versión:</span>
+              <button
+                aria-expanded={versionMenuOpen}
+                aria-haspopup="listbox"
+                aria-label="Versión consultada"
+                className="rq-doc-select__button"
+                disabled={busy || unsaved}
+                onClick={() => setVersionMenuOpen((current) => !current)}
+                type="button"
+              >
+                <strong>
+                  Versión {version.versionNumber}
+                  {version.versionNumber === documentState.currentVersionNumber
+                    ? " · actual"
+                    : ""}
+                </strong>
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="16"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                  viewBox="0 0 24 24"
+                  width="16"
+                >
+                  <path d="m5 9 7 7 7-7" />
+                </svg>
+              </button>
+              {versionMenuOpen ? (
+                <ul
+                  aria-label="Versiones del documento"
+                  className="rq-doc-select__list"
+                  role="listbox"
+                >
+                  {Array.from(
+                    { length: documentState.currentVersionNumber },
+                    (_, index) => documentState.currentVersionNumber - index,
+                  ).map((item) => (
+                    <li
+                      aria-selected={version.versionNumber === item}
+                      key={item}
+                      role="option"
+                    >
+                      <button
+                        onClick={() => {
+                          setVersionMenuOpen(false);
+                          void loadVersion(item);
+                        }}
+                        type="button"
+                      >
+                        <span>{item}</span>
+                        Versión {item}
+                        {item === documentState.currentVersionNumber
+                          ? " · actual"
+                          : ""}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <small>SemVer {version.version}</small>
+          </aside>
+          {currentVersion ? (
+            <aside
+              className="rq-document-workflow"
+              aria-label="Revisión y aprobación"
+            >
+              <header>
+                <div>
+                  <strong>Revisión y aprobación</strong>
+                  <span>
+                    Comentarios, correcciones y decisiones conservan actor,
+                    fecha y correlación.
+                  </span>
+                </div>
+                <RqStatusBadge tone={statusTone(version.status)}>
+                  {statusLabel(version.status)}
+                </RqStatusBadge>
+              </header>
+
+              {version.status === "DRAFT" ||
+              version.status === "CHANGES_REQUESTED" ||
+              version.status === "IN_REVIEW" ? (
+                <label className="rq-document-review-comment">
+                  <span>
+                    {version.status === "DRAFT" ||
+                    version.status === "CHANGES_REQUESTED"
+                      ? "Comentario inicial (opcional)"
+                      : "Comentario u observación"}
+                  </span>
+                  <textarea
+                    disabled={busy}
+                    maxLength={4000}
+                    onChange={(event) => setReviewComment(event.target.value)}
+                    rows={3}
+                    value={reviewComment}
+                  />
+                </label>
+              ) : null}
+
+              <div className="rq-document-workflow-actions">
+                <div>
+                  <strong>Estado de la versión actual</strong>
+                  <span>
+                    Solo los roles asignados pueden ejecutar cada decisión.
+                  </span>
+                </div>
+                {version.status === "DRAFT" ||
+                version.status === "CHANGES_REQUESTED" ? (
+                  <RqActionButton
+                    disabled={busy || unsaved}
+                    onClick={() => void requestReview()}
+                    tone="operation"
+                  >
+                    {version.status === "CHANGES_REQUESTED"
+                      ? "Reenviar a validación"
+                      : "Enviar a validación"}
+                  </RqActionButton>
+                ) : null}
+                {version.status === "IN_REVIEW" && review ? (
+                  <>
+                    <RqActionButton
+                      disabled={busy || !reviewComment.trim()}
+                      onClick={() => void addReviewComment()}
+                      tone="consult"
+                    >
+                      Agregar comentario
+                    </RqActionButton>
+                    <RqActionButton
+                      disabled={busy}
+                      onClick={() => void decideReview("request-changes")}
+                      tone="operation"
+                    >
+                      Solicitar correcciones
+                    </RqActionButton>
+                    <RqActionButton
+                      disabled={busy}
+                      onClick={() => void decideReview("reject")}
+                      tone="danger"
+                    >
+                      Rechazar
+                    </RqActionButton>
+                    <RqActionButton
+                      disabled={busy}
+                      onClick={() => void decideReview("approve")}
+                      tone="affirmative"
+                    >
+                      Aprobar y bloquear
+                    </RqActionButton>
+                  </>
+                ) : null}
+              </div>
+
+              {version.status === "IN_REVIEW" && !review ? (
+                <p className="rq-document-review-warning">
+                  La versión está en validación, pero todavía no se encontró su
+                  expediente de Workflow.
+                </p>
+              ) : null}
+
+              {review && review.activities.length > 0 ? (
+                <ol className="rq-document-review-activity">
+                  {review.activities.map((activity) => (
+                    <li key={activity.id}>
+                      <span aria-hidden="true" />
+                      <div>
+                        <strong>{workflowActivityLabel(activity.type)}</strong>
+                        <small>
+                          {formatDate(activity.createdAt)} · Actor{" "}
+                          {activity.actorUserId}
+                        </small>
+                        {activity.comment ? <p>{activity.comment}</p> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </aside>
+          ) : null}
+        </div>
       </div>
 
-      {currentVersion ? (
-        <section
-          className="rq-document-workflow"
-          aria-label="Revisión y aprobación"
+      {validationExpanded ? (
+        <div
+          className="rq-project-modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setValidationExpanded(false);
+            }
+          }}
+          role="presentation"
         >
-          <header>
-            <div>
-              <strong>Revisión y aprobación</strong>
-              <span>
-                Comentarios, correcciones y decisiones conservan actor, fecha y
-                correlación.
-              </span>
-            </div>
-            {review ? (
-              <RqStatusBadge
-                tone={
-                  review.status === "APPROVED"
-                    ? "success"
-                    : review.status === "IN_REVIEW"
-                      ? "process"
-                      : "danger"
-                }
+          <section
+            aria-labelledby="document-corrections-title"
+            aria-modal="true"
+            className="rq-project-modal rq-document-corrections-modal"
+            ref={validationDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
+            <header className="rq-project-modal__header rq-document-corrections-modal__header">
+              <div>
+                <span>Revisión de completitud</span>
+                <h2 id="document-corrections-title">
+                  Puntos que requieren atención
+                </h2>
+                <p>
+                  {validationGroups.length} puntos presentan información por
+                  completar o corregir.
+                </p>
+              </div>
+              <button
+                aria-label="Cerrar correcciones"
+                onClick={() => setValidationExpanded(false)}
+                type="button"
               >
-                {review.status.replaceAll("_", " ")}
-              </RqStatusBadge>
-            ) : null}
-          </header>
-
-          {version.status === "DRAFT" || version.status === "IN_REVIEW" ? (
-            <label className="rq-document-review-comment">
-              <span>
-                {version.status === "DRAFT"
-                  ? "Comentario inicial (opcional)"
-                  : "Comentario u observación"}
-              </span>
-              <textarea
-                disabled={busy}
-                maxLength={4000}
-                onChange={(event) => setReviewComment(event.target.value)}
-                rows={3}
-                value={reviewComment}
-              />
-            </label>
-          ) : null}
-
-          <div className="rq-document-workflow-actions">
-            <div>
-              <strong>Estado de la versión actual</strong>
-              <span>
-                Solo los roles asignados pueden ejecutar cada decisión.
-              </span>
+                ×
+              </button>
+            </header>
+            <div className="rq-document-corrections-list">
+              {validationGroups.map(([group, issues]) => {
+                const section = version.sections.find(
+                  (item) => item.title === group,
+                );
+                return (
+                  <details
+                    className="rq-doc-issue"
+                    key={group}
+                    open={issues.length <= 3}
+                  >
+                    <summary>
+                      <span>
+                        {section
+                          ? `Punto ${section.order} de ${version.sections.length}`
+                          : "Documento"}
+                      </span>
+                      <h3>{group}</h3>
+                      <small>
+                        {issues.length}{" "}
+                        {issues.length === 1 ? "observación" : "observaciones"}
+                      </small>
+                      <i aria-hidden="true">⌄</i>
+                    </summary>
+                    <ul>
+                      {issues.map((issue) => (
+                        <li key={issue}>{issue.replace(`${group} · `, "")}</li>
+                      ))}
+                    </ul>
+                    {section ? (
+                      <button
+                        className="rq-doc-issue__go"
+                        onClick={() => {
+                          chooseSection(section);
+                          setValidationExpanded(false);
+                        }}
+                        type="button"
+                      >
+                        Ir al punto {section.order}
+                      </button>
+                    ) : null}
+                  </details>
+                );
+              })}
             </div>
-            {version.status === "DRAFT" ? (
+            <footer className="rq-document-corrections-modal__footer">
               <RqActionButton
-                disabled={busy || unsaved}
-                onClick={() => void requestReview()}
+                onClick={() => setValidationExpanded(false)}
                 tone="operation"
               >
-                Enviar a validación
+                Entendido
               </RqActionButton>
-            ) : null}
-            {version.status === "IN_REVIEW" && review ? (
-              <>
-                <RqActionButton
-                  disabled={busy || !reviewComment.trim()}
-                  onClick={() => void addReviewComment()}
-                  tone="consult"
-                >
-                  Agregar comentario
-                </RqActionButton>
-                <RqActionButton
-                  disabled={busy}
-                  onClick={() => void decideReview("request-changes")}
-                  tone="operation"
-                >
-                  Solicitar correcciones
-                </RqActionButton>
-                <RqActionButton
-                  disabled={busy}
-                  onClick={() => void decideReview("reject")}
-                  tone="danger"
-                >
-                  Rechazar
-                </RqActionButton>
-                <RqActionButton
-                  disabled={busy}
-                  onClick={() => void decideReview("approve")}
-                  tone="affirmative"
-                >
-                  Aprobar y bloquear
-                </RqActionButton>
-              </>
-            ) : null}
-          </div>
-
-          {version.status === "IN_REVIEW" && !review ? (
-            <p className="rq-document-review-warning">
-              La versión está en validación, pero todavía no se encontró su
-              expediente de Workflow.
-            </p>
-          ) : null}
-
-          {review && review.activities.length > 0 ? (
-            <ol className="rq-document-review-activity">
-              {review.activities.map((activity) => (
-                <li key={activity.id}>
-                  <span aria-hidden="true" />
-                  <div>
-                    <strong>{workflowActivityLabel(activity.type)}</strong>
-                    <small>
-                      {formatDate(activity.createdAt)} · Actor{" "}
-                      {activity.actorUserId}
-                    </small>
-                    {activity.comment ? <p>{activity.comment}</p> : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </section>
+            </footer>
+          </section>
+        </div>
       ) : null}
 
       {versionOpen ? (
@@ -1803,7 +3293,7 @@ export function RequirementDocumentEditor({
                   <div>
                     <strong>{entry.eventType.replaceAll("_", " ")}</strong>
                     <small>{formatDate(entry.createdAt)}</small>
-                    <pre>{JSON.stringify(entry.details, null, 2)}</pre>
+                    <DocumentHumanValue value={entry.details} />
                   </div>
                 </li>
               ))}
@@ -1824,11 +3314,23 @@ export function RequirementDocumentEditor({
           >
             <header className="rq-project-modal__header">
               <div>
-                <span>Generación explícita</span>
-                <h2 id="ai-version-title">Nueva versión con IA</h2>
+                <span>
+                  {aiVersionMode === "returned-word"
+                    ? "Revisión humana"
+                    : "Generación explícita"}
+                </span>
+                <h2 id="ai-version-title">
+                  {aiVersionMode === "returned-word"
+                    ? "Importar Word corregido"
+                    : "Nueva versión con IA"}
+                </h2>
               </div>
               <button
-                aria-label="Cerrar nueva versión con IA"
+                aria-label={
+                  aiVersionMode === "returned-word"
+                    ? "Cerrar importación del Word corregido"
+                    : "Cerrar nueva versión con IA"
+                }
                 disabled={busy}
                 onClick={() => setAiVersionOpen(false)}
                 type="button"
@@ -1837,48 +3339,186 @@ export function RequirementDocumentEditor({
               </button>
             </header>
             <div className="rq-document-ai-version-content">
-              <p>
-                Se clonará la versión actual y una única ejecución de IA
-                completará el nuevo DRAFT. La versión anterior no se modifica.
-              </p>
+              {aiVersionMode === "returned-word" ? (
+                <p>
+                  Selecciona el Word que descargaste y corregiste. La IA lo
+                  comparará con la versión actual, aplicará las mejoras en una
+                  nueva versión y conservará intacta la versión anterior.
+                </p>
+              ) : (
+                <p>
+                  La IA tomará la versión actual como base consolidada y
+                  conservará lo que no deba cambiar.{" "}
+                  {
+                    "No necesitas volver a seleccionar los archivos anteriores: "
+                  }
+                  la nueva evidencia, el contexto y tu instrucción tendrán
+                  prioridad. La versión anterior permanecerá sin cambios.
+                </p>
+              )}
               <fieldset>
-                <legend>Fuentes READY</legend>
-                {aiSources.length === 0 ? (
-                  <p>No hay fuentes listas para usar.</p>
-                ) : (
-                  <div className="rq-document-ai-source-list">
-                    {aiSources.map((source) => (
-                      <label key={source.id}>
-                        <input
-                          checked={selectedAiSourceIds.has(source.id)}
-                          disabled={busy}
-                          onChange={() => toggleAiSource(source.id)}
-                          type="checkbox"
-                        />
+                <legend>
+                  {aiVersionMode === "returned-word"
+                    ? "Documento Word corregido"
+                    : "Nueva evidencia"}
+                </legend>
+                <label className="rq-document-ai-file-picker">
+                  <span>
+                    {aiVersionMode === "returned-word"
+                      ? "Seleccionar Word corregido"
+                      : "Agregar archivos o diagramas"}
+                  </span>
+                  <input
+                    accept={
+                      aiVersionMode === "returned-word"
+                        ? ".docx"
+                        : AI_EVIDENCE_FILE_ACCEPT
+                    }
+                    disabled={busy}
+                    multiple={aiVersionMode !== "returned-word"}
+                    onChange={(event) =>
+                      selectAiEvidenceFiles(event.target.files)
+                    }
+                    type="file"
+                  />
+                  <small>
+                    {aiVersionMode === "returned-word"
+                      ? "Un archivo .docx correspondiente a este documento."
+                      : "PDF, Word, Excel, CSV, TXT, VTT e imágenes PNG, JPG o WEBP. Máximo 20 archivos."}
+                  </small>
+                </label>
+                {aiEvidenceFiles.length > 0 ? (
+                  <ul className="rq-document-ai-file-list">
+                    {aiEvidenceFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                      >
                         <span>
-                          <strong>{source.title}</strong>
-                          <small>
-                            {source.sourceType} ·{" "}
-                            {source.classification ?? "Sin clasificación"}
-                          </small>
+                          <strong>{file.name}</strong>
+                          <small>{Math.ceil(file.size / 1024)} KB</small>
                         </span>
-                      </label>
+                        <button
+                          disabled={busy}
+                          onClick={() => removeAiEvidenceFile(index)}
+                          type="button"
+                        >
+                          Quitar
+                        </button>
+                      </li>
                     ))}
-                  </div>
-                )}
+                  </ul>
+                ) : null}
               </fieldset>
               <label className="rq-field">
-                <span>Instrucción adicional opcional</span>
+                <span>
+                  {aiVersionMode === "returned-word"
+                    ? "Indicaciones adicionales (opcional)"
+                    : "Nueva información o contexto"}
+                </span>
                 <textarea
                   disabled={busy}
-                  maxLength={2000}
-                  onChange={(event) => setAiInstruction(event.target.value)}
-                  placeholder="Ejemplo: prioriza los vacíos y contradicciones identificados."
-                  rows={4}
-                  value={aiInstruction}
+                  maxLength={20000}
+                  onChange={(event) =>
+                    setAiAdditionalInformation(event.target.value)
+                  }
+                  placeholder={
+                    aiVersionMode === "returned-word"
+                      ? "Opcional: explica qué partes corregiste o qué debe revisarse con especial cuidado."
+                      : "Registra aquí hechos, decisiones, reglas o necesidades nuevas que deban quedar como evidencia trazable de esta versión."
+                  }
+                  rows={5}
+                  value={aiAdditionalInformation}
                 />
-                <small>{aiInstruction.length}/2000</small>
+                <small>{aiAdditionalInformation.length}/20000</small>
               </label>
+              {aiVersionMode === "general" ? (
+                <label className="rq-field">
+                  <span>Cambio general o transversal</span>
+                  <textarea
+                    disabled={busy}
+                    maxLength={20000}
+                    onChange={(event) => setAiInstruction(event.target.value)}
+                    placeholder="Describe aquí únicamente los cambios que afectan al documento completo o a varias secciones."
+                    rows={4}
+                    value={aiInstruction}
+                  />
+                  <small>{aiInstruction.length}/20000</small>
+                </label>
+              ) : null}
+              {aiVersionMode === "general" ? (
+                <fieldset className="rq-document-ai-section-instructions">
+                  <legend>Cambios por punto del documento</legend>
+                  <p>
+                    Indica el cambio en el punto exacto donde debe quedar. La IA
+                    conservará lo demás y actualizará las secciones
+                    dependientes.
+                  </p>
+                  {version.sections.map((section, index) => (
+                    <details key={section.key}>
+                      <summary>
+                        <span>
+                          Punto {index + 1} · {section.title}
+                        </span>
+                        <small>
+                          {aiSectionInstructions[section.key]?.trim()
+                            ? "Cambio definido"
+                            : "Sin cambios específicos"}
+                        </small>
+                      </summary>
+                      <label className="rq-field">
+                        <span>Qué debe cambiar en este punto</span>
+                        <textarea
+                          disabled={busy}
+                          maxLength={6000}
+                          onChange={(event) =>
+                            setAiSectionInstructions((current) => ({
+                              ...current,
+                              [section.key]: event.target.value,
+                            }))
+                          }
+                          placeholder={`Describe el resultado esperado para ${section.title}.`}
+                          rows={4}
+                          value={aiSectionInstructions[section.key] ?? ""}
+                        />
+                        <small>
+                          {(aiSectionInstructions[section.key] ?? "").length}
+                          /6000
+                        </small>
+                      </label>
+                    </details>
+                  ))}
+                </fieldset>
+              ) : null}
+              <fieldset className="rq-document-ai-engines">
+                <legend>Motores de IA</legend>
+                <AiEngineChips
+                  capabilities={aiEngines.capabilities}
+                  loading={aiEngines.loading}
+                  locked={busy}
+                  providerSelections={aiEngines.providerSelections}
+                  selectProvider={aiEngines.selectProvider}
+                  selection={aiEngines.selection}
+                  toggle={aiEngines.toggle}
+                />
+                {aiEngines.error ? (
+                  <small role="alert">{aiEngines.error}</small>
+                ) : null}
+                {!aiEngines.loading && aiEnginesMissing ? (
+                  <small id="ai-engines-required" role="status">
+                    Enciende y configura un motor de IA (local o nube) para
+                    habilitar la creación. La IA nube nunca se activa sin tu
+                    elección.
+                  </small>
+                ) : null}
+              </fieldset>
+              {busy && aiGenerationStage ? (
+                <p
+                  aria-live="polite"
+                  className="rq-document-ai-generation-stage"
+                >
+                  {aiGenerationStage}
+                </p>
+              ) : null}
             </div>
             <div className="rq-project-modal__actions">
               <RqActionButton
@@ -1888,11 +3528,30 @@ export function RequirementDocumentEditor({
                 Cancelar
               </RqActionButton>
               <RqActionButton
-                disabled={busy || selectedAiSourceIds.size === 0}
+                aria-describedby={
+                  aiEnginesMissing ? "ai-engines-required" : undefined
+                }
+                disabled={
+                  busy ||
+                  aiEngines.loading ||
+                  aiEnginesMissing ||
+                  (aiVersionMode === "returned-word"
+                    ? aiEvidenceFiles.length !== 1
+                    : aiEvidenceFiles.length === 0 &&
+                      !aiAdditionalInformation.trim() &&
+                      !aiInstruction.trim() &&
+                      !Object.values(aiSectionInstructions).some((value) =>
+                        value?.trim(),
+                      ))
+                }
                 onClick={() => void createAiVersion()}
                 tone="affirmative"
               >
-                {busy ? "Generando…" : "Crear versión con IA"}
+                {busy
+                  ? "Generando…"
+                  : aiVersionMode === "returned-word"
+                    ? "Crear versión desde Word"
+                    : "Crear versión con IA"}
               </RqActionButton>
             </div>
           </section>
@@ -2017,6 +3676,17 @@ export function RequirementDocumentEditor({
                           {item.errorMessage ?? execution?.errorMessage}
                         </p>
                       ) : null}
+                      {item.status === "FAILED" ? (
+                        <div className="rq-project-modal__actions">
+                          <RqActionButton
+                            disabled={busy}
+                            onClick={() => void retryAiGeneration(item.id)}
+                            tone="consult"
+                          >
+                            Reintentar esta generación
+                          </RqActionButton>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -2119,10 +3789,16 @@ export function RequirementDocumentEditor({
                       <span>{changed ? "Con cambios" : "Sin cambios"}</span>
                     </header>
                     <div>
-                      <pre>{JSON.stringify(leftSection.content, null, 2)}</pre>
-                      <pre>
-                        {JSON.stringify(rightSection?.content ?? null, null, 2)}
-                      </pre>
+                      <DocumentSectionView
+                        sectionKey={leftSection.key}
+                        templateControlled={leftSection.templateControlled}
+                        value={leftSection.content}
+                      />
+                      <DocumentSectionView
+                        sectionKey={rightSection?.key ?? leftSection.key}
+                        templateControlled={rightSection?.templateControlled}
+                        value={rightSection?.content ?? null}
+                      />
                     </div>
                   </article>
                 );

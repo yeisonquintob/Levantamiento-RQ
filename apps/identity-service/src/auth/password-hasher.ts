@@ -6,6 +6,7 @@ import {
 } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
+import { argon2id, hash as argon2Hash, needsRehash, verify as argon2Verify } from "argon2";
 
 const KEY_LENGTH = 64;
 const OPTIONS: ScryptOptions = {
@@ -30,21 +31,24 @@ function derive(password: string, salt: Buffer): Promise<Buffer> {
 @Injectable()
 export class PasswordHasher {
   async hash(password: string): Promise<string> {
-    const salt = randomBytes(16);
-    const derived = await derive(password, salt);
-
-    return [
-      "scrypt",
-      "v=1",
-      "N=16384",
-      "r=8",
-      "p=1",
-      salt.toString("base64url"),
-      derived.toString("base64url"),
-    ].join("$");
+    return argon2Hash(password, {
+      type: argon2id,
+      memoryCost: 65_536,
+      timeCost: 3,
+      parallelism: 1,
+      hashLength: 32,
+      salt: randomBytes(16),
+    });
   }
 
   async verify(password: string, encoded: string): Promise<boolean> {
+    if (encoded.startsWith("$argon2id$")) {
+      try {
+        return await argon2Verify(encoded, password);
+      } catch {
+        return false;
+      }
+    }
     const parts = encoded.split("$");
 
     if (
@@ -69,6 +73,15 @@ export class PasswordHasher {
       );
     } catch {
       return false;
+    }
+  }
+
+  needsRehash(encoded: string): boolean {
+    if (!encoded.startsWith("$argon2id$")) return true;
+    try {
+      return needsRehash(encoded, { memoryCost: 65_536, timeCost: 3, parallelism: 1 });
+    } catch {
+      return true;
     }
   }
 }

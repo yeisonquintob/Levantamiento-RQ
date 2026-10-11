@@ -49,6 +49,7 @@ function mapSession(session: RefreshSessionEntity): RefreshSessionRecord {
   return {
     id: session.id,
     userId: session.userId,
+    familyId: session.familyId,
     tokenHash: session.tokenHash,
     expiresAt: session.expiresAt,
     revokedAt: session.revokedAt,
@@ -156,6 +157,45 @@ export class TypeOrmIdentityStore implements IdentityStore {
       .where("Id = :sessionId", { sessionId })
       .andWhere("RevokedAt IS NULL")
       .execute();
+  }
+
+  async upgradePasswordHash(userId: string, passwordHash: string, instant: Date): Promise<void> {
+    await this.users.update(userId, { passwordHash, updatedAt: instant });
+  }
+
+  async revokeRefreshFamily(familyId: string, userId: string, instant: Date): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(RefreshSessionEntity)
+        .createQueryBuilder()
+        .update(RefreshSessionEntity)
+        .set({ revokedAt: instant, lastUsedAt: instant })
+        .where("FamilyId = :familyId", { familyId })
+        .andWhere("UserId = :userId", { userId })
+        .execute();
+      await manager.getRepository(UserEntity)
+        .createQueryBuilder()
+        .update(UserEntity)
+        .set({ sessionVersion: () => "SessionVersion + 1", updatedAt: instant })
+        .where("Id = :userId", { userId })
+        .execute();
+    });
+  }
+
+  async recordSecurityEvent(
+    eventType: string,
+    actorUserId: string,
+    targetUserId: string,
+    detail: string | null,
+    instant: Date,
+  ): Promise<void> {
+    await this.dataSource.getRepository(SecurityAuditEntity).insert({
+      id: randomUUID(),
+      eventType: eventType.slice(0, 64),
+      actorUserId,
+      targetUserId,
+      detail: detail?.slice(0, 2000) ?? null,
+      createdAt: instant,
+    });
   }
 
   async changePassword(

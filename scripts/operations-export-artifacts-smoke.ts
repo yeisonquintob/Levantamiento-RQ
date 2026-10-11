@@ -26,7 +26,11 @@ async function waitForExports(ids: readonly string[]): Promise<void> {
     const rows = await Promise.all(ids.map((id) => exports.findOneBy({ id })));
     if (rows.every((row) => row?.status === "COMPLETED")) return;
     const failed = rows.find((row) => row?.status === "FAILED");
-    if (failed) throw new Error(failed.errorMessage ?? "Exportación fallida.");
+    if (failed) {
+      throw new Error(
+        `${failed.format}: ${failed.errorMessage ?? "Exportación fallida."}`,
+      );
+    }
     await delay(200);
   }
   throw new Error("Las exportaciones no terminaron dentro del tiempo límite.");
@@ -41,7 +45,7 @@ async function main(): Promise<void> {
   const documentId = randomUUID();
   const documentVersionId = randomUUID();
   const actorId = randomUUID();
-  const requestIds = [randomUUID(), randomUUID()];
+  const requestIds = [randomUUID(), randomUUID(), randomUUID()];
   const processingConfig = {
     ...loadOperationsProcessingConfig(process.env),
     queueName: `rq-exports-smoke-${randomUUID()}`,
@@ -85,14 +89,15 @@ async function main(): Promise<void> {
         sectionKey: "milestones",
         code: "RF-SMOKE-001",
         title: "Generar archivos reales",
-        description: "El sistema genera PDF y DOCX desde la versión aprobada.",
+        description:
+          "El sistema genera PDF, DOCX y Markdown desde la versión aprobada.",
         requirementType: "FUNCTIONAL",
         status: "APPROVED",
         order: 1,
         acceptanceCriteria: [
           {
             id: randomUUID(),
-            description: "Ambos artefactos superan la validación de firma.",
+            description: "Los tres artefactos superan la validación esperada.",
             order: 1,
           },
         ],
@@ -104,6 +109,17 @@ async function main(): Promise<void> {
     id: documentId,
     projectId,
     title: "Documento temporal de exportación",
+    template: {
+      id: randomUUID(),
+      sourceTemplateId: randomUUID(),
+      code: "RQ-MEDIUM",
+      name: "Requerimiento mediano",
+      version: "1.1.0",
+      templateType: "MEDIUM_REQUIREMENT",
+      includesScrum: true,
+      definition: {},
+      appliedAt: new Date().toISOString(),
+    },
     currentVersionDetail: version,
   };
   const events: string[] = [];
@@ -113,7 +129,11 @@ async function main(): Promise<void> {
     dataSource,
     { requireRead: async () => project } as never,
     {
-      requireApprovedVersion: async () => ({ document, version }),
+      requireApprovedVersion: async () => ({
+        document,
+        version,
+        templateLogo: null,
+      }),
     } as never,
     { issue: async () => "short-lived-internal-token" } as never,
     storage,
@@ -130,7 +150,7 @@ async function main(): Promise<void> {
   try {
     const now = new Date();
     await exports.save(
-      (["PDF", "DOCX"] as const).map((format, index) =>
+      (["PDF", "DOCX", "MARKDOWN"] as const).map((format, index) =>
         exports.create({
           id: requestIds[index],
           projectId,
@@ -159,7 +179,7 @@ async function main(): Promise<void> {
     const stored = await artifacts.findBy(
       requestIds.map((exportRequestId) => ({ exportRequestId })),
     );
-    assert.equal(stored.length, 2);
+    assert.equal(stored.length, 3);
     storedPaths = stored.map((item) => item.storagePath);
     const files = await Promise.all(
       stored.map(async (artifact) => ({
@@ -180,13 +200,17 @@ async function main(): Promise<void> {
     const docx = files.find(({ artifact }) =>
       artifact.fileName.endsWith(".docx"),
     );
+    const markdown = files.find(({ artifact }) =>
+      artifact.fileName.endsWith(".md"),
+    );
     assert.equal(pdf?.buffer.subarray(0, 5).toString("ascii"), "%PDF-");
     assert.equal(docx?.buffer.subarray(0, 2).toString("ascii"), "PK");
+    assert.match(markdown?.buffer.toString("utf8") ?? "", /^# /);
     assert.equal(
       events.filter((name) => name === "export.completed").length,
-      2,
+      3,
     );
-    console.log("✓ BullMQ procesó las exportaciones PDF y DOCX.");
+    console.log("✓ BullMQ procesó las exportaciones PDF, DOCX y Markdown.");
     console.log("✓ Azurite conservó artefactos privados con SHA-256 válido.");
   } finally {
     await worker.onModuleDestroy();

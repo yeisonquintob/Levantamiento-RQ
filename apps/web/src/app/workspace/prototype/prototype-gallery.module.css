@@ -1,0 +1,1368 @@
+.gallery {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  min-width: 0;
+}
+.workspaceMenu {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.workspaceMenu > div {
+  display: flex;
+  gap: 4px;
+}
+.workspaceMenu button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--rq-color-muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 16px;
+}
+.workspaceMenu button[aria-current="page"] {
+  background: color-mix(in srgb, var(--rq-action-operation) 12%, transparent);
+  color: var(--rq-action-operation);
+}
+.workspaceMenu .newPrototype {
+  background: var(--rq-action-affirmative);
+  color: white;
+}
+.workspaceActions {
+  display: flex;
+  gap: 8px;
+}
+
+/* RQ PROTOTYPE HEADER COMPACT V2
+   Volver + título + pasos en una sola fila para ganar altura útil. */
+.workspaceMenuSource {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) auto minmax(145px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.workspaceMenuSource > .workspaceActions:first-child {
+  justify-content: flex-start;
+}
+.workspaceMenuSource > .workspaceActions:last-child {
+  justify-content: flex-end;
+}
+.workspaceMenuSource .workflowHeader {
+  min-width: 0;
+  justify-content: center;
+}
+.workspaceMenu .stopPrototype {
+  background: var(--rq-color-danger, #b42318);
+  color: white;
+}
+.history {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.history > header {
+  align-items: start;
+  display: flex;
+  justify-content: space-between;
+}
+.history > header h2 {
+  margin-bottom: 4px;
+}
+.history > header p {
+  color: var(--rq-color-muted);
+  margin: 0;
+}
+.historyFilters {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.historyFilters > label {
+  flex: 0 1 150px;
+  min-width: 0;
+}
+.historyFilters > label:first-child {
+  flex: 1 1 260px;
+}
+.historyFilters label {
+  display: grid;
+  gap: 3px;
+}
+.historyFilters label span {
+  color: var(--rq-color-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.historyFilters input,
+.historyFilters select,
+.historyFilters button,
+.history table button {
+  border: 1px solid var(--rq-color-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+.historyFilters input,
+.historyFilters select {
+  box-sizing: border-box;
+  width: 100%;
+}
+.historyFilters input,
+.historyFilters select {
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+}
+.historyFilters button,
+.history table button {
+  background: var(--rq-action-operation);
+  color: white;
+  cursor: pointer;
+}
+.history td strong,
+.history td small {
+  display: block;
+}
+.historyActions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.historyFilterActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+@media (max-width: 760px) {
+  .historyFilterActions {
+    flex: 1 1 100%;
+  }
+}
+.historyFilterActions button {
+  flex: 1 1 0;
+}
+.historyFilterActions button:first-child {
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+}
+.history table th,
+.history table td,
+.historyActionHeader,
+.historyActionCell {
+  text-align: left !important;
+  vertical-align: middle;
+}
+.history table {
+  --history-divider: color-mix(
+    in srgb,
+    var(--rq-color-border) 72%,
+    var(--rq-color-text)
+  );
+  width: 100%;
+  margin: 0;
+  border: 0;
+}
+.history table th {
+  padding-block: 7px;
+  border-right: 1px solid
+    color-mix(in srgb, var(--rq-color-on-institutional) 34%, transparent);
+  border-bottom: 1px solid var(--history-divider);
+}
+.history table td {
+  padding-block: 6px;
+  border-right: 1px solid var(--history-divider);
+  border-bottom: 1px solid var(--history-divider);
+}
+.history table :is(th, td):last-child {
+  border-right: 0;
+}
+.history table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.history :global(.rq-table-shell__scroll) {
+  border: 1px solid var(--rq-color-border);
+  border-radius: 10px;
+  background: var(--rq-color-surface);
+  box-shadow: none;
+}
+.historyCount {
+  display: flex;
+  justify-content: flex-end;
+  padding-block: 0 2px;
+  color: var(--rq-color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.historyActionCell {
+  white-space: nowrap;
+}
+.history table .deleteAction {
+  background: var(--rq-color-danger, #b42318);
+}
+.historyActions button:not(.deleteAction) {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-consult) 88%,
+    var(--rq-color-text)
+  );
+  background: color-mix(
+    in srgb,
+    var(--rq-action-consult) 84%,
+    var(--rq-color-surface)
+  );
+  opacity: 0.92;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+.historyActions button:not(.deleteAction):hover {
+  border-color: var(--rq-action-consult);
+  background: var(--rq-action-consult);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.historyEmpty {
+  color: var(--rq-color-muted);
+  margin: 8px 0;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .historyFilters > label {
+    flex: 1 1 calc(50% - 5px);
+  }
+  .historyFilters > label:first-child {
+    flex: 1 1 100%;
+  }
+  .workspaceMenu {
+    align-items: stretch;
+    gap: 6px;
+  }
+  .workspaceMenu > div {
+    min-width: 0;
+  }
+  .workspaceMenu button {
+    padding-inline: 10px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1300px) {
+}
+.statusBar {
+  background: #f7f4fa;
+  border: 1px solid #e4ddea;
+  border-radius: 14px;
+  padding: 16px;
+}
+.statusTop {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+.statusTop strong {
+  color: #382e43;
+}
+.statusTop span {
+  color: #675579;
+  font-weight: 700;
+}
+.progress {
+  background: #e8e2ec;
+  border-radius: 999px;
+  height: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.progress i {
+  background: #675579;
+  display: block;
+  height: 100%;
+  transition: width 0.25s ease;
+}
+.counts {
+  color: #675579;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+}
+.tabs {
+  display: inline-flex;
+  align-self: start;
+  justify-self: start;
+  gap: 6px;
+}
+
+.workflowHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 18px;
+  padding: 0;
+  color: var(--rq-color-muted);
+}
+.workflowHeader p {
+  margin: 0;
+  color: var(--rq-color-text);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.workflowHeader ol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  white-space: nowrap;
+}
+.workflowHeader li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+}
+.workflowHeader li span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 50%;
+}
+.workflowHeader li[data-active="true"] {
+  color: var(--rq-action-operation);
+  font-weight: 700;
+}
+/* RQ PROTOTYPE HEADER COMPACT V2 RESPONSIVE */
+@media (max-width: 1180px) {
+  .workspaceMenuSource {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .workspaceMenuSource .workflowHeader {
+    flex-wrap: wrap;
+    gap: 5px 12px;
+  }
+  .workflowHeader p {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspaceMenuSource {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .workspaceMenuSource .workflowHeader {
+    justify-content: flex-start;
+  }
+  .workspaceMenuSource > .workspaceActions:last-child {
+    justify-content: flex-start;
+  }
+}
+
+.modelSelector {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  color: var(--rq-color-text);
+  font-size: 12px;
+}
+.modelSelector select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--rq-color-text);
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  font: inherit;
+}
+.modelSelector small {
+  color: var(--rq-color-muted);
+  font-weight: normal;
+  line-height: 1.5;
+}
+.tabs button {
+  background: #f4f1f6;
+  border: 1px solid #ddd5e3;
+  border-radius: 999px;
+  color: #51445d;
+  cursor: pointer;
+  padding: 8px 18px;
+}
+.tabs button[aria-selected="true"] {
+  background: #675579;
+  border-color: #675579;
+  color: white;
+}
+.stage {
+  min-width: 0;
+}
+.screenHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.screenHeader h3 {
+  color: #2f2736;
+  font-size: 1.35rem;
+  margin: 4px 0;
+}
+.screenHeader p {
+  color: #6e6474;
+  margin: 0;
+}
+.badge {
+  background: #eee8f1;
+  border-radius: 999px;
+  color: #675579;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.frame {
+  align-items: center;
+  background: #ece8ef;
+  border: 1px solid #ddd5e3;
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  min-height: 330px;
+  overflow: hidden;
+  padding: 14px;
+}
+.frame[data-device="MOBILE"] {
+  margin-inline: auto;
+  max-width: 470px;
+}
+.frame img {
+  border-radius: 9px;
+  display: block;
+  height: auto;
+  max-height: 70vh;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+.placeholder {
+  color: #716679;
+  padding: 60px 20px;
+  text-align: center;
+}
+.placeholder strong,
+.placeholder span {
+  display: block;
+}
+.placeholder span {
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+.navigation {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.navigation button,
+.action,
+.secondaryAction {
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 14px;
+}
+.navigation button,
+.secondaryAction {
+  background: white;
+  border: 1px solid #d8d0de;
+  color: #574a62;
+}
+.action {
+  background: #675579;
+  border: 1px solid #675579;
+  color: white;
+}
+.navigation button:disabled,
+.action:disabled,
+.secondaryAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.thumbs {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.thumb {
+  background: white;
+  border: 1px solid #ded7e3;
+  border-radius: 12px;
+  color: #51485a;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px;
+  text-align: left;
+}
+.thumb[aria-current="true"] {
+  border-color: #675579;
+  box-shadow: 0 0 0 2px rgba(103, 85, 121, 0.15);
+}
+.thumbVisual {
+  align-items: center;
+  aspect-ratio: 16 / 9;
+  background: #f1edf3;
+  border-radius: 7px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+.thumbVisual[data-device="MOBILE"] {
+  aspect-ratio: 3 / 4;
+}
+.thumbVisual img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.thumb strong,
+.thumb small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thumb strong {
+  font-size: 0.82rem;
+  margin-top: 7px;
+}
+.thumb small {
+  color: #817688;
+  font-size: 0.72rem;
+  margin-top: 3px;
+}
+.engines {
+  border-top: 1px solid #ebe6ee;
+  color: #756b7b;
+  display: grid;
+  font-size: 0.8rem;
+  gap: 4px;
+  padding-top: 14px;
+}
+.alert {
+  background: #fff4ed;
+  border: 1px solid #f0cdb9;
+  border-radius: 10px;
+  color: #824a2d;
+  padding: 10px 12px;
+}
+.empty {
+  color: #716679;
+  padding: 70px 20px;
+  text-align: center;
+}
+button.action:focus-visible,
+button.secondaryAction:focus-visible,
+.thumb:focus-visible,
+.tabs button:focus-visible,
+.navigation button:focus-visible {
+  outline: 3px solid rgba(103, 85, 121, 0.28);
+  outline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .screenHeader,
+  .statusTop,
+  .navigation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .tabs {
+    align-self: flex-start;
+  }
+  .frame {
+    min-height: 240px;
+    padding: 8px;
+  }
+  .thumbs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* =========================================================
+   RQ PROTOTYPE RESULTS ALERTS V1
+   Resultado textual + imágenes claramente separadas.
+   ========================================================= */
+
+.analysisResult {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 12px;
+  background: var(--rq-color-surface);
+}
+
+.previewSectionHeader,
+.imageSectionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.previewSectionHeader > div,
+.imageSectionHeading > div {
+  min-width: 0;
+}
+
+.previewSectionHeader small,
+.imageSectionHeading small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--rq-color-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.previewSectionHeader h3,
+.imageSectionHeading h3 {
+  margin: 0;
+  color: var(--rq-color-text);
+  font-size: 1rem;
+}
+
+.previewSectionHeader > span,
+.imageSectionHeading > span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 999px;
+  color: var(--rq-color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.analysisSummary {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rq-color-border);
+}
+
+.analysisSummary strong {
+  color: var(--rq-color-text);
+}
+
+.analysisSummary p {
+  margin: 0;
+  color: var(--rq-color-muted);
+  line-height: 1.5;
+}
+
+.analysisScreens {
+  display: grid;
+  gap: 8px;
+}
+
+.analysisScreen {
+  border: 1px solid var(--rq-color-border);
+  border-radius: 9px;
+  background: var(--rq-color-surface);
+  overflow: hidden;
+}
+
+.analysisScreen summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--rq-color-text);
+  list-style: none;
+}
+.analysisScreen summary input {
+  accent-color: var(--rq-action-operation);
+  flex: 0 0 auto;
+  height: 17px;
+  width: 17px;
+}
+.generateSelection {
+  background: var(--rq-action-affirmative);
+  border: 0;
+  border-radius: 9px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 11px 16px;
+}
+.generateSelection:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.analysisScreen summary input {
+  accent-color: var(--rq-action-operation);
+  flex: 0 0 auto;
+  height: 17px;
+  width: 17px;
+}
+.generateSelection {
+  background: var(--rq-action-affirmative);
+  border: 0;
+  border-radius: 9px;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 11px 16px;
+}
+.generateSelection:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.analysisScreen summary::-webkit-details-marker {
+  display: none;
+}
+
+.analysisScreen summary span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysisScreen summary small {
+  flex: 0 0 auto;
+  color: var(--rq-color-muted);
+  font-size: 0.7rem;
+}
+
+.analysisScreenContent {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--rq-color-border);
+  color: var(--rq-color-muted);
+  font-size: 0.8rem;
+}
+
+.analysisScreenContent p {
+  margin: 9px 0 0;
+  color: var(--rq-color-text);
+  line-height: 1.45;
+}
+
+.analysisScreenContent > span,
+.analysisScreenContent > div {
+  display: block;
+}
+
+.analysisScreenContent ul {
+  margin: 5px 0 0;
+  padding-left: 18px;
+}
+
+.analysisEmpty {
+  display: grid;
+  gap: 4px;
+  padding: 18px 12px;
+  border-top: 1px solid var(--rq-color-border);
+  color: var(--rq-color-muted);
+  text-align: center;
+}
+
+.analysisEmpty strong {
+  color: var(--rq-color-text);
+}
+
+.imageSectionHeading {
+  padding-top: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rq-color-border);
+}
+
+@media (max-width: 720px) {
+  .previewSectionHeader,
+  .imageSectionHeading,
+  .analysisScreen summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .previewSectionHeader > span,
+  .imageSectionHeading > span,
+  .analysisScreen summary small {
+    align-self: flex-start;
+  }
+
+  .analysisScreen summary span {
+    white-space: normal;
+  }
+}
+
+/* RQ PROTOTYPE RESULTS ALERTS V1 FIN */
+/* =========================================================
+   RQ PROTOTYPE POINT 03 TABS V1.1
+   Dos vistas excluyentes: Respuesta procesada | Imágenes.
+   ========================================================= */
+
+.resultTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--rq-color-surface-soft) 72%,
+    var(--rq-color-surface)
+  );
+}
+
+.resultTabs button {
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--rq-color-muted);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.resultTabs button > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultTabs button > small {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.resultTabs button[aria-selected="true"] {
+  border-color: var(--rq-color-border);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  box-shadow: 0 1px 2px rgb(20 28 32 / 6%);
+}
+
+.resultTabs button[aria-selected="true"] > small {
+  color: var(--rq-action-operation);
+}
+
+.resultTabs button:focus-visible {
+  outline: 3px solid
+    color-mix(in srgb, var(--rq-action-operation) 26%, transparent);
+  outline-offset: 2px;
+}
+
+.imagePanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.imageSectionHeading {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.galleryTitle,
+.galleryCounts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.galleryCounts {
+  margin-left: auto;
+  color: var(--rq-color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.galleryCounts span {
+  white-space: nowrap;
+}
+.galleryTitle .tabs button {
+  padding: 5px 12px;
+}
+.galleryStrip {
+  min-width: 0;
+  overflow: hidden;
+}
+.galleryStrip .thumbs {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 8px 2px 4px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+.galleryStrip .thumb {
+  flex: 0 0 140px;
+}
+.galleryStrip .thumbVisual {
+  aspect-ratio: 16 / 9;
+}
+.galleryStrip .thumbVisual img {
+  object-fit: contain;
+}
+.compactStatus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--rq-color-muted);
+  font-size: 0.75rem;
+}
+.screenHeader {
+  margin-bottom: 8px;
+}
+.screenHeader > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.screenHeader h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+.actions {
+  margin-top: 8px;
+}
+.frame {
+  position: relative;
+}
+.framePrevious,
+.frameNext {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 24%;
+  border: 0;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 2.6rem;
+  opacity: 0;
+  text-shadow: 0 1px 7px rgb(0 0 0 / 75%);
+  transition:
+    opacity 140ms ease,
+    background 140ms ease;
+}
+.framePrevious {
+  left: 0;
+  text-align: left;
+  padding-left: 18px;
+}
+.frameNext {
+  right: 0;
+  text-align: right;
+  padding-right: 18px;
+}
+.frame:hover .framePrevious:not(:disabled),
+.frame:hover .frameNext:not(:disabled),
+.framePrevious:focus-visible,
+.frameNext:focus-visible {
+  opacity: 1;
+}
+.framePrevious:hover:not(:disabled) {
+  background: linear-gradient(90deg, rgb(0 0 0 / 28%), transparent);
+}
+.frameNext:hover:not(:disabled) {
+  background: linear-gradient(270deg, rgb(0 0 0 / 28%), transparent);
+}
+.framePrevious:disabled,
+.frameNext:disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .resultTabs {
+    grid-template-columns: 1fr;
+  }
+
+  .resultTabs button {
+    min-height: 40px;
+  }
+}
+
+/* RQ PROTOTYPE POINT 03 TABS V1.1 FIN */
+
+/* =========================================================
+   RQ PROTOTYPE POINT 03 TABS SIN MARCO V1.2
+   Solo elimina el contenedor visual exterior.
+   ========================================================= */
+
+.resultTabs {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* RQ PROTOTYPE POINT 03 TABS SIN MARCO V1.2 FIN */
+/* =========================================================
+   RQ PROTOTYPE PERSISTENT TEXT PROGRESS V1.4
+   Barras por etapa para fuente e interpretación.
+   ========================================================= */
+
+.stageProgress {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.stageProgressHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.72rem;
+}
+
+.stageProgressHeader strong {
+  color: var(--rq-color-text);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.stageProgressHeader span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rq-color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stageProgressHeader b {
+  color: var(--rq-color-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.stageProgressTrack {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--rq-color-border);
+}
+
+.stageProgressTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rq-action-operation);
+  transition: width 220ms ease;
+}
+
+@media (max-width: 720px) {
+  .stageProgressHeader {
+    grid-template-columns: 1fr auto;
+  }
+
+  .stageProgressHeader > span {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* RQ PROTOTYPE PERSISTENT TEXT PROGRESS V1.4 FIN */
+
+/* =========================================================
+   RQ PROTOTYPE POINT 02 PROGRESS FIX V1.4.1
+   rq-device-selection aplica una grilla de 3 columnas a sus
+   div hijos directos. La barra del punto 02 también es un div
+   directo, por eso quedaba comprimida horizontalmente.
+   Este override afecta únicamente stageProgress dentro del
+   punto 02 y lo devuelve al formato vertical esperado.
+   ========================================================= */
+
+:global(.rq-device-selection) > .stageProgress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+/* RQ PROTOTYPE POINT 02 PROGRESS FIX V1.4.1 FIN */
+
+/* =========================================================
+   RQ_PROTOTYPE_HISTORY_COMPACT_V1
+   Alcance: historial de Generar prototipo.
+   - KPI y + Nuevo en la misma fila.
+   - Acciones de tabla más compactas.
+   ========================================================= */
+.historyTopRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.historyTopRow :global(.rq-kpi-grid) {
+  min-width: 0;
+}
+
+.historyToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.deletionDialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: 80vh;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 12px;
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+}
+
+.deletionDialog::backdrop {
+  background: rgb(0 0 0 / 50%);
+}
+
+.deletionDialog li {
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+
+.deleteSelected {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--rq-action-danger);
+  color: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.historyToolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.historySelection {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.historySelection input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--rq-action-operation);
+}
+
+.newPrototype {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--rq-action-affirmative);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.history table button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.historyActions {
+  gap: 6px;
+}
+
+@media (max-width: 760px) {
+  .historyTopRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .historyTopRow .newPrototype {
+    justify-self: end;
+  }
+}
+/* RQ_PROTOTYPE_HISTORY_COMPACT_V1 FIN */
+
+/* =========================================================
+   RQ PROTOTYPE HEADER ALIGN V3
+   - Texto de ayuda centrado.
+   - Pasos 1/2/3 alineados al extremo derecho.
+   - Menor separación con Fuente / Formato / Vista previa.
+   ========================================================= */
+.workspaceMenuSource {
+  grid-template-columns: minmax(145px, 1fr) minmax(360px, auto) minmax(
+      280px,
+      1fr
+    );
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 0;
+  margin-bottom: -8px;
+}
+
+.workspaceSourceTitle {
+  justify-self: center;
+  margin: 0;
+  color: var(--rq-color-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.workspaceMenuSource .workflowHeader {
+  justify-self: end;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 10px;
+  min-width: max-content;
+  padding: 0;
+}
+
+.workspaceMenuSource .workflowHeader ol {
+  justify-content: flex-end;
+}
+
+.workspaceMenuSource .workflowHeader .stopPrototype {
+  margin-left: 2px;
+}
+
+@media (max-width: 1180px) {
+  .workspaceMenuSource {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .workspaceSourceTitle {
+    white-space: normal;
+  }
+
+  .workspaceMenuSource .workflowHeader {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspaceMenuSource {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    margin-bottom: 0;
+  }
+
+  .workspaceSourceTitle {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .workspaceMenuSource .workflowHeader {
+    justify-self: start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* RQ PROTOTIPO EXPORTAR E IMPORTAR V1
+   Resultado del texto: «Generar» (general) y «Exportar» (TXT para otra IA) lado a lado;
+   «Importar imágenes» en la galería. */
+.selectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.selectionActions > button {
+  flex: 1 1 200px;
+}
+.exportSelection {
+  background: var(--rq-color-surface, white);
+  border: 1px solid var(--rq-action-operation);
+  border-radius: 9px;
+  color: var(--rq-action-operation);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+  padding: 11px 16px;
+}
+.exportSelection:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.importImages {
+  display: flex;
+  align-items: center;
+}

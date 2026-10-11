@@ -167,3 +167,69 @@ test("las contraseñas temporales generadas son únicas y cumplen la longitud m�
   assert.ok(first.length >= 12);
   assert.match(first, /^Rq![A-Za-z0-9_-]+9a$/u);
 });
+
+test("el autorregistro crea usuario inactivo y rol ANALYST en una sola transacción", async () => {
+  const analystRole = {
+    id: "33333333-3333-4333-8333-333333333333",
+    code: "ANALYST",
+    isActive: true,
+  };
+  let repositoryCall = 0;
+  let transactionCount = 0;
+  let createdUser: Readonly<Record<string, unknown>> | undefined;
+  let assignedRole: Readonly<Record<string, unknown>> | undefined;
+
+  const usersRepository = {
+    exists: () => Promise.resolve(false),
+    create: (value: Readonly<Record<string, unknown>>) => {
+      createdUser = value;
+      return value;
+    },
+    save: (value: Readonly<Record<string, unknown>>) =>
+      Promise.resolve({ ...value, id: value.id as string }),
+  };
+  const manager = {
+    getRepository: () => {
+      repositoryCall += 1;
+      if (repositoryCall === 1) return usersRepository;
+      if (repositoryCall === 2) {
+        return { findOne: () => Promise.resolve(analystRole) };
+      }
+      if (repositoryCall === 3) {
+        return {
+          insert: (value: Readonly<Record<string, unknown>>) => {
+            assignedRole = value;
+            return Promise.resolve();
+          },
+        };
+      }
+      return { insert: () => Promise.resolve() };
+    },
+  };
+  const service = usersService({
+    passwordHasher: { hash: () => Promise.resolve("argon2-hash") },
+    dataSource: {
+      transaction: async (work: (value: unknown) => Promise<unknown>) => {
+        transactionCount += 1;
+        return work(manager);
+      },
+    },
+  });
+
+  const response = await service.registerAccount({
+    displayName: "Nueva Analista",
+    email: "Analista@Empresa.com",
+    password: "Clave-Segura-2026",
+  });
+
+  assert.equal(transactionCount, 1);
+  assert.equal(createdUser?.isActive, false);
+  assert.equal(createdUser?.emailNormalized, "analista@empresa.com");
+  assert.equal(assignedRole?.roleId, analystRole.id);
+  assert.equal(assignedRole?.userId, response.userId);
+  assert.deepEqual(response, {
+    userId: response.userId,
+    status: "PENDING_ACTIVATION",
+    roleCode: "ANALYST",
+  });
+});

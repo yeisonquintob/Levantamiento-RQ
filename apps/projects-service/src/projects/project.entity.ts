@@ -8,6 +8,7 @@ import {
 
 import type {
   DocumentTemplateType,
+  ProjectActivityState,
   ProjectStatus,
 } from "@levantamiento-rq/shared-contracts";
 
@@ -40,6 +41,9 @@ export class ProjectEntity {
 
   @Column("nvarchar", { name: "Status", length: 32, default: "DRAFT" })
   status!: ProjectStatus;
+
+  @Column("nvarchar", { name: "ActivityState", length: 10, default: "ACTIVE" })
+  activityState!: ProjectActivityState;
 
   @Column("uniqueidentifier", {
     name: "TemplateId",

@@ -9,6 +9,7 @@ import {
   type DocumentTemplateStatus,
   type DocumentTemplateType,
   type UpdateDocumentTemplateRequest,
+  type UpdateDocumentTemplateLogoRequest,
 } from "@levantamiento-rq/shared-contracts";
 
 export interface DocumentTemplateListQuery {
@@ -21,11 +22,12 @@ export interface DocumentTemplateListQuery {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SEMVER_PATTERN =
-  /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
+const SEMVER_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const CODE_PATTERN = /^[A-Z][A-Z0-9-]{2,39}$/;
 const SECTION_KEY_PATTERN = /^[a-z][a-zA-Z0-9]{2,63}$/;
 const MAX_TEMPLATE_SECTIONS = 50;
+const MAX_LOGO_BYTES = 512 * 1024;
+const LOGO_MEDIA_TYPES = ["image/png", "image/jpeg"] as const;
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -140,9 +142,7 @@ function optionalSections(
     }
 
     if (keys.has(key)) {
-      throw new BadRequestException(
-        `La key de sección ${key} está repetida.`,
-      );
+      throw new BadRequestException(`La key de sección ${key} está repetida.`);
     }
 
     keys.add(key);
@@ -168,9 +168,7 @@ function templateType(value: unknown): DocumentTemplateType {
   return value as DocumentTemplateType;
 }
 
-function optionalTemplateType(
-  value: unknown,
-): DocumentTemplateType | null {
+function optionalTemplateType(value: unknown): DocumentTemplateType | null {
   if (value === undefined || value === null || value === "") {
     return null;
   }
@@ -178,18 +176,14 @@ function optionalTemplateType(
   return templateType(value);
 }
 
-function optionalStatus(
-  value: unknown,
-): DocumentTemplateStatus | null {
+function optionalStatus(value: unknown): DocumentTemplateStatus | null {
   if (value === undefined || value === null || value === "") {
     return null;
   }
 
   if (
     typeof value !== "string" ||
-    !DOCUMENT_TEMPLATE_STATUSES.includes(
-      value as DocumentTemplateStatus,
-    )
+    !DOCUMENT_TEMPLATE_STATUSES.includes(value as DocumentTemplateStatus)
   ) {
     throw new BadRequestException("El estado de plantilla no es válido.");
   }
@@ -214,10 +208,7 @@ function normalizedCode(value: unknown): string {
 }
 
 function semanticVersion(value: unknown): string {
-  if (
-    typeof value !== "string" ||
-    !SEMVER_PATTERN.test(value.trim())
-  ) {
+  if (typeof value !== "string" || !SEMVER_PATTERN.test(value.trim())) {
     throw new BadRequestException(
       "version debe usar SemVer sin sufijos, por ejemplo 1.0.0.",
     );
@@ -247,11 +238,7 @@ function readInteger(
 
   const resolved = Number(value);
 
-  if (
-    !Number.isInteger(resolved) ||
-    resolved < minimum ||
-    resolved > maximum
-  ) {
+  if (!Number.isInteger(resolved) || resolved < minimum || resolved > maximum) {
     throw new BadRequestException(
       `${field} debe estar entre ${minimum} y ${maximum}.`,
     );
@@ -322,6 +309,62 @@ export function parseUpdateDocumentTemplate(
   return result;
 }
 
+export function parseUpdateDocumentTemplateLogo(
+  value: unknown,
+): UpdateDocumentTemplateLogoRequest {
+  const record = asRecord(value);
+  const fileName = requiredText(record, "fileName", 1, 260);
+  const mediaType = record.mediaType;
+  const dataBase64 = record.dataBase64;
+
+  if (
+    typeof mediaType !== "string" ||
+    !LOGO_MEDIA_TYPES.includes(mediaType as (typeof LOGO_MEDIA_TYPES)[number])
+  ) {
+    throw new BadRequestException("El logo debe ser una imagen PNG o JPEG.");
+  }
+
+  if (
+    typeof dataBase64 !== "string" ||
+    dataBase64.length === 0 ||
+    dataBase64.length > Math.ceil((MAX_LOGO_BYTES * 4) / 3) + 4 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(dataBase64)
+  ) {
+    throw new BadRequestException("El contenido base64 del logo no es válido.");
+  }
+
+  const data = Buffer.from(dataBase64, "base64");
+  if (data.length === 0 || data.length > MAX_LOGO_BYTES) {
+    throw new BadRequestException("El logo debe pesar máximo 512 KB.");
+  }
+
+  const isPng =
+    data.length >= 8 &&
+    data
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const isJpeg =
+    data.length >= 3 &&
+    data[0] === 0xff &&
+    data[1] === 0xd8 &&
+    data[2] === 0xff;
+
+  if (
+    (mediaType === "image/png" && !isPng) ||
+    (mediaType === "image/jpeg" && !isJpeg)
+  ) {
+    throw new BadRequestException(
+      "El contenido del logo no coincide con el tipo de imagen declarado.",
+    );
+  }
+
+  return {
+    fileName,
+    mediaType: mediaType as "image/png" | "image/jpeg",
+    dataBase64,
+  };
+}
+
 export function parseCloneDocumentTemplate(
   value: unknown,
 ): CloneDocumentTemplateRequest {
@@ -371,16 +414,12 @@ export function assertScrumRule(
   validateScrumRule(type, includesScrum);
 }
 
-export function compareSemanticVersions(
-  left: string,
-  right: string,
-): number {
+export function compareSemanticVersions(left: string, right: string): number {
   const leftParts = left.split(".").map(Number);
   const rightParts = right.split(".").map(Number);
 
   for (let index = 0; index < 3; index += 1) {
-    const difference =
-      (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
 
     if (difference !== 0) {
       return difference;

@@ -36,16 +36,20 @@ Documents. Workflow conserva `IN_REVIEW`, `CHANGES_REQUESTED`, `APPROVED` y
 - Solicitar validación bloquea cambios no autorizados.
 - Aprobar crea una versión inmutable.
 - Modificar un aprobado crea una nueva versión en BORRADOR.
-- El control de cambios registra versión, fecha, modificación y aprobó.
+- Generar o regenerar un borrador no crea una entrada de control de cambios.
+- Al aprobar una versión posterior a la inicial, el control de cambios registra una única entrada compacta con versión, fecha, modificación y quién aprobó.
 - Comentarios, correcciones y decisiones registran actor, correlación y clave
   idempotente en `RqWorkflowDb`.
 - Repetir una mutación con la misma clave no duplica la actividad.
 
 ## Roles
 
-- Elaboró: crea y edita.
-- Revisó: valida y solicita correcciones.
-- Aprobó: toma la decisión final.
+- Elaboró: la persona responsable autenticada que crea y edita.
+- Revisó: su líder, que valida y solicita correcciones.
+- Aprobó: la persona solicitante o su líder, que toma la decisión final.
+
+Los nombres inferidos desde fuentes son propuestas; el actor autenticado que
+ejecuta cada transición es el dato definitivo del expediente.
 
 Una misma persona podrá ocupar más de un rol únicamente cuando la política
 de la organización lo permita y quede auditado.

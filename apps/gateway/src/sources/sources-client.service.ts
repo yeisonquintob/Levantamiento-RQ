@@ -8,6 +8,7 @@ import {
 import type {
   CreateTextSourceRequest,
   ProcessSourcesRequest,
+  ProjectDomainPurgeResult,
   SourceBatchProcessingResponse,
   SourceDetail,
   SourceListResponse,
@@ -166,6 +167,17 @@ export class SourcesClientService {
     return this.request<SourceBatchProcessingResponse>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/sources/process-all`,
       "POST",
+      accessToken,
+    );
+  }
+
+  purgeProject(
+    accessToken: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    return this.request(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources`,
+      "DELETE",
       accessToken,
     );
   }

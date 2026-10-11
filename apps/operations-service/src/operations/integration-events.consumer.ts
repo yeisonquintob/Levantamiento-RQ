@@ -39,6 +39,7 @@ const ROUTING_KEYS = [
   "review.changes-requested",
   "document.approved",
   "document.rejected",
+  "analysis.completed",
   "analysis.failed",
   "export.completed",
   "export.failed",

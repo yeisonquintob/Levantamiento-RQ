@@ -3,12 +3,14 @@ import { Module } from "@nestjs/common";
 import { AiAnalysisClientService } from "../analysis/ai-analysis-client.service";
 import { AiAnalysisGatewayController } from "../analysis/ai-analysis-gateway.controller";
 import { AiProviderConfigurationsGatewayController } from "../analysis/ai-provider-configurations-gateway.controller";
+import { ViabilityCriteriaGatewayController } from "../analysis/viability-criteria-gateway.controller";
 import { AuthGatewayController } from "../auth/auth-gateway.controller";
 import { IdentityClientService } from "../auth/identity-client.service";
 import { GATEWAY_CONFIG, loadGatewayConfig } from "../config/gateway-config";
 import { DocumentTemplatesClientService } from "../templates/document-templates-client.service";
 import { DocumentTemplatesGatewayController } from "../templates/document-templates-gateway.controller";
 import { ProjectsClientService } from "../projects/projects-client.service";
+import { ProjectAreasGatewayController } from "../projects/project-areas-gateway.controller";
 import { ProjectsGatewayController } from "../projects/projects-gateway.controller";
 import { SourcesClientService } from "../sources/sources-client.service";
 import { SourcesGatewayController } from "../sources/sources-gateway.controller";
@@ -21,6 +23,9 @@ import { OperationsGatewayController } from "../operations/operations-gateway.co
 import { WorkflowClientService } from "../workflow/workflow-client.service";
 import { WorkflowGatewayController } from "../workflow/workflow-gateway.controller";
 import { AuthRateLimitGuard } from "../security/auth-rate-limit.guard";
+import { PrototypesClientService } from "../prototypes/prototypes-client.service";
+import { PrototypesGatewayController } from "../prototypes/prototypes-gateway.controller";
+import { PrototypeImagesGatewayController } from "../prototypes/prototype-images-gateway.controller";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
@@ -29,14 +34,18 @@ import { AppService } from "./app.service";
     AppController,
     AuthGatewayController,
     ProjectsGatewayController,
+    ProjectAreasGatewayController,
     SourcesGatewayController,
     DocumentTemplatesGatewayController,
     UsersGatewayController,
     DocumentsGatewayController,
     AiAnalysisGatewayController,
     AiProviderConfigurationsGatewayController,
+    ViabilityCriteriaGatewayController,
     WorkflowGatewayController,
     OperationsGatewayController,
+    PrototypesGatewayController,
+    PrototypeImagesGatewayController,
   ],
   providers: [
     {
@@ -53,6 +62,7 @@ import { AppService } from "./app.service";
     AiAnalysisClientService,
     WorkflowClientService,
     OperationsClientService,
+    PrototypesClientService,
     AuthRateLimitGuard,
   ],
 })

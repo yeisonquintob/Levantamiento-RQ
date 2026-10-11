@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { randomBytes, scryptSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
+import { exportJWK, generateKeyPair } from "jose";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 
@@ -91,6 +93,17 @@ class FakeIdentityStore implements IdentityStore {
     return Promise.resolve();
   }
 
+  revokeRefreshFamily(familyId: string, userId: string, instant: Date): Promise<void> {
+    for (const [sessionId, session] of this.sessions) {
+      if (session.familyId === familyId && session.userId === userId) {
+        this.sessions.set(sessionId, { ...session, revokedAt: instant });
+      }
+    }
+    const user = this.users.get(userId);
+    if (user) this.users.set(userId, { ...user, sessionVersion: user.sessionVersion + 1 });
+    return Promise.resolve();
+  }
+
   changePassword(
     userId: string,
     passwordHash: string,
@@ -117,18 +130,46 @@ class FakeIdentityStore implements IdentityStore {
   }
 }
 
-const config: AuthConfig = {
-  enabled: true,
-  issuer: "levantamiento-rq-test",
-  audience: "levantamiento-rq-test",
-  accessSecret: "a".repeat(64),
-  refreshSecret: "b".repeat(64),
-  accessTtlSeconds: 300,
-  refreshTtlSeconds: 3600,
-  inactivityTtlSeconds: 1800,
-};
+const encode = (value: unknown) =>
+  Buffer.from(JSON.stringify(value), "utf8").toString("base64");
+
+async function createAuthConfig(): Promise<AuthConfig> {
+  const { privateKey, publicKey } = await generateKeyPair("EdDSA", {
+    crv: "Ed25519",
+    extractable: true,
+  });
+  const accessKeyId = "identity-test-ed25519-1";
+  return {
+    enabled: true,
+    issuer: "levantamiento-rq-test",
+    audience: "levantamiento-rq-test",
+    accessPrivateJwk: encode({
+      ...(await exportJWK(privateKey)),
+      kid: accessKeyId,
+      alg: "EdDSA",
+      use: "sig",
+    }),
+    accessPublicJwks: encode({
+      keys: [
+        {
+          ...(await exportJWK(publicKey)),
+          kid: accessKeyId,
+          alg: "EdDSA",
+          use: "sig",
+          principal: "identity",
+        },
+      ],
+    }),
+    accessKeyId,
+    refreshSecret: "b".repeat(64),
+    accessTtlSeconds: 300,
+    refreshTtlSeconds: 3600,
+    inactivityTtlSeconds: 1800,
+  };
+}
 
 async function createFixture(active = true) {
+  const config = await createAuthConfig();
   const store = new FakeIdentityStore();
   const hasher = new PasswordHasher();
   const tokenService = new TokenService(config);
@@ -152,14 +193,33 @@ async function createFixture(active = true) {
   return { store, hasher, tokenService, auth, user, password };
 }
 
-test("scrypt genera hashes con sal y verifica la contraseña", async () => {
+test("Argon2id genera hashes con sal y verifica la contraseña", async () => {
   const hasher = new PasswordHasher();
   const first = await hasher.hash("Password123!");
   const second = await hasher.hash("Password123!");
 
   assert.notEqual(first, second);
+  assert.match(first, /^\$argon2id\$/);
   assert.equal(await hasher.verify("Password123!", first), true);
   assert.equal(await hasher.verify("incorrecta", first), false);
+});
+
+test("verifica scrypt legado y exige rehash automático a Argon2id", async () => {
+  const password = "Password123!";
+  const salt = randomBytes(16);
+  const derived = scryptSync(password, salt, 64, {
+    N: 16384,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  });
+  const legacy = [
+    "scrypt", "v=1", "N=16384", "r=8", "p=1",
+    salt.toString("base64url"), derived.toString("base64url"),
+  ].join("$");
+  const hasher = new PasswordHasher();
+  assert.equal(await hasher.verify(password, legacy), true);
+  assert.equal(hasher.needsRehash(legacy), true);
 });
 
 test("inicio, consulta, renovación y cierre de sesión", async () => {
@@ -188,14 +248,53 @@ test("inicio, consulta, renovación y cierre de sesión", async () => {
 
   await assert.rejects(
     () => fixture.auth.refresh(signedIn.refreshToken),
-    /Sesión de renovación inválida|La sesión ya fue utilizada/,
+    /Sesión de renovación inválida|La sesión ya fue utilizada|reutilización/,
+  );
+  await assert.rejects(
+    () => fixture.auth.authenticateAccessToken(signedIn.accessToken),
+    /cuenta no está disponible/i,
   );
 
   await fixture.auth.signOut(refreshed.refreshToken);
 
   await assert.rejects(
     () => fixture.auth.refresh(refreshed.refreshToken),
-    /Sesión de renovación inválida/,
+    /Sesión de renovación inválida|reutilización/,
+  );
+});
+
+test("la familia de refresh acepta la representación UUID de SQL Server sin depender del casing", async () => {
+  const fixture = await createFixture();
+  const signedIn = await fixture.auth.signIn({
+    email: fixture.user.email,
+    password: fixture.password,
+  });
+
+  const stored = [...fixture.store.sessions.values()][0];
+  assert.ok(stored);
+
+  fixture.store.sessions.set(stored.id, {
+    ...stored,
+    familyId: stored.familyId.toUpperCase(),
+  });
+
+  const refreshed = await fixture.auth.refresh(
+    signedIn.refreshToken,
+  );
+
+  assert.notEqual(
+    refreshed.refreshToken,
+    signedIn.refreshToken,
+  );
+
+  const active = [...fixture.store.sessions.values()].find(
+    (session) => !session.revokedAt,
+  );
+
+  assert.ok(active);
+  assert.equal(
+    active.familyId,
+    active.familyId.toLowerCase(),
   );
 });
 
@@ -298,8 +397,31 @@ test("el Workspace renueva solo con actividad y avisa la expiración", async () 
   assert.match(manager, /ACTIVITY_WINDOW_MS/);
   assert.match(manager, /api\/v1\/auth\/refresh/);
   assert.match(manager, /api\/v1\/auth\/sign-out/);
-  assert.match(manager, /redirectToSignIn\("inactivity"\)/);
-  assert.match(signIn, /30 minutos de inactividad/);
+  assert.match(manager, /redirectToSignIn\(\s*"inactivity"/);
+  assert.match(signIn, /Inactivo por <strong>30 minutos<\/strong>/);
+
+  /*
+   * La renovación debe coordinar pestañas sin guardar
+   * tokens ni sesión en localStorage/sessionStorage.
+   */
+  assert.match(manager, /navigator\.locks/);
+  assert.match(manager, /BroadcastChannel/);
+  assert.match(manager, /ifAvailable:\s*true/);
+  assert.match(manager, /visibilitychange/);
+
+  /*
+   * Un error temporal de Gateway/Redis no debe
+   * interpretarse como credencial vencida.
+   */
+  assert.match(
+    manager,
+    /response\.status === 401[\s\S]*response\.status === 403/,
+  );
+  assert.doesNotMatch(
+    manager,
+    /if \(!response\.ok\) \{\s*redirectToSignIn/,
+  );
+
   assert.doesNotMatch(manager, /localStorage|sessionStorage/);
 });
 
@@ -325,10 +447,67 @@ test("el acceso elimina credenciales y parámetros no permitidos de la URL", asy
     readFile("apps/web/src/app/sign-in/sign-in-form.tsx", "utf8"),
     readFile("apps/web/next.config.js", "utf8"),
   ]);
-  assert.match(proxy, /matcher: \["\/sign-in"/);
+  assert.match(proxy, /source: "\/\(\(\?!api\|_next\/static/);
+  assert.match(proxy, /'nonce-\$\{nonce\}' 'strict-dynamic'/);
+  assert.doesNotMatch(proxy, /script-src[^\n]*unsafe-inline/);
   assert.match(proxy, /Referrer-Policy", "no-referrer"/);
   assert.match(form, /history\.replaceState/);
-  assert.match(nextConfig, /allowedDevOrigins: \["127\.0\.0\.1", "localhost"\]/);
+  assert.match(nextConfig, /RQ_ALLOWED_DEV_ORIGINS/);
+  assert.match(nextConfig, /const allowedDevOrigins = resolveAllowedDevOrigins/);
+  assert.match(proxy, /request\.nextUrl\.hostname/);
   assert.match(nextConfig, /logging: \{ incomingRequests: false \}/);
   assert.match(nextConfig, /Referrer-Policy", value: "no-referrer"/);
+});
+
+test("la detección de IP LAN local usa node:os.networkInterfaces, deduplica y propaga a ambas listas de orígenes", async () => {
+  const script = await readFile("scripts/local-auth-up.sh", "utf8");
+
+  assert.match(script, /require\("node:os"\)/);
+  assert.match(script, /networkInterfaces\(\)/);
+  assert.match(script, /is_private_ipv4 "\$ip"/);
+
+  assert.match(script, /awk 'NF && !seen\[\$0\]\+\+'/);
+
+  assert.match(
+    script,
+    /WEB_ORIGINS_RUNTIME="\$\{WEB_ORIGINS_RUNTIME\},http:\/\/\$\{ip\}:4200"/,
+  );
+  assert.match(
+    script,
+    /RQ_ALLOWED_DEV_ORIGINS_RUNTIME="\$\{RQ_ALLOWED_DEV_ORIGINS_RUNTIME\},\$\{ip\}"/,
+  );
+
+  assert.match(script, /127\.0\.0\.1,localhost/);
+  assert.match(script, /http:\/\/127\.0\.0\.1:4200,http:\/\/localhost:4200/);
+});
+
+test("el aviso de inactividad es contextual y se cierra desde el correo", async () => {
+  const [form, styles] = await Promise.all([
+    readFile("apps/web/src/app/sign-in/sign-in-form.tsx", "utf8"),
+    readFile("apps/web/src/app/auth.css", "utf8"),
+  ]);
+
+  assert.match(form, /setInactivityNotice\(true\)/);
+  assert.doesNotMatch(form, /setMessage\("Inactivo por 30 minutos\."\)/);
+  assert.doesNotMatch(form, /addEventListener\("pointerdown"/);
+  // El aviso es una pastilla flotante con reloj y botón para cerrarla, fuera del formulario.
+  assert.match(
+    form,
+    /\{inactivityNotice \? \(\s*<div className="rq-auth-inactivity-notice" role="status">[\s\S]*?Inactivo por <strong>30 minutos<\/strong>[\s\S]*?aria-label="Cerrar aviso"[\s\S]*?onClick=\{dismissInactivityNotice\}/,
+  );
+  assert.doesNotMatch(
+    form,
+    /rq-auth-intro">Continúa con tu cuenta activa\.<\/p>\s*\{inactivityNotice/,
+  );
+  assert.match(form, /url\.searchParams\.delete\("reason"\)/);
+  assert.match(form, /id="email"[\s\S]*?onClick=\{dismissInactivityNotice\}[\s\S]*?onFocus=\{dismissInactivityNotice\}/);
+  const notice = styles.match(/\.rq-auth-inactivity-notice\s*\{[^}]*\}/)?.[0] ?? "";
+  assert.match(notice, /position: fixed;/);
+  assert.match(notice, /var\(--rq-color-surface\)/);
+  assert.match(notice, /border-radius: 999px;/);
+  assert.match(form, /data-session-expired=\{message === SESSION_EXPIRED_MESSAGE \|\| undefined\}/);
+  assert.match(
+    styles,
+    /\.rq-auth-message\[data-session-expired="true"\]\s*\{\s*position: fixed;/,
+  );
 });

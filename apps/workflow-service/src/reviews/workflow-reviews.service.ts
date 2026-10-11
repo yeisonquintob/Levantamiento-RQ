@@ -20,6 +20,7 @@ import type {
   WorkflowReviewAssignment,
   WorkflowReviewDetail,
   WorkflowReviewListResponse,
+  ProjectDomainPurgeResult,
   WorkflowReviewStatus,
   WorkflowReviewSummary,
 } from "@levantamiento-rq/shared-contracts";
@@ -110,21 +111,23 @@ export class WorkflowReviewsService {
         );
       }
 
-      const initialActivity = await this.activities.findOneBy({
-        reviewRequestId: existing.id,
-        type: "REVIEW_REQUESTED",
-      });
+      const initialActivity = await this.findIdempotentActivity(
+        existing.id,
+        context.idempotencyKey,
+      );
 
-      if (initialActivity?.idempotencyKey === context.idempotencyKey) {
+      if (initialActivity?.type === "REVIEW_REQUESTED") {
         return this.loadDetail(projectId, existing.id);
       }
 
-      throw new ConflictException(
-        "La versión ya tiene una revisión creada con otra clave idempotente.",
-      );
+      if (existing.status !== "CHANGES_REQUESTED") {
+        throw new ConflictException(
+          "La versión ya tiene una revisión creada con otra clave idempotente.",
+        );
+      }
     }
 
-    const document = await this.documents.requireDraftVersion(
+    const document = await this.documents.requireEditableVersion(
       projectId,
       documentId,
       versionNumber,
@@ -133,7 +136,7 @@ export class WorkflowReviewsService {
       context.correlationId,
     );
     const now = new Date();
-    const reviewId = randomUUID();
+    const reviewId = existing?.id ?? randomUUID();
     const reviewerIds = access.project.participants
       .filter((participant) => participant.role === "REVIEWER")
       .map((participant) => participant.userId);
@@ -151,43 +154,68 @@ export class WorkflowReviewsService {
     );
 
     await this.dataSource.transaction(async (manager) => {
-      await manager.save(
-        manager.create(WorkflowReviewRequestEntity, {
-          id: reviewId,
-          projectId,
-          documentId,
-          documentVersionId: document.currentVersionDetail.id,
-          versionNumber,
-          status: "IN_REVIEW",
-          revision: 1,
-          requestedByUserId: context.actor.id,
-          requestedAt: now,
-          completedByUserId: null,
-          completedAt: null,
-          createdAt: now,
-          updatedAt: now,
-        }),
-      );
-      await manager.save(WorkflowReviewAssignmentEntity, [
-        ...reviewerIds.map((userId) => ({
-          id: randomUUID(),
-          reviewRequestId: reviewId,
-          userId,
-          role: "REVIEWER" as const,
-          status: "PENDING" as const,
-          assignedAt: now,
-          completedAt: null,
-        })),
-        {
-          id: randomUUID(),
-          reviewRequestId: reviewId,
-          userId: access.project.ownerUserId,
-          role: "APPROVER" as const,
-          status: "PENDING" as const,
-          assignedAt: now,
-          completedAt: null,
-        },
-      ]);
+      if (existing) {
+        const result = await manager
+          .createQueryBuilder()
+          .update(WorkflowReviewRequestEntity)
+          .set({
+            status: "IN_REVIEW",
+            revision: () => "Revision + 1",
+            requestedByUserId: context.actor.id,
+            requestedAt: now,
+            completedByUserId: null,
+            completedAt: null,
+            updatedAt: now,
+          })
+          .where("Id = :reviewId", { reviewId })
+          .andWhere("Status = :status", { status: "CHANGES_REQUESTED" })
+          .execute();
+        if (result.affected !== 1) this.stale();
+
+        await manager.update(
+          WorkflowReviewAssignmentEntity,
+          { reviewRequestId: reviewId },
+          { status: "PENDING", completedAt: null },
+        );
+      } else {
+        await manager.save(
+          manager.create(WorkflowReviewRequestEntity, {
+            id: reviewId,
+            projectId,
+            documentId,
+            documentVersionId: document.currentVersionDetail.id,
+            versionNumber,
+            status: "IN_REVIEW",
+            revision: 1,
+            requestedByUserId: context.actor.id,
+            requestedAt: now,
+            completedByUserId: null,
+            completedAt: null,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        );
+        await manager.save(WorkflowReviewAssignmentEntity, [
+          ...reviewerIds.map((userId) => ({
+            id: randomUUID(),
+            reviewRequestId: reviewId,
+            userId,
+            role: "REVIEWER" as const,
+            status: "PENDING" as const,
+            assignedAt: now,
+            completedAt: null,
+          })),
+          {
+            id: randomUUID(),
+            reviewRequestId: reviewId,
+            userId: access.project.ownerUserId,
+            role: "APPROVER" as const,
+            status: "PENDING" as const,
+            assignedAt: now,
+            completedAt: null,
+          },
+        ]);
+      }
       await manager.save(
         manager.create(WorkflowReviewActivityEntity, {
           id: randomUUID(),
@@ -213,6 +241,7 @@ export class WorkflowReviewsService {
         documentVersionId: document.currentVersionDetail.id,
         versionNumber,
         requestedByUserId: context.actor.id,
+        actorName: context.actor.displayName,
       },
     });
 
@@ -233,6 +262,21 @@ export class WorkflowReviewsService {
       items: reviews.map((review) => this.toSummary(review)),
       totalItems: reviews.length,
     };
+  }
+
+  async purgeProject(
+    context: WorkflowActorContext,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    const access = await this.requireProjectAccess(context, projectId);
+    if (access.role !== "ADMIN" && access.role !== "OWNER") {
+      throw new ForbiddenException(
+        "Solo ADMIN o el propietario pueden eliminar las revisiones del proyecto.",
+      );
+    }
+    const count = await this.reviews.countBy({ projectId });
+    if (count > 0) await this.reviews.delete({ projectId });
+    return { deleted: true, count };
   }
 
   async getById(
@@ -328,7 +372,7 @@ export class WorkflowReviewsService {
       request,
       "CHANGES_REQUESTED",
       "CHANGES_REQUESTED",
-      "reject",
+      "request-changes",
       "REVIEWER",
     );
   }
@@ -379,7 +423,7 @@ export class WorkflowReviewsService {
       WorkflowActivityType,
       "REVIEW_REQUESTED" | "COMMENTED"
     >,
-    documentAction: "approve" | "reject",
+    documentAction: "request-changes" | "approve" | "reject",
     requiredAssignment: "REVIEWER" | "APPROVER",
   ): Promise<WorkflowReviewDetail> {
     this.requireIdempotencyKey(context);
@@ -523,6 +567,10 @@ export class WorkflowReviewsService {
           versionNumber: review.versionNumber,
           requestedByUserId: review.requestedByUserId,
           decidedByUserId: context.actor.id,
+          actorName: context.actor.displayName,
+          previousStatus: review.status,
+          status,
+          comment: request.comment ?? null,
         },
       });
     }

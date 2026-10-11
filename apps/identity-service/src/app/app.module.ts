@@ -7,12 +7,16 @@ import {
 } from "@levantamiento-rq/shared-persistence";
 
 import { AccessTokenGuard } from "../auth/access-token.guard";
-import {
-  AUTH_CONFIG,
-  loadAuthConfig,
-} from "../auth/auth-config";
+import { AUTH_CONFIG, loadAuthConfig } from "../auth/auth-config";
 import { AuthController } from "../auth/auth-controller";
 import { AuthService } from "../auth/auth-service";
+import {
+  loadMicrosoftAuthConfig,
+  MICROSOFT_AUTH_CONFIG,
+} from "../auth/microsoft-auth-config";
+import { MicrosoftAuthController } from "../auth/microsoft-auth.controller";
+import { MicrosoftAuthService } from "../auth/microsoft-auth.service";
+import { RegistrationController } from "../auth/registration-controller";
 import { DisabledIdentityStore } from "../auth/disabled-identity.store";
 import { IDENTITY_STORE } from "../auth/identity-store";
 import { PasswordHasher } from "../auth/password-hasher";
@@ -70,14 +74,15 @@ const storeProviders: Provider[] = databaseConfig.enabled
       serviceName: "identity-service",
       defaultDatabaseName: "RqIdentityDb",
     }),
-    ...(databaseConfig.enabled
-      ? [TypeOrmModule.forFeature(entities)]
-      : []),
+    ...(databaseConfig.enabled ? [TypeOrmModule.forFeature(entities)] : []),
   ],
   controllers: [
     AppController,
     AuthController,
-    ...(databaseConfig.enabled ? [UsersController] : []),
+    MicrosoftAuthController,
+    ...(databaseConfig.enabled
+      ? [RegistrationController, UsersController]
+      : []),
   ],
   providers: [
     AppService,
@@ -85,9 +90,14 @@ const storeProviders: Provider[] = databaseConfig.enabled
       provide: AUTH_CONFIG,
       useFactory: loadAuthConfig,
     },
+    {
+      provide: MICROSOFT_AUTH_CONFIG,
+      useFactory: loadMicrosoftAuthConfig,
+    },
     PasswordHasher,
     TokenService,
     AuthService,
+    MicrosoftAuthService,
     AccessTokenGuard,
     PermissionsGuard,
     ...(databaseConfig.enabled ? [UsersService] : []),

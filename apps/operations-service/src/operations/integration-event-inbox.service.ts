@@ -30,6 +30,7 @@ const CONSUMED_EVENTS = [
   "review.changes-requested",
   "document.approved",
   "document.rejected",
+  "analysis.completed",
   "analysis.failed",
   "export.completed",
   "export.failed",
@@ -188,7 +189,14 @@ export class IntegrationEventInboxService {
             correlationId: event.correlationId,
             ipAddress: null,
             userAgent: `${event.producer}/integration-event`,
-            metadataJson: JSON.stringify(definition.auditMetadata),
+            metadataJson: JSON.stringify({
+              ...definition.auditMetadata,
+              projectLabel: `${project.code} · ${project.title}`,
+              actorName:
+                typeof event.data.actorName === "string"
+                  ? event.data.actorName.slice(0, 200)
+                  : null,
+            }),
             occurredAt: new Date(event.occurredAtUtc),
           }),
         );
@@ -310,19 +318,54 @@ export class IntegrationEventInboxService {
       };
     }
 
+    if (event.eventName === "analysis.completed") {
+      const purpose = requiredText(data, "purpose", 24);
+      const sourceGeneration =
+        data.sourceGeneration === true || purpose === "INITIAL_DRAFT";
+      return {
+        recipients: sourceGeneration
+          ? [requiredId(data, "requestedByUserId")]
+          : [],
+        type: "ANALYSIS_COMPLETED",
+        subject: "Borrador generado con IA",
+        body: sourceGeneration
+          ? `${projectLabel}: la generación solicitada desde Fuentes terminó correctamente. Puedes consultar el prompt de la solicitud.`
+          : `${projectLabel}: la nueva versión con IA fue generada.`,
+        resourceType: sourceGeneration
+          ? "SourceAnalysisRequest"
+          : "AnalysisRequest",
+        resourceId: requiredId(data, "analysisRequestId"),
+        actorUserId: OPERATIONS_SERVICE_ACTOR.id,
+        auditAction: "ANALYSIS_COMPLETED",
+        auditResult: "SUCCEEDED",
+        auditMetadata: {
+          executionId: requiredId(data, "executionId"),
+          purpose,
+          sourceGeneration,
+          generatedVersion: requiredText(data, "generatedVersion", 32),
+        },
+      };
+    }
+
     if (event.eventName === "analysis.failed") {
+      const sourceGeneration = data.sourceGeneration === true;
       return {
         recipients: [requiredId(data, "requestedByUserId")],
         type: "ANALYSIS_FAILED",
         subject: "El análisis no pudo completarse",
-        body: `${projectLabel}: revisa el estado del análisis antes de reintentarlo.`,
-        resourceType: "AnalysisRequest",
+        body: sourceGeneration
+          ? `${projectLabel}: la generación solicitada desde Fuentes falló. Puedes consultar el prompt de la solicitud antes de reintentar.`
+          : `${projectLabel}: revisa el estado del análisis antes de reintentarlo.`,
+        resourceType: sourceGeneration
+          ? "SourceAnalysisRequest"
+          : "AnalysisRequest",
         resourceId: requiredId(data, "analysisRequestId"),
         actorUserId: OPERATIONS_SERVICE_ACTOR.id,
         auditAction: "ANALYSIS_FAILED",
         auditResult: "FAILED",
         auditMetadata: {
           executionId: requiredId(data, "executionId"),
+          sourceGeneration,
           errorCode: requiredText(data, "errorCode", 120),
         },
       };
@@ -357,6 +400,10 @@ export class IntegrationEventInboxService {
 
   private documentMetadata(data: Readonly<Record<string, unknown>>) {
     return {
+      comment: typeof data.comment === "string" ? data.comment : null,
+      previousStatus:
+        typeof data.previousStatus === "string" ? data.previousStatus : null,
+      status: typeof data.status === "string" ? data.status : null,
       reviewId: requiredId(data, "reviewId"),
       documentId: requiredId(data, "documentId"),
       documentVersionId: requiredId(data, "documentVersionId"),

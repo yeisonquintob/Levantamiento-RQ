@@ -445,6 +445,7 @@ async function main(): Promise<void> {
               documentId,
               documentVersionId,
               sourceIds: [sourceId],
+              engines: ["CLOUD"],
             },
           },
         )

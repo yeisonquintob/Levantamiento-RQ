@@ -1,3 +1,4 @@
+import type { AuditHistoryResponse } from "@levantamiento-rq/shared-contracts";
 import {
   HttpException,
   Inject,
@@ -173,6 +174,64 @@ export class UsersClientService {
       userId,
       "revoke-sessions",
       {},
+      correlationId,
+    );
+  }
+
+  async resolveAuditActors(
+    history: AuditHistoryResponse,
+    accessToken: string,
+    correlationId?: string,
+  ): Promise<AuditHistoryResponse> {
+    const ids = [
+      ...new Set(
+        history.items
+          .filter((item) => !item.actorName && item.actorUserId)
+          .map((item) => item.actorUserId as string),
+      ),
+    ];
+    const names = new Map<string, string>();
+    // Limit concurrent Identity requests for historical events without a name snapshot.
+    for (let offset = 0; offset < ids.length; offset += 5) {
+      await Promise.all(
+        ids.slice(offset, offset + 5).map(async (id) => {
+          try {
+            names.set(
+              id,
+              (await this.get(accessToken, id, correlationId)).displayName,
+            );
+          } catch {
+            /* The recorded identifier remains available if the user no longer exists. */
+          }
+        }),
+      );
+    }
+    return {
+      ...history,
+      items: history.items.map((item) => ({
+        ...item,
+        actorName:
+          item.actorName ??
+          (item.actorUserId ? (names.get(item.actorUserId) ?? null) : null),
+      })),
+    };
+  }
+
+  auditHistory(
+    accessToken: string,
+    query: Readonly<Record<string, unknown>>,
+    correlationId?: string,
+  ): Promise<AuditHistoryResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (typeof value === "string" || typeof value === "number")
+        params.set(key, String(value));
+    }
+    return this.request(
+      `/api/v1/users/audit-events?${params}`,
+      "GET",
+      accessToken,
+      undefined,
       correlationId,
     );
   }

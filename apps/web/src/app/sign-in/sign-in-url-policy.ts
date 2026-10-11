@@ -1,4 +1,10 @@
-export type SignInReason = "expired" | "inactivity";
+export type SignInReason =
+  | "expired"
+  | "inactivity"
+  | "microsoft-cancelled"
+  | "microsoft-denied"
+  | "microsoft-failed"
+  | "microsoft-unavailable";
 
 export interface SignInUrlPolicyResult {
   changed: boolean;
@@ -6,7 +12,14 @@ export interface SignInUrlPolicyResult {
   safeSearch: string;
 }
 
-const ALLOWED_REASONS = new Set<SignInReason>(["expired", "inactivity"]);
+const ALLOWED_REASONS = new Set<SignInReason>([
+  "expired",
+  "inactivity",
+  "microsoft-cancelled",
+  "microsoft-denied",
+  "microsoft-failed",
+  "microsoft-unavailable",
+]);
 
 export function applySignInUrlPolicy(search: string): SignInUrlPolicyResult {
   const original = search.startsWith("?") ? search.slice(1) : search;

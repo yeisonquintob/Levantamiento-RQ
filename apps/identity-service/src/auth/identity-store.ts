@@ -18,6 +18,7 @@ export interface RefreshSessionRecord {
   replacedBySessionId: string | null;
   createdAt: Date;
   lastUsedAt: Date | null;
+  familyId: string;
 }
 
 export interface NewRefreshSession {
@@ -28,6 +29,7 @@ export interface NewRefreshSession {
   createdAt: Date;
   userAgent: string | null;
   ipAddress: string | null;
+  familyId: string;
 }
 
 export interface IdentityStore {
@@ -49,4 +51,7 @@ export interface IdentityStore {
     passwordHash: string,
     instant: Date,
   ): Promise<boolean>;
+  upgradePasswordHash?(userId: string, passwordHash: string, instant: Date): Promise<void>;
+  revokeRefreshFamily?(familyId: string, userId: string, instant: Date): Promise<void>;
+  recordSecurityEvent?(eventType: string, actorUserId: string, targetUserId: string, detail: string | null, instant: Date): Promise<void>;
 }

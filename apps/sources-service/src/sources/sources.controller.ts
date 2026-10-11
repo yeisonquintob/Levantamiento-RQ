@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -97,6 +98,23 @@ export class SourcesController {
       context.accessToken,
       parseProjectId(projectId),
       parseSourceListQuery(query),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Eliminar definitivamente las fuentes del proyecto",
+  })
+  @Delete()
+  @HttpCode(200)
+  purgeProject(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    const context = requireContext(request);
+    return this.sources.purgeProject(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
     );
   }
 
@@ -303,6 +321,33 @@ export class SourcesController {
       .header("content-type", file.mediaType)
       .header("content-disposition", attachmentDisposition(file.fileName))
       .header("content-length", String(file.buffer.length))
+      .send(file.buffer);
+  }
+
+  @ApiOperation({ summary: "Obtener imagen privada para AI Analysis" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "sourceId", format: "uuid" })
+  @Get(":sourceId/internal-ai-image")
+  async internalAiImage(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+    @Param("sourceId") sourceId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    if (request.serviceIdentity !== "ai-analysis-service") {
+      throw new ForbiddenException(
+        "Este recurso está reservado para AI Analysis Service.",
+      );
+    }
+    const file = await this.sources.downloadInternalImage(
+      parseProjectId(projectId),
+      parseSourceId(sourceId),
+    );
+    return reply
+      .header("content-type", file.mediaType)
+      .header("content-length", String(file.buffer.length))
+      .header("x-source-sha256", file.sha256)
+      .header("cache-control", "no-store")
       .send(file.buffer);
   }
 

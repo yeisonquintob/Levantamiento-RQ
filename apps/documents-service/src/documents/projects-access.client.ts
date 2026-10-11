@@ -19,7 +19,7 @@ import {
 
 export interface DocumentProjectAccess {
   project: ProjectDetail;
-  role: ProjectParticipantRole | "ADMIN";
+  role: ProjectParticipantRole | "ADMIN" | "SERVICE";
   canEdit: boolean;
   canReview: boolean;
 }
@@ -75,8 +75,11 @@ export class DocumentsProjectsAccessClient {
 
     const project = payload as ProjectDetail;
     const administrator = isAdministrator(actor);
+    const serviceReader = actor.permissions.includes("projects.read.all");
     const role = administrator
       ? "ADMIN"
+      : serviceReader
+        ? "SERVICE"
       : project.participants.find(
           (participant) => participant.userId === actor.id,
         )?.role;
@@ -91,6 +94,14 @@ export class DocumentsProjectsAccessClient {
       canEdit: administrator || role === "OWNER" || role === "EDITOR",
       canReview: administrator || role === "OWNER" || role === "REVIEWER",
     };
+  }
+
+  async documentGenerated(projectId: string, documentId: string, accessToken: string): Promise<void> {
+    const response = await fetch(`${this.config.projectsServiceUrl}/api/v1/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(documentId)}/generated`, {
+      method: "POST", headers: { authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(this.config.projectsTimeoutMs),
+    });
+    if (!response.ok) throw new ServiceUnavailableException("El borrador se guardó, pero no se pudo actualizar el estado del proyecto. Reintenta la operación.");
   }
 
   private async readPayload(response: Response): Promise<unknown> {

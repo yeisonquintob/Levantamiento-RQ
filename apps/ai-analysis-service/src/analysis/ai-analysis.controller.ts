@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -23,8 +24,10 @@ import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 import { AiAnalysisAccessTokenGuard } from "./ai-analysis-access-token.guard";
 import {
   parseAiAnalysisRequestListQuery,
+  parseAiAnalysisTokenEstimateRequest,
   parseAnalysisRequestId,
   parseCreateAiAnalysisRequest,
+  parseProcessRequirementDiscussionRequest,
   parseProjectId,
   parseReviewAiAnalysisResult,
 } from "./ai-analysis-input";
@@ -33,6 +36,7 @@ import {
   type AiAnalysisActorContext,
   AiAnalysisService,
 } from "./ai-analysis.service";
+import { RequirementDiscussionService } from "../discussion/requirement-discussion.service";
 
 function context(request: AiAnalysisRequest): AiAnalysisActorContext {
   if (
@@ -55,7 +59,10 @@ function context(request: AiAnalysisRequest): AiAnalysisActorContext {
 @UseGuards(AiAnalysisAccessTokenGuard)
 @Controller()
 export class AiAnalysisController {
-  constructor(private readonly analysis: AiAnalysisService) {}
+  constructor(
+    private readonly analysis: AiAnalysisService,
+    private readonly discussion: RequirementDiscussionService,
+  ) {}
 
   @ApiOperation({ summary: "Crear una solicitud de análisis" })
   @ApiParam({ name: "projectId", format: "uuid" })
@@ -77,9 +84,28 @@ export class AiAnalysisController {
         },
         instruction: {
           type: "string",
-          maxLength: 2_000,
+          maxLength: 20_000,
           description:
             "Instrucción opcional del usuario para una nueva versión con IA.",
+        },
+        sectionInstructions: {
+          type: "array",
+          maxItems: 14,
+          uniqueItems: true,
+          description:
+            "Cambios explícitos dirigidos a un punto del documento. El backend los aplica a esa sección y propaga sus dependencias.",
+          items: {
+            type: "object",
+            required: ["sectionKey", "instruction"],
+            properties: {
+              sectionKey: { type: "string" },
+              instruction: {
+                type: "string",
+                minLength: 1,
+                maxLength: 6000,
+              },
+            },
+          },
         },
         idempotencyKey: {
           type: "string",
@@ -119,6 +145,100 @@ export class AiAnalysisController {
     );
   }
 
+  @ApiOperation({
+    summary: "Estimar tokens del prompt sin ejecutar el proveedor de IA",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["documentId", "sourceIds"],
+      properties: {
+        documentId: { type: "string", format: "uuid" },
+        sourceIds: {
+          type: "array",
+          minItems: 1,
+          maxItems: 100,
+          uniqueItems: true,
+          items: { type: "string", format: "uuid" },
+        },
+        purpose: {
+          type: "string",
+          enum: ["INITIAL_DRAFT", "AI_VERSION"],
+          default: "AI_VERSION",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Estimación calculada localmente con la misma regla preventiva usada antes de OpenAI.",
+  })
+  @Post("projects/:projectId/analysis-requests/token-estimate")
+  @HttpCode(200)
+  estimateTokens(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Body() body: unknown,
+  ) {
+    return this.analysis.estimateTokens(
+      context(request),
+      parseProjectId(projectId),
+      parseAiAnalysisTokenEstimateRequest(body),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Consultar los motores disponibles para procesar una discusión",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Get("projects/:projectId/analysis-requests/discussion/capabilities")
+  discussionCapabilities(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.discussion.capabilities(
+      context(request),
+      parseProjectId(projectId),
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      "Procesar las respuestas y la conversación con el motor de IA solicitado",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Respuestas consolidadas en el orden original por IA local o IA nube.",
+  })
+  @Post("projects/:projectId/analysis-requests/discussion/process")
+  @HttpCode(200)
+  processDiscussion(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Body() body: unknown,
+  ) {
+    return this.discussion.process(
+      context(request),
+      parseProjectId(projectId),
+      parseProcessRequirementDiscussionRequest(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Detener el procesamiento activo de una discusión" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("projects/:projectId/analysis-requests/discussion/cancel")
+  @HttpCode(200)
+  cancelDiscussion(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.discussion.cancel(context(request), parseProjectId(projectId));
+  }
+
   @ApiOperation({ summary: "Listar solicitudes de análisis del proyecto" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @Get("projects/:projectId/analysis-requests")
@@ -134,6 +254,21 @@ export class AiAnalysisController {
     );
   }
 
+  @ApiOperation({
+    summary: "Eliminar definitivamente los análisis del proyecto",
+  })
+  @Delete("projects/:projectId/analysis-requests")
+  @HttpCode(200)
+  purgeProject(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.analysis.purgeProject(
+      context(request),
+      parseProjectId(projectId),
+    );
+  }
+
   @ApiOperation({ summary: "Consultar una solicitud de análisis" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @ApiParam({ name: "analysisRequestId", format: "uuid" })
@@ -144,6 +279,24 @@ export class AiAnalysisController {
     @Param("analysisRequestId") analysisRequestId: string,
   ) {
     return this.analysis.getById(
+      context(request),
+      parseProjectId(projectId),
+      parseAnalysisRequestId(analysisRequestId),
+    );
+  }
+
+  @ApiOperation({
+    summary: "Consultar el prompt del borrador inicial generado desde Fuentes",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "analysisRequestId", format: "uuid" })
+  @Get("projects/:projectId/analysis-requests/:analysisRequestId/prompt")
+  getPrompt(
+    @Req() request: AiAnalysisRequest,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+  ) {
+    return this.analysis.getPrompt(
       context(request),
       parseProjectId(projectId),
       parseAnalysisRequestId(analysisRequestId),

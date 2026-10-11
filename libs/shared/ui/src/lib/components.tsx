@@ -33,6 +33,8 @@ export interface RqKpiCardProps {
   description: string;
   value: string;
   icon?: ReactNode;
+  /** Color del valor (por ejemplo, verde si es viable). Sin valor usa el color normal. */
+  valueTone?: "success" | "warning" | "danger" | "neutral";
 }
 
 export function RqKpiCard({
@@ -40,6 +42,7 @@ export function RqKpiCard({
   description,
   value,
   icon,
+  valueTone,
 }: RqKpiCardProps): ReactElement {
   return (
     <article className="rq-kpi">
@@ -50,7 +53,14 @@ export function RqKpiCard({
         <strong className="rq-kpi__title">{title}</strong>
         <span className="rq-kpi__description">{description}</span>
       </span>
-      <strong className="rq-kpi__value">{value}</strong>
+      <strong
+        className="rq-kpi__value"
+        data-rq-value-tone={
+          valueTone && valueTone !== "neutral" ? valueTone : undefined
+        }
+      >
+        {value}
+      </strong>
     </article>
   );
 }

@@ -1,5 +1,6 @@
 export const ACCESS_COOKIE = "rq_access";
 export const REFRESH_COOKIE = "rq_refresh";
+export const MICROSOFT_TRANSACTION_COOKIE = "rq_ms_tx";
 
 export function readCookie(
   header: string | undefined,
@@ -11,11 +12,22 @@ export function readCookie(
     const [rawName, ...rawValue] = part.trim().split("=");
 
     if (rawName === name) {
-      return decodeURIComponent(rawValue.join("="));
+      try {
+        return decodeURIComponent(rawValue.join("="));
+      } catch {
+        return null;
+      }
     }
   }
 
   return null;
+}
+
+export function hasCookie(header: string | undefined, name: string): boolean {
+  if (!header) return false;
+  return header
+    .split(";")
+    .some((part) => part.trim().split("=", 1)[0] === name);
 }
 
 export function serializeCookie(

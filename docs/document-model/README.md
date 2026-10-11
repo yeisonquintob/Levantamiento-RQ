@@ -14,7 +14,7 @@ Versión 1.0.0
 Alineado con ISO/IEC/IEEE 29148:2018
 ```
 
-El orden de las trece secciones es obligatorio y no podrá alterarse sin
+El orden de las catorce secciones base es obligatorio y no podrá alterarse sin
 crear una nueva versión formal de la plantilla.
 
 ## Secciones obligatorias
@@ -23,15 +23,19 @@ crear una nueva versión formal de la plantilla.
 2. Objetivos del proyecto.
 3. Descripción del problema.
 4. Alcance.
-5. Diagrama de flujo.
-6. Requerimientos por hito o funcionalidad.
-7. Requerimientos no funcionales.
-8. Pruebas.
-9. Supuestos, dependencias y pendientes.
-10. Aprobaciones y control de cambios.
-11. Reglas de redacción.
-12. Formato visual recomendado.
-13. Instrucción para automatización.
+5. Solución propuesta del profesional de soluciones.
+6. Diagrama de flujo.
+7. Requerimientos.
+8. Esquema.
+9. Pruebas.
+10. Supuestos, dependencias y pendientes.
+11. Aprobaciones y control de cambios.
+12. Reglas de redacción.
+13. Formato visual recomendado.
+14. Instrucción para automatización.
+
+Las plantillas con Scrum incorporan como sección 15 el plan sugerido de
+implementación.
 
 ## Documentos del modelo
 
@@ -39,6 +43,7 @@ crear una nueva versión formal de la plantilla.
 - [Catálogo de campos](field-catalog.md)
 - [Reglas de validación](validation-rules.md)
 - [Contrato de salida de IA](ai-output-contract.md)
+- [Ejemplo patrón para IA nube e IA local](cloud-local-ai-reference-example.md)
 - [Versionamiento y aprobaciones](versioning-and-approval.md)
 - [Reglas de exportación](export-format.md)
 - [Mapeo del análisis ERP](erp-fit-gap-mapping.md)
@@ -53,6 +58,8 @@ crear una nueva versión formal de la plantilla.
 - No agregar secciones automáticamente.
 - No aprobar documentos automáticamente.
 - Conservar evidencias y trazabilidad.
+- Tratar la discusión del levantamiento como una fuente permanente del análisis.
+- Registrar responsables solo en Aprobaciones y el control de cambio solo al aprobar.
 - Crear una nueva versión ante cambios aprobados.
 - Separar metadatos técnicos del contenido visible del documento.
 
@@ -64,12 +71,13 @@ adicionales en el documento exportado.
 
 ## Relación con Dynamics 365
 
-El análisis fit-gap se incorporará sin modificar las trece secciones.
+El análisis fit-gap se incorporará sin modificar las catorce secciones base.
 Sus resultados se ubicarán en:
 
 - 4.3 Sistemas o fuentes involucradas.
-- 6. Requerimientos por hito o funcionalidad.
-- 9. Supuestos, dependencias y pendientes.
+- 5. Solución propuesta del profesional de soluciones.
+- 7. Requerimientos.
+- 10. Supuestos, dependencias y pendientes.
 
 La evidencia técnica completa permanecerá como metadato trazable.
 
@@ -84,6 +92,7 @@ Los tres perfiles de requerimiento incluyen por defecto Epic, Feature,
 historias de usuario y criterios de aceptación. El perfil FDD ERP mantiene
 Scrum deshabilitado por defecto y solo lo incorpora cuando una nueva versión
 lo configura expresamente.
+
 ## Relación entre plantilla e inteligencia artificial
 
 La versión publicada de una plantilla forma parte del contexto de análisis.

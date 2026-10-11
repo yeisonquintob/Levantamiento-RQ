@@ -57,14 +57,19 @@ export class InMemorySlidingWindowLimiter {
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export function isBrowserMutationAllowed(input: {
+  hasSessionCookie?: boolean;
   method: string;
   origin?: string;
   secFetchSite?: string;
-  webOrigin: string;
+  webOrigins: readonly string[];
 }): boolean {
-  if (SAFE_METHODS.has(input.method.toUpperCase())) return true;
   if (input.secFetchSite?.toLowerCase() === "cross-site") return false;
-  if (!input.origin) return true;
+  if (SAFE_METHODS.has(input.method.toUpperCase())) return true;
+  const originAllowed = input.origin
+    ? input.webOrigins.includes(input.origin)
+    : false;
+  if (input.secFetchSite) return originAllowed;
+  if (!input.origin) return !input.hasSessionCookie;
 
-  return input.origin === input.webOrigin;
+  return originAllowed;
 }

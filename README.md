@@ -11,6 +11,11 @@ autocontenida usando `FakeAiProvider`. La validación real de OpenAI y el
 despliegue en Azure son acciones externas: requieren credenciales configuradas
 por un administrador, pero no cambios de código.
 
+**Prototypes Service** (generación de prototipos) es una capacidad posterior a
+la V1 que está **en validación**: existe como servicio propio, pero no forma
+parte del cierre técnico de la V1 ni de su CI, Docker y Bicep (ver
+[Estado V1](docs/plans/status-application-v1.md#capacidades-posteriores-a-v1-en-validación)).
+
 ERP Knowledge permanece deliberadamente como capacidad futura opcional. Su
 servicio base y su infraestructura están reservados, sin conexión directa ni
 escritura sobre Dynamics 365 productivo.
@@ -42,22 +47,23 @@ Documents y siempre lo marca como contenido que requiere revisión humana.
 
 ## Arquitectura
 
-| Componente    | Responsabilidad                                   | Persistencia                          |
-| ------------- | ------------------------------------------------- | ------------------------------------- |
-| Web           | Workspace responsive y PWA segura                 | Sin secretos ni JWT en `localStorage` |
-| Gateway       | BFF único, cookies, origen, correlación y proxies | Sin base de datos                     |
-| Identity      | Usuarios, roles, permisos y sesiones              | `RqIdentityDb`                        |
-| Projects      | Proyectos, participantes y plantilla aplicada     | `RqProjectsDb`                        |
-| Sources       | Fuentes, hash, extracción y archivos privados     | `RqSourcesDb` + Blob                  |
-| Documents     | Plantillas, documentos, versiones y contenido     | `RqDocumentsDb`                       |
-| AI Analysis   | Proveedores, prompts, ejecuciones y propuestas    | `RqAiDb`                              |
-| ERP Knowledge | Reserva segura para snapshots/fit-gap futuros     | `RqErpKnowledgeDb` futura             |
-| Workflow      | Revisión, comentarios, correcciones y aprobación  | `RqWorkflowDb`                        |
-| Operations    | Exportaciones, notificaciones, inbox y auditoría  | `RqOperationsDb` + Blob               |
+| Componente    | Responsabilidad                                     | Persistencia                            |
+| ------------- | --------------------------------------------------- | --------------------------------------- |
+| Web           | Workspace responsive y PWA segura                   | Sin secretos ni JWT en `localStorage`   |
+| Gateway       | BFF único, cookies, origen, correlación y proxies   | Sin base de datos                       |
+| Identity      | Usuarios, roles, permisos y sesiones                | `RqIdentityDb`                          |
+| Projects      | Proyectos, participantes y plantilla aplicada       | `RqProjectsDb`                          |
+| Sources       | Fuentes, hash, extracción y archivos privados       | `RqSourcesDb` + Blob                    |
+| Documents     | Plantillas, documentos, versiones y contenido       | `RqDocumentsDb`                         |
+| AI Analysis   | Proveedores, prompts, ejecuciones y propuestas      | `RqAiDb`                                |
+| ERP Knowledge | Reserva segura para snapshots/fit-gap futuros       | `RqErpKnowledgeDb` futura               |
+| Workflow      | Revisión, comentarios, correcciones y aprobación    | `RqWorkflowDb`                          |
+| Operations    | Exportaciones, notificaciones, inbox y auditoría    | `RqOperationsDb` + Blob                 |
+| Prototypes\*  | Plan de pantallas, especificación visual e imágenes | `RqPrototypesDb` + Blob (en validación) |
 
 No existen claves foráneas entre bases de dominios. HTTP atiende operaciones
 síncronas; RabbitMQ transporta eventos; Redis/BullMQ ejecuta extracción,
-análisis y exportaciones.
+análisis, exportaciones y las imágenes de prototipo.
 
 ## Límites de uso de IA
 
@@ -112,6 +118,7 @@ Puertos:
 | ERP Knowledge (futuro, no iniciado por V1) |   3006 |
 | Workflow                                   |   3007 |
 | Operations                                 |   3008 |
+| Prototypes (en validación)                 |   3009 |
 | Web                                        |   4200 |
 
 ## Configuración segura de IA

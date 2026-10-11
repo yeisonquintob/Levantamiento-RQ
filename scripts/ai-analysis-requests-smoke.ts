@@ -34,6 +34,8 @@ function readySource(
     classification: "REQUIREMENT",
     contentPreview: "Contenido smoke",
     processingStatus: "READY",
+    processingProgress: 100,
+    processingStage: "COMPLETED",
     processingMessage: null,
     processedAt: timestamp,
     status: "ACTIVE",
@@ -117,6 +119,7 @@ async function main(): Promise<void> {
       documentId,
       documentVersionId,
       sourceIds,
+      engines: ["CLOUD"],
     });
     analysisRequestId = created.id;
 

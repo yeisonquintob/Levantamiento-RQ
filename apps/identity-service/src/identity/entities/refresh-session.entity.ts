@@ -22,6 +22,9 @@ export class RefreshSessionEntity {
   @Column("uniqueidentifier", { name: "UserId" })
   userId!: string;
 
+  @Column("uniqueidentifier", { name: "FamilyId" })
+  familyId!: string;
+
   @Column("char", { name: "TokenHash", length: 64 })
   tokenHash!: string;
 

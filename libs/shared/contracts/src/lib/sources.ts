@@ -29,6 +29,28 @@ export const SOURCE_PROCESSING_STATUSES = [
 export type SourceProcessingStatus =
   (typeof SOURCE_PROCESSING_STATUSES)[number];
 
+export const SOURCE_PROCESSING_STAGES = [
+  "QUEUED",
+  "PREPARING",
+  "DOWNLOADING",
+  "VALIDATING",
+  "EXTRACTING",
+  "NORMALIZING",
+  "PERSISTING",
+  "FINALIZING",
+  "COMPLETED",
+  "FAILED",
+] as const;
+
+export type SourceProcessingStage =
+  (typeof SOURCE_PROCESSING_STAGES)[number];
+
+export interface SourceProcessingProgress {
+  percentage: number;
+  stage: SourceProcessingStage;
+  message: string;
+}
+
 export const SOURCE_CLASSIFICATIONS = [
   "REQUIREMENT",
   "MEETING",
@@ -48,6 +70,7 @@ export const SOURCE_FILE_EXTENSIONS = [
   "docx",
   "xlsx",
   "txt",
+  "vtt",
   "csv",
   "png",
   "jpg",
@@ -66,6 +89,8 @@ export interface SourceSummary {
   classification: SourceClassification | null;
   contentPreview: string | null;
   processingStatus: SourceProcessingStatus;
+  processingProgress: number;
+  processingStage: SourceProcessingStage;
   processingMessage: string | null;
   processedAt: string | null;
   status: SourceStatus;

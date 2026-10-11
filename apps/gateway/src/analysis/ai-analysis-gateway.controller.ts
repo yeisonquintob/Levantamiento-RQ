@@ -21,7 +21,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 
-import type { CreateAiAnalysisRequest } from "@levantamiento-rq/shared-contracts";
+import type {
+  AiAnalysisTokenEstimateRequest,
+  CreateAiAnalysisRequest,
+  ProcessRequirementDiscussionRequest,
+} from "@levantamiento-rq/shared-contracts";
 
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
 import { AiAnalysisClientService } from "./ai-analysis-client.service";
@@ -81,7 +85,7 @@ export class AiAnalysisGatewayController {
         },
         instruction: {
           type: "string",
-          maxLength: 2_000,
+          maxLength: 20_000,
         },
         idempotencyKey: {
           type: "string",
@@ -126,6 +130,75 @@ export class AiAnalysisGatewayController {
   }
 
   @ApiOperation({
+    summary: "Estimar tokens del prompt sin ejecutar IA",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("token-estimate")
+  @HttpCode(200)
+  estimateTokens(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Body() body: AiAnalysisTokenEstimateRequest | unknown,
+  ) {
+    return this.analysis.estimateTokens(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      body,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Consultar la disponibilidad de IA local y nube para la discusión",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Get("discussion/capabilities")
+  discussionCapabilities(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.analysis.getDiscussionCapabilities(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Procesar una discusión con el motor local o nube seleccionado",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("discussion/process")
+  @HttpCode(200)
+  processDiscussion(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Body() body: ProcessRequirementDiscussionRequest | unknown,
+  ) {
+    return this.analysis.processDiscussion(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      body,
+    );
+  }
+
+  @ApiOperation({ summary: "Detener el procesamiento activo de una discusión" })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Post("discussion/cancel")
+  @HttpCode(200)
+  cancelDiscussion(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+  ) {
+    return this.analysis.cancelDiscussion(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+    );
+  }
+
+  @ApiOperation({
     summary: "Listar solicitudes de análisis del proyecto",
   })
   @ApiParam({ name: "projectId", format: "uuid" })
@@ -155,6 +228,25 @@ export class AiAnalysisGatewayController {
     @Param("analysisRequestId") analysisRequestId: string,
   ) {
     return this.analysis.getById(
+      accessToken(request),
+      correlationId(request),
+      projectId,
+      analysisRequestId,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Consultar el prompt del borrador inicial generado desde Fuentes",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @ApiParam({ name: "analysisRequestId", format: "uuid" })
+  @Get(":analysisRequestId/prompt")
+  getPrompt(
+    @Req() request: RequestLike,
+    @Param("projectId") projectId: string,
+    @Param("analysisRequestId") analysisRequestId: string,
+  ) {
+    return this.analysis.getPrompt(
       accessToken(request),
       correlationId(request),
       projectId,

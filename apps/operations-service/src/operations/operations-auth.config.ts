@@ -1,21 +1,17 @@
+import { requiredPrivateJwk, requiredPublicJwks } from "@levantamiento-rq/shared-http";
+
 export const OPERATIONS_AUTH_CONFIG = Symbol("OPERATIONS_AUTH_CONFIG");
 
 export interface OperationsAuthConfig {
   issuer: string;
   audience: string;
-  accessSecret: string;
+  accessPublicJwks: string;
+  workloadPrivateJwk: string;
+  workloadKeyId: string;
   projectsServiceUrl: string;
   projectsTimeoutMs: number;
   documentsServiceUrl: string;
   documentsTimeoutMs: number;
-}
-
-function requiredSecret(value: string | undefined): string {
-  const resolved = value?.trim() ?? "";
-  if (resolved.length < 32) {
-    throw new Error("JWT_ACCESS_SECRET debe tener mínimo 32 caracteres.");
-  }
-  return resolved;
 }
 
 function url(value: string | undefined, fallback: string, name: string) {
@@ -37,10 +33,16 @@ function timeout(value: string | undefined, name: string): number {
 export function loadOperationsAuthConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): OperationsAuthConfig {
+  const workloadKeyId = environment.WORKLOAD_JWT_KEY_ID?.trim() ?? "";
   return {
     issuer: environment.JWT_ISSUER?.trim() || "levantamiento-rq-identity",
     audience: environment.JWT_AUDIENCE?.trim() || "levantamiento-rq",
-    accessSecret: requiredSecret(environment.JWT_ACCESS_SECRET),
+    accessPublicJwks: requiredPublicJwks(environment.JWT_ACCESS_PUBLIC_JWKS_BASE64),
+    workloadKeyId,
+    workloadPrivateJwk: requiredPrivateJwk(
+      environment.WORKLOAD_JWT_PRIVATE_JWK_BASE64,
+      workloadKeyId,
+    ),
     projectsServiceUrl: url(
       environment.PROJECTS_SERVICE_URL,
       "http://127.0.0.1:3002",

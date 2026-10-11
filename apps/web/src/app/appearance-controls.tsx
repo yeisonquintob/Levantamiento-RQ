@@ -6,9 +6,11 @@ import { useDialogAccessibility } from "./use-dialog-accessibility";
 
 type Theme = "normal" | "cold" | "warm" | "dark";
 type FontScale = "compact" | "normal" | "large" | "extra-large";
+type MotionSpeed = "reduced" | "fast" | "normal" | "slow";
 
 const THEME_KEY = "rq-theme";
 const FONT_KEY = "rq-font";
+const MOTION_KEY = "rq-motion";
 
 const THEME_OPTIONS: readonly {
   value: Theme;
@@ -32,14 +34,31 @@ const FONT_OPTIONS: readonly {
   { value: "extra-large", label: "Muy grande", symbol: "A++" },
 ];
 
-function applyPreferences(theme: Theme, font: FontScale): void {
+const MOTION_OPTIONS: readonly {
+  value: MotionSpeed;
+  label: string;
+  symbol: string;
+}[] = [
+  { value: "reduced", label: "Reducido", symbol: "◦" },
+  { value: "fast", label: "Rápido", symbol: "»" },
+  { value: "normal", label: "Normal", symbol: "›" },
+  { value: "slow", label: "Lento", symbol: "…" },
+];
+
+function applyPreferences(
+  theme: Theme,
+  font: FontScale,
+  motion: MotionSpeed,
+): void {
   document.documentElement.dataset.rqTheme = theme;
   document.documentElement.dataset.rqFont = font;
+  document.documentElement.dataset.rqMotion = motion;
 }
 
 export function AppearanceControls() {
   const [theme, setTheme] = useState<Theme>("normal");
   const [font, setFont] = useState<FontScale>("normal");
+  const [motion, setMotion] = useState<MotionSpeed>("normal");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dialogRef = useDialogAccessibility<HTMLElement>(open, () =>
@@ -47,14 +66,17 @@ export function AppearanceControls() {
   );
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
-    const savedFont = localStorage.getItem(FONT_KEY) as FontScale | null;
-    const resolvedTheme = savedTheme ?? "normal";
-    const resolvedFont = savedFont ?? "normal";
+    const resolvedTheme = (document.documentElement.dataset.rqTheme ??
+      "normal") as Theme;
+    const resolvedFont = (document.documentElement.dataset.rqFont ??
+      "normal") as FontScale;
+
+    const resolvedMotion = (document.documentElement.dataset.rqMotion ??
+      "normal") as MotionSpeed;
 
     setTheme(resolvedTheme);
     setFont(resolvedFont);
-    applyPreferences(resolvedTheme, resolvedFont);
+    setMotion(resolvedMotion);
   }, []);
 
   useEffect(() => {
@@ -84,14 +106,32 @@ export function AppearanceControls() {
 
   function changeTheme(value: Theme): void {
     setTheme(value);
-    localStorage.setItem(THEME_KEY, value);
-    applyPreferences(value, font);
+    applyPreferences(value, font, motion);
+    try {
+      localStorage.setItem(THEME_KEY, value);
+    } catch {
+      /* Keep the selected theme when browser storage is unavailable. */
+    }
   }
 
   function changeFont(value: FontScale): void {
     setFont(value);
-    localStorage.setItem(FONT_KEY, value);
-    applyPreferences(theme, value);
+    applyPreferences(theme, value, motion);
+    try {
+      localStorage.setItem(FONT_KEY, value);
+    } catch {
+      /* Keep the selected font when browser storage is unavailable. */
+    }
+  }
+
+  function changeMotion(value: MotionSpeed): void {
+    setMotion(value);
+    applyPreferences(theme, font, value);
+    try {
+      localStorage.setItem(MOTION_KEY, value);
+    } catch {
+      /* Keep the selected motion when browser storage is unavailable. */
+    }
   }
 
   return (
@@ -101,6 +141,7 @@ export function AppearanceControls() {
       ref={containerRef}
     >
       <button
+        aria-label="Apariencia"
         aria-expanded={open}
         aria-haspopup="dialog"
         className="rq-appearance__trigger"
@@ -108,6 +149,23 @@ export function AppearanceControls() {
         type="button"
       >
         <span aria-hidden="true">◐</span>
+        <svg aria-hidden="true" className="rq-appearance__sun" viewBox="0 0 24 24">
+          <circle
+            cx="12"
+            cy="12"
+            fill="none"
+            r="4"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <path
+            d="M12 2.5v2.5M12 19v2.5M2.5 12H5m14 0h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.8"
+          />
+        </svg>
         <strong>Apariencia</strong>
       </button>
 
@@ -157,6 +215,24 @@ export function AppearanceControls() {
                   data-active={font === option.value}
                   key={option.value}
                   onClick={() => changeFont(option.value)}
+                  type="button"
+                >
+                  <span aria-hidden="true">{option.symbol}</span>
+                  <small>{option.label}</small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Velocidad de transición</legend>
+            <div className="rq-appearance__options">
+              {MOTION_OPTIONS.map((option) => (
+                <button
+                  aria-pressed={motion === option.value}
+                  data-active={motion === option.value}
+                  key={option.value}
+                  onClick={() => changeMotion(option.value)}
                   type="button"
                 >
                   <span aria-hidden="true">{option.symbol}</span>

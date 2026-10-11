@@ -1,0 +1,424 @@
+--- a/docs/architecture/local-only-v2-protected-boundaries.json
++++ b/docs/architecture/local-only-v2-protected-boundaries.v2_01.json
+@@ -1,8 +1,8 @@
+ {
+-  "schemaVersion": 2,
+-  "step": "LOCAL_ONLY_V2_00",
+-  "purpose": "Baseline SHA de componentes fuera de alcance de LOCAL_ONLY_V2.",
+-  "generatedAt": "2026-09-18T00:56:35.366Z",
++  "schemaVersion": 3,
++  "step": "LOCAL_ONLY_V2_01",
++  "purpose": "Baseline SHA de componentes fuera de alcance de LOCAL_ONLY_V2, tras la revisión humana de las diferencias del Paso 0 (propuesta v2; no creado).",
++  "generatedAt": "PENDIENTE: se fija al crear el manifiesto tras la autorización",
+   "gitCommit": "55e50b7fe828ac4b18d82cbb3d0fef3c7ef11041",
+   "groups": {
+     "CLOUD_AND_PROVIDER_INFRA": [
+@@ -79,6 +79,11 @@
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
++      "path": "Dockerfile",
++      "sha256": "4622e7687ee1d3d5f4ad6abfe00a1985de5444fe1c6b2741a210b95ab0f127a9",
++      "groups": ["SHARED_INFRA_AND_CONFIG"]
++    },
++    {
+       "path": "apps/ai-analysis-service/src/assets/comfyui-workflows/z-image-turbo-ui.json",
+       "sha256": "5b3940af6789f14992027e5636f87b4e1c19f65ffcb017cac506d336e2fff419",
+       "groups": ["PROTOTYPES_IMAGES_COMFYUI"]
+@@ -195,7 +200,7 @@
+     },
+     {
+       "path": "apps/ai-analysis-service/src/discussion/requirement-discussion.service.ts",
+-      "sha256": "04427c1f48f09046c88460adb9610e57852242bb8b32712644bcbeda5f11abb1",
++      "sha256": "0e1336a30fee46a26cdefeb9fd22f072d1ca416f60b53c3a0d31ff399c82f722",
+       "groups": ["DISCUSSION"]
+     },
+     {
+@@ -1055,7 +1060,7 @@
+     },
+     {
+       "path": "apps/operations-service/src/operations/export-work-plan.ts",
+-      "sha256": "8b9b8ad501b325d6add90a29b352ef7953334e6c05b9ada5488b636ac1a92822",
++      "sha256": "7af2d612e9297efbaddcaca6992f5aff27e4653f33a97e974219d4f4c28644b0",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1380,7 +1385,7 @@
+     },
+     {
+       "path": "apps/prototypes-service/src/images/prototype-image-blob.storage.ts",
+-      "sha256": "245eb6feb54bd60e0767f2da196862422e0df773eaeaf709c6332de208bf37ef",
++      "sha256": "2f0e9040744f5c8564bc2e7281330ac6ea6d7aa81f4614c5609bad36d366f574",
+       "groups": ["PROTOTYPES_IMAGES_COMFYUI", "UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1445,7 +1450,7 @@
+     },
+     {
+       "path": "apps/prototypes-service/src/planning/prototype-planning.service.ts",
+-      "sha256": "8ce3106a2ce2351a4bfe851160c2ac15ec3b81a4cf64b4a6d00a0f1afe00b718",
++      "sha256": "d766e3bd93d64048dbee3a148aef88a7fdf5461f693303918c1fc0b85d04c1fa",
+       "groups": ["PROTOTYPES_IMAGES_COMFYUI", "UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1520,7 +1525,7 @@
+     },
+     {
+       "path": "apps/prototypes-service/src/visual/prototype-visual-templates.ts",
+-      "sha256": "e19b0b384e9a703af76fc24400211017ebb04612dc763fa884ce7263f213bd74",
++      "sha256": "77b0afa06a9daf1742de3149cc61baa3ba362b53ffa32e805fe0852f295fdee2",
+       "groups": ["PROTOTYPES_IMAGES_COMFYUI", "UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1791,11 +1796,6 @@
+     {
+       "path": "apps/web/src/app/appearance-controls.tsx",
+       "sha256": "5777220251e59995a5939f1e342fb8f5d64d9f0f4fdddfb20efee1118e41c958",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/auth.css",
+-      "sha256": "811fbab04df6d9147b285832fee7dcb66c1a767436f6d6668acbfa4668b9af0c",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1894,18 +1894,18 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/analysis/analysis-workspace.tsx",
+-      "sha256": "67e7b41793147849c3f60835cd333fd0c6a87847b162829a93084f9f5094005c",
++      "path": "apps/web/src/app/workspace/ai-generation-label.ts",
++      "sha256": "91bd136a832978dcd5f1e41687f6db11a5c676dcefa9e53cb1f08b6f27e63a03",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/analysis/page.tsx",
+-      "sha256": "7e8d563d05974472b393c45e0c8cb36f265efa9b11d87bb1286cfa22183711e4",
++      "path": "apps/web/src/app/workspace/ai-generation-mode.ts",
++      "sha256": "0ffb426bbf017d1be35d295205b33e8aa00a47300164509b6542e6308136718f",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/audit/audit-workspace.module.css",
+-      "sha256": "8fac3dccb256f22683b618c1c9ccb0180e7366a4b8e92c452a0639ebcde12f91",
++      "path": "apps/web/src/app/workspace/analysis/analysis-workspace.tsx",
++      "sha256": "67e7b41793147849c3f60835cd333fd0c6a87847b162829a93084f9f5094005c",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+@@ -1914,31 +1914,11 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/audit/page.tsx",
+-      "sha256": "d76e27920bf981f39cdc179f90ad18e17a21d330043f87a20e46f9a95fd4f9f2",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/workspace/discussion/discussion-project-list.tsx",
+-      "sha256": "76795bf45b9d1e8299442c5a578b5625397c336f80c60d77d904b3ea2de4ae62",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/workspace/discussion/discussion-project-metrics-cells.tsx",
+-      "sha256": "49973dcbdb6b12643338c99a2f61c59e68370a59a5234e7cfd7f3fb54a07d57d",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/discussion/page.tsx",
+       "sha256": "74bce691e989481694414d8a2525aa59d6414b43b39465c095ba468de81d805b",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/documents/[documentId]/colombian-business-calendar.ts",
+-      "sha256": "3d7e30934ca93ea4b64cb4978125c80e64837da2ef8322465606c0324b9342bc",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.tsx",
+       "sha256": "74a23144da44d00c18131f14b086e17929cba59b237fc0fb37fdd6ad4dd878e0",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -1969,11 +1949,6 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/execution/azure-devops-csv.ts",
+-      "sha256": "8755baf590588fe9e58b2f776569761167d231f123cea39124b49c45fd532464",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/execution/execution-workspace.tsx",
+       "sha256": "122149d25494f3f3cb8fdb9fca0dc91f9732bdd310371d6f89bad1268e36d181",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -1984,11 +1959,6 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/home-stage-progress.ts",
+-      "sha256": "caa0cf4d23963fdd90aee84346c2f256215887f1e9d59a46f04c972f75b86700",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/home-workspace.tsx",
+       "sha256": "b953492d3a75fc384ea8912235b42b51a450418dd146430d1653fb02ba696b70",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2034,26 +2004,6 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/prototype/page.tsx",
+-      "sha256": "818698bea6a268bbd4406e6d6398ad4bd0d97515177185dabe814cccb3ea6589",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/workspace/prototype/prototype-gallery.module.css",
+-      "sha256": "469232a5062949e9a64ea56c89fc49c854338c6f5401fc4a188f3c4e190e3f54",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/workspace/prototype/prototype-gallery.ts",
+-      "sha256": "223335b4bb30ee948d9395af28bdc400a098c7d1c37b02d8f7ffcf1d6da3ac0a",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+-      "path": "apps/web/src/app/workspace/prototype/prototype-source.ts",
+-      "sha256": "583ba3789c6ab81ca5ec3827c86a6501e99eb9fcb3516b0bb6cfe173c0c77dbf",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/prototype/prototype-workspace.tsx",
+       "sha256": "332be57c7da6d66a43fc1297649b58865a4f4150daeedf7f7b2b83ebbabaeddc",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2084,21 +2034,11 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/settings/page.tsx",
+-      "sha256": "f4a03b06dace7164f57e27b34bf3eb39860b3cb9cf433e10c2c99b7ac64993f7",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/settings/settings-access.ts",
+       "sha256": "a54714ea81066d5ae52fde8cf9326d336ac585f0e14d6196a4da645bafec8272",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/settings/settings-navigation.tsx",
+-      "sha256": "d37da62fcda0a10a6d8136fb8a8cc78b6cb4d6504f97a76c9d15b1b6bbed5199",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/settings/settings-user.ts",
+       "sha256": "abebfde7a3afca2f5967a7994ea5a43b7e23d11d3fa5a5e6a15118e2da8d32b8",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2124,11 +2064,6 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/settings/viability/viability-workspace.module.css",
+-      "sha256": "30667d60decfbd6ac0a80530f97901bcb44afe3d136a70b85099c079380243a0",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/settings/viability/viability-workspace.tsx",
+       "sha256": "b351fd74a54c0a4af7efb4359d7529cfb53d9fd4be3fbdd1cb421453f98d6be0",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2139,11 +2074,6 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/sources/source-capture-helpers.ts",
+-      "sha256": "e15c7cb18d3758a0c4d04ef5e0a1bc07adf23c7d27cdd6c32f922964380dbb4a",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/sources/sources-project-list.tsx",
+       "sha256": "d63142b3cbe0b3eae28da093e9e996ec941782aca4f008a4dbc87f25133725c9",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2159,21 +2089,11 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/templates/page.tsx",
+-      "sha256": "e8f3fbf934b8488836e91444716d4926e94c2e3ed84e7501aa5163eb977c003f",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/templates/templates-workspace.tsx",
+       "sha256": "2034800c561cb831e1ceb78a9e7f9a85a1e36c50edb8e82447942def96b4a688",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "apps/web/src/app/workspace/validation/devops-txt-export.ts",
+-      "sha256": "8e4406fb262ee7e6ede88fea75792c10b60091f968f1681101d98f4d94bce3a8",
+-      "groups": ["UI_AND_OTHER_SERVICES"]
+-    },
+-    {
+       "path": "apps/web/src/app/workspace/validation/page.tsx",
+       "sha256": "1b2e149efd993fd54eac7db441e794bff0f69d5cd58a8d68b09add5d6a558d38",
+       "groups": ["UI_AND_OTHER_SERVICES"]
+@@ -2319,16 +2239,16 @@
+       "groups": ["UI_AND_OTHER_SERVICES"]
+     },
+     {
+-      "path": "Dockerfile",
+-      "sha256": "4622e7687ee1d3d5f4ad6abfe00a1985de5444fe1c6b2741a210b95ab0f127a9",
+-      "groups": ["SHARED_INFRA_AND_CONFIG"]
+-    },
+-    {
+       "path": "docs/prototype-design-standard.md",
+       "sha256": "d3d8d0e60957f4079d79efc51bd663b1886b00fc45f05fe078a5b174a75f3767",
+       "groups": ["PROTOTYPES_IMAGES_COMFYUI"]
+     },
+     {
++      "path": "infrastructure/azure/README.md",
++      "sha256": "d242ba69c38ae2d8a98a104b10d01b5737d4e39876df506b35947b4ed4f500ac",
++      "groups": ["SHARED_INFRA_AND_CONFIG"]
++    },
++    {
+       "path": "infrastructure/azure/main.bicep",
+       "sha256": "77800d2e9d6b3a33c3e7864a099c4a435c4a98c442d4985487b21b5e72c6a1b6",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+@@ -2339,11 +2259,6 @@
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+-      "path": "infrastructure/azure/README.md",
+-      "sha256": "d242ba69c38ae2d8a98a104b10d01b5737d4e39876df506b35947b4ed4f500ac",
+-      "groups": ["SHARED_INFRA_AND_CONFIG"]
+-    },
+-    {
+       "path": "infrastructure/azurite/README.md",
+       "sha256": "cb19b06f3da4fc730d07f85820032973d3cc29638fb4199d8527373172a9fc8a",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+@@ -2359,13 +2274,13 @@
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+-      "path": "infrastructure/docker/compose.yaml",
+-      "sha256": "a73a86aafa25a4bc0267322240c4fe8182488295b7bc7c6a74d0f2f761a4ccce",
++      "path": "infrastructure/docker/README.md",
++      "sha256": "cb4b80b7d7ad7b9a8ed8a61fcc4e92def84bf1391380ca59d4fe82eb72205feb",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+-      "path": "infrastructure/docker/README.md",
+-      "sha256": "cb4b80b7d7ad7b9a8ed8a61fcc4e92def84bf1391380ca59d4fe82eb72205feb",
++      "path": "infrastructure/docker/compose.yaml",
++      "sha256": "a73a86aafa25a4bc0267322240c4fe8182488295b7bc7c6a74d0f2f761a4ccce",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+@@ -2821,6 +2736,11 @@
+     {
+       "path": "libs/shared/ui/.babelrc",
+       "sha256": "3213ddb7630a21e5c3bd9205fae7ca61fcba817072daf3502172e1c903dabea4",
++      "groups": ["SHARED_INFRA_AND_CONFIG"]
++    },
++    {
++      "path": "libs/shared/ui/README.md",
++      "sha256": "89823ac28b9b6ba4bdea38fbf2ad2e3fa4b8d90b2016606b701d3123774795cb",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+@@ -2839,11 +2759,6 @@
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+-      "path": "libs/shared/ui/README.md",
+-      "sha256": "89823ac28b9b6ba4bdea38fbf2ad2e3fa4b8d90b2016606b701d3123774795cb",
+-      "groups": ["SHARED_INFRA_AND_CONFIG"]
+-    },
+-    {
+       "path": "libs/shared/ui/rollup.config.cjs",
+       "sha256": "2560be1008768c6515b2fdd6a9c6ed48ab7c3696bb6d867a40b01cf2cc41d7a3",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+@@ -2869,11 +2784,6 @@
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     },
+     {
+-      "path": "libs/shared/ui/src/styles.css",
+-      "sha256": "6c8150f6a84a1b1fdc4ecf40c9d9a515a77a326ca0038f7100669abd2bb1149f",
+-      "groups": ["SHARED_INFRA_AND_CONFIG"]
+-    },
+-    {
+       "path": "libs/shared/ui/tsconfig.json",
+       "sha256": "b89d590641089d53d96c77182e922eabd00ab8330e9eaa253132b64c577c602a",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+@@ -2915,7 +2825,7 @@
+     },
+     {
+       "path": "tests/ai-analysis/prototype-image-generation-internal.test.ts",
+-      "sha256": "a75e40a9d80f239e5e78845a8eec1ab5756c134974114d6a1b2d17ecf116e98c",
++      "sha256": "1bc3227da1f6d26def314ee86c6fdabb368cdaaf884f16002624a00c908ca3e2",
+       "groups": ["EXISTING_BOUNDARY_TESTS"]
+     },
+     {
+@@ -2925,7 +2835,7 @@
+     },
+     {
+       "path": "tests/ai-analysis/provider-selection.test.ts",
+-      "sha256": "39d868f9f5b26418a4382f0cddc7412204d6f2ea0c953690bea67ce169ae1e45",
++      "sha256": "9301d882365d4e0d425a4ac4fc549a29119875cc3ddf950ae1f228bc6cda7d7f",
+       "groups": ["EXISTING_BOUNDARY_TESTS"]
+     },
+     {
+@@ -2935,12 +2845,12 @@
+     },
+     {
+       "path": "tests/prototypes/prototype-gallery.test.ts",
+-      "sha256": "342d83a65bf7e8bb265c987a9d61bc19fa7b06148b7f194792b5f274ad6b72f5",
++      "sha256": "6b41e22d7147b4e9cba85cdf1fdaf014cdab9307bd892509a5a4a8bc22021f4c",
+       "groups": ["EXISTING_BOUNDARY_TESTS"]
+     },
+     {
+       "path": "tests/prototypes/prototype-image-generation.test.ts",
+-      "sha256": "374e21effefdc6d5c8c71d7d69e01b3d56ecd3451e7683ba699b8be0cad2b8d9",
++      "sha256": "d8fd4e351210ccdf6bcc82afd2a997bffdcba86359b3ec90f501fc8a4a348553",
+       "groups": ["EXISTING_BOUNDARY_TESTS"]
+     },
+     {
+@@ -2968,5 +2878,42 @@
+       "sha256": "915312771572a9c759e315766f99ef1fdddba3b3f454d31c883a6712881df053",
+       "groups": ["SHARED_INFRA_AND_CONFIG"]
+     }
++  ],
++  "supersedes": {
++    "step": "LOCAL_ONLY_V2_00",
++    "manifestSha256": "7706305d93a2ec5a56823c968817bf9c6edf541a6c862853a5c9618fd3ca8293",
++    "note": "LOCAL_ONLY_V2_00 se conserva sin cambios; este documento no lo sustituye ni lo edita."
++  },
++  "excludedPaths": [
++    "apps/web/AGENTS.md",
++    "apps/web/CLAUDE.md",
++    "apps/web/src/app/auth.css",
++    "apps/web/src/app/sidebar-navigation.ts",
++    "apps/web/src/app/table-column-resizer.tsx",
++    "apps/web/src/app/use-auto-dismiss.ts",
++    "apps/web/src/app/workspace/analysis/page.tsx",
++    "apps/web/src/app/workspace/audit/audit-workspace.module.css",
++    "apps/web/src/app/workspace/audit/page.tsx",
++    "apps/web/src/app/workspace/discussion/discussion-project-list.tsx",
++    "apps/web/src/app/workspace/discussion/discussion-project-metrics-cells.tsx",
++    "apps/web/src/app/workspace/documents/[documentId]/colombian-business-calendar.ts",
++    "apps/web/src/app/workspace/execution/azure-devops-csv.ts",
++    "apps/web/src/app/workspace/home-stage-progress.ts",
++    "apps/web/src/app/workspace/prototype/page.tsx",
++    "apps/web/src/app/workspace/prototype/prototype-gallery.module.css",
++    "apps/web/src/app/workspace/prototype/prototype-gallery.ts",
++    "apps/web/src/app/workspace/prototype/prototype-source.ts",
++    "apps/web/src/app/workspace/settings/page.tsx",
++    "apps/web/src/app/workspace/settings/settings-navigation.tsx",
++    "apps/web/src/app/workspace/settings/sidebar/page.tsx",
++    "apps/web/src/app/workspace/settings/sidebar/sidebar-settings.tsx",
++    "apps/web/src/app/workspace/settings/viability/viability-workspace.module.css",
++    "apps/web/src/app/workspace/sources/source-capture-helpers.ts",
++    "apps/web/src/app/workspace/sources/source-token-breakdown.ts",
++    "apps/web/src/app/workspace/sources/sources-generation-panel.tsx",
++    "apps/web/src/app/workspace/sources/sources-generation-summary.ts",
++    "apps/web/src/app/workspace/templates/page.tsx",
++    "apps/web/src/app/workspace/validation/devops-txt-export.ts",
++    "libs/shared/ui/src/styles.css"
+   ]
+ }

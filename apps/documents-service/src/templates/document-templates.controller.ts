@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -27,6 +28,7 @@ import {
   parseDocumentTemplateId,
   parseDocumentTemplateListQuery,
   parseUpdateDocumentTemplate,
+  parseUpdateDocumentTemplateLogo,
 } from "./document-templates-input";
 import { DocumentTemplatesService } from "./document-templates.service";
 import type { DocumentsRequest } from "./documents-request";
@@ -44,9 +46,7 @@ function requireActor(request: DocumentsRequest): AuthenticatedUser {
 @UseGuards(DocumentsAccessTokenGuard)
 @Controller("templates")
 export class DocumentTemplatesController {
-  constructor(
-    private readonly templates: DocumentTemplatesService,
-  ) {}
+  constructor(private readonly templates: DocumentTemplatesService) {}
 
   @ApiOperation({
     summary: "Consultar indicadores del catálogo de plantillas",
@@ -63,10 +63,7 @@ export class DocumentTemplatesController {
     description: "Listado paginado de plantillas.",
   })
   @Get()
-  list(
-    @Req() request: DocumentsRequest,
-    @Query() query: unknown,
-  ) {
+  list(@Req() request: DocumentsRequest, @Query() query: unknown) {
     return this.templates.list(
       requireActor(request),
       parseDocumentTemplateListQuery(query),
@@ -77,13 +74,7 @@ export class DocumentTemplatesController {
   @ApiBody({
     schema: {
       type: "object",
-      required: [
-        "code",
-        "name",
-        "templateType",
-        "version",
-        "includesScrum",
-      ],
+      required: ["code", "name", "templateType", "version", "includesScrum"],
       properties: {
         code: { type: "string", example: "RQ-CUSTOM" },
         name: { type: "string", minLength: 3, maxLength: 200 },
@@ -108,10 +99,7 @@ export class DocumentTemplatesController {
   })
   @ApiResponse({ status: 201, description: "Plantilla creada." })
   @Post()
-  create(
-    @Req() request: DocumentsRequest,
-    @Body() body: unknown,
-  ) {
+  create(@Req() request: DocumentsRequest, @Body() body: unknown) {
     return this.templates.create(
       requireActor(request),
       parseCreateDocumentTemplate(body),
@@ -132,6 +120,20 @@ export class DocumentTemplatesController {
     );
   }
 
+  @ApiOperation({ summary: "Consultar el logo de una plantilla" })
+  @ApiParam({ name: "templateId", format: "uuid" })
+  @ApiResponse({ status: 200, description: "Logo de plantilla o null." })
+  @Get(":templateId/logo")
+  getLogo(
+    @Req() request: DocumentsRequest,
+    @Param("templateId") templateId: string,
+  ) {
+    return this.templates.getLogo(
+      requireActor(request),
+      parseDocumentTemplateId(templateId),
+    );
+  }
+
   @ApiOperation({ summary: "Actualizar una plantilla en borrador" })
   @ApiParam({ name: "templateId", format: "uuid" })
   @ApiResponse({ status: 200, description: "Plantilla actualizada." })
@@ -145,6 +147,22 @@ export class DocumentTemplatesController {
       requireActor(request),
       parseDocumentTemplateId(templateId),
       parseUpdateDocumentTemplate(body),
+    );
+  }
+
+  @ApiOperation({ summary: "Actualizar el logo de una plantilla activa" })
+  @ApiParam({ name: "templateId", format: "uuid" })
+  @ApiResponse({ status: 200, description: "Logo de plantilla actualizado." })
+  @Put(":templateId/logo")
+  updateLogo(
+    @Req() request: DocumentsRequest,
+    @Param("templateId") templateId: string,
+    @Body() body: unknown,
+  ) {
+    return this.templates.updateLogo(
+      requireActor(request),
+      parseDocumentTemplateId(templateId),
+      parseUpdateDocumentTemplateLogo(body),
     );
   }
 

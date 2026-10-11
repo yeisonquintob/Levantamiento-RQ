@@ -1,3 +1,4 @@
+import { UsersClientService } from "../users/users-client.service";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -9,6 +10,7 @@ import {
   Patch,
   Post,
   Req,
+  Query,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -41,7 +43,23 @@ function context(request: RequestLike): {
 @ApiCookieAuth("rq_access")
 @Controller("admin/ai-providers")
 export class AiProviderConfigurationsGatewayController {
-  constructor(private readonly analysis: AiAnalysisClientService) {}
+  constructor(
+    private readonly analysis: AiAnalysisClientService,
+    private readonly users: UsersClientService,
+  ) {}
+
+  @Get("audit-events")
+  async auditHistory(
+    @Req() request: RequestLike,
+    @Query() query: Readonly<Record<string, unknown>>,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.users.resolveAuditActors(
+      await this.analysis.auditHistory(token, query, correlationId),
+      token,
+      correlationId,
+    );
+  }
 
   @Get()
   @ApiOperation({ summary: "Listar configuraciones de proveedores de IA" })
@@ -50,10 +68,58 @@ export class AiProviderConfigurationsGatewayController {
     return this.analysis.listProviders(token, correlationId);
   }
 
+  @Get("ollama/models")
+  listOllamaModels(
+    @Req() request: RequestLike,
+    @Query("baseUrl") baseUrl: string,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.analysis.listOllamaModels(token, correlationId, baseUrl);
+  }
+
+  @Get("openai-compatible/models")
+  listOpenAiCompatibleModels(
+    @Req() request: RequestLike,
+    @Query("baseUrl") baseUrl: string,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.analysis.listOpenAiCompatibleModels(
+      token,
+      correlationId,
+      baseUrl,
+    );
+  }
+
+  @Get(":providerConfigurationId/openai/models")
+  @ApiOperation({
+    summary: "Listar los modelos disponibles para una clave OpenAI",
+  })
+  listOpenAiModels(
+    @Req() request: RequestLike,
+    @Param("providerConfigurationId") providerConfigurationId: string,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.analysis.listOpenAiModels(
+      token,
+      correlationId,
+      providerConfigurationId,
+    );
+  }
+
   @Post()
   create(@Req() request: RequestLike, @Body() body: unknown) {
     const { token, correlationId } = context(request);
     return this.analysis.createProvider(token, correlationId, body);
+  }
+
+  @Post(":providerConfigurationId/duplicate")
+  duplicate(
+    @Req() request: RequestLike,
+    @Param("providerConfigurationId") id: string,
+    @Body() body: unknown,
+  ) {
+    const { token, correlationId } = context(request);
+    return this.analysis.duplicateProvider(token, correlationId, id, body);
   }
 
   @Patch(":providerConfigurationId")

@@ -15,7 +15,8 @@ export interface GatewayConfig extends BaseServiceConfig {
   aiAnalysisServiceUrl: string;
   workflowServiceUrl: string;
   operationsServiceUrl: string;
-  webOrigin: string;
+  prototypesServiceUrl: string;
+  webOrigins: readonly string[];
   identityTimeoutMs: number;
   projectsTimeoutMs: number;
   sourcesTimeoutMs: number;
@@ -23,6 +24,7 @@ export interface GatewayConfig extends BaseServiceConfig {
   aiAnalysisTimeoutMs: number;
   workflowTimeoutMs: number;
   operationsTimeoutMs: number;
+  prototypesTimeoutMs: number;
   sourcesUploadTimeoutMs: number;
   sourcesMaxFileBytes: number;
   sourcesMaxFilesPerUpload: number;
@@ -30,6 +32,9 @@ export interface GatewayConfig extends BaseServiceConfig {
   cookieSecure: boolean;
   authSignInRateLimit: number;
   authSignInRateWindowSeconds: number;
+  rateLimitRedisHost: string;
+  rateLimitRedisPort: number;
+  rateLimitRedisPassword: string | null;
 }
 
 function readText(
@@ -77,6 +82,52 @@ function readUrl(
   }
 }
 
+export function parseWebOrigins(
+  value: string,
+  variableName = "WEB_ORIGINS",
+): string[] {
+  const origins = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      if (entry === "*" || entry.toLowerCase() === "null") {
+        throw new Error(`${variableName} no admite '${entry}'.`);
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(entry);
+      } catch {
+        throw new Error(
+          `${variableName} contiene un origen inválido: ${entry}`,
+        );
+      }
+
+      if (
+        !["http:", "https:"].includes(parsed.protocol) ||
+        parsed.username ||
+        parsed.password ||
+        parsed.pathname !== "/" ||
+        parsed.search ||
+        parsed.hash
+      ) {
+        throw new Error(
+          `${variableName} contiene un origen inválido: ${entry}`,
+        );
+      }
+
+      return parsed.origin;
+    });
+
+  const uniqueOrigins = [...new Set(origins)];
+  if (uniqueOrigins.length === 0) {
+    throw new Error(`${variableName} debe contener al menos un origen.`);
+  }
+
+  return uniqueOrigins;
+}
+
 function readBoolean(
   value: string | undefined,
   fallback: boolean,
@@ -110,6 +161,36 @@ function readInteger(
 export function loadGatewayConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): GatewayConfig {
+  const baseConfig = loadBaseServiceConfig(
+    {
+      serviceName: "gateway",
+      defaultPort: 3000,
+    },
+    environment,
+  );
+  const configuredWebOrigins =
+    environment.WEB_ORIGINS?.trim() || environment.WEB_ORIGIN?.trim();
+  if (baseConfig.environment === "production" && !configuredWebOrigins) {
+    throw new Error("WEB_ORIGINS es obligatorio en producción.");
+  }
+  const webOrigins = parseWebOrigins(
+    configuredWebOrigins || "http://127.0.0.1:4200,http://localhost:4200",
+    environment.WEB_ORIGINS?.trim() ? "WEB_ORIGINS" : "WEB_ORIGIN",
+  );
+  const cookieSecure = readBoolean(
+    environment.AUTH_COOKIE_SECURE,
+    baseConfig.environment === "production",
+    "AUTH_COOKIE_SECURE",
+  );
+  if (baseConfig.environment === "production" && !cookieSecure) {
+    throw new Error("AUTH_COOKIE_SECURE debe ser true en producción.");
+  }
+  if (
+    baseConfig.environment === "production" &&
+    webOrigins.some((origin) => !origin.startsWith("https://"))
+  ) {
+    throw new Error("WEB_ORIGINS solo admite HTTPS en producción.");
+  }
   const sourcesMaxFileBytes = readInteger(
     environment.SOURCES_MAX_FILE_BYTES,
     20 * 1024 * 1024,
@@ -126,13 +207,7 @@ export function loadGatewayConfig(
   );
 
   return {
-    ...loadBaseServiceConfig(
-      {
-        serviceName: "gateway",
-        defaultPort: 3000,
-      },
-      environment,
-    ),
+    ...baseConfig,
     globalPrefix: readGlobalPrefix(environment.API_GLOBAL_PREFIX),
     version: readText(environment.APP_VERSION, "0.0.0", "APP_VERSION"),
     identityServiceUrl: readUrl(
@@ -170,11 +245,12 @@ export function loadGatewayConfig(
       "http://127.0.0.1:3008",
       "OPERATIONS_SERVICE_URL",
     ),
-    webOrigin: readUrl(
-      environment.WEB_ORIGIN,
-      "http://127.0.0.1:4200",
-      "WEB_ORIGIN",
+    prototypesServiceUrl: readUrl(
+      environment.PROTOTYPES_SERVICE_URL,
+      "http://127.0.0.1:3009",
+      "PROTOTYPES_SERVICE_URL",
     ),
+    webOrigins,
     identityTimeoutMs: readInteger(
       environment.IDENTITY_TIMEOUT_MS,
       5000,
@@ -224,6 +300,13 @@ export function loadGatewayConfig(
       300000,
       "OPERATIONS_TIMEOUT_MS",
     ),
+    prototypesTimeoutMs: readInteger(
+      environment.PROTOTYPES_TIMEOUT_MS,
+      600000,
+      500,
+      600000,
+      "PROTOTYPES_TIMEOUT_MS",
+    ),
     sourcesUploadTimeoutMs: readInteger(
       environment.SOURCES_UPLOAD_TIMEOUT_MS,
       300000,
@@ -240,11 +323,7 @@ export function loadGatewayConfig(
       500 * 1024 * 1024,
       "SOURCES_MAX_BATCH_BYTES",
     ),
-    cookieSecure: readBoolean(
-      environment.AUTH_COOKIE_SECURE,
-      false,
-      "AUTH_COOKIE_SECURE",
-    ),
+    cookieSecure,
     authSignInRateLimit: readInteger(
       environment.AUTH_SIGN_IN_RATE_LIMIT,
       10,
@@ -259,5 +338,21 @@ export function loadGatewayConfig(
       86_400,
       "AUTH_SIGN_IN_RATE_WINDOW_SECONDS",
     ),
+    rateLimitRedisHost: readText(
+      environment.GATEWAY_REDIS_HOST,
+      "127.0.0.1",
+      "GATEWAY_REDIS_HOST",
+    ),
+    rateLimitRedisPort: readInteger(
+      environment.GATEWAY_REDIS_PORT ?? environment.RQ_REDIS_PORT,
+      6381,
+      1,
+      65535,
+      "GATEWAY_REDIS_PORT",
+    ),
+    rateLimitRedisPassword:
+      environment.GATEWAY_REDIS_PASSWORD?.trim() ||
+      environment.REDIS_PASSWORD?.trim() ||
+      null,
   };
 }

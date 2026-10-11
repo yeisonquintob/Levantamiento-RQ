@@ -37,7 +37,21 @@ export class SourceProcessingWorker implements OnModuleInit, OnModuleDestroy {
           throw new Error(`Trabajo de Sources no reconocido: ${job.name}.`);
         }
 
-        await this.processing.process(job.data, job.attemptsMade + 1);
+        await this.processing.process(
+          job.data,
+          job.attemptsMade + 1,
+          async (progress) => {
+            try {
+              await job.updateProgress(progress);
+            } catch (error) {
+              this.logger.warn(
+                `No fue posible publicar el progreso de ${job.data.sourceId}: ${
+                  error instanceof Error ? error.message : "error desconocido"
+                }`,
+              );
+            }
+          },
+        );
       },
       {
         connection: this.config.connection,

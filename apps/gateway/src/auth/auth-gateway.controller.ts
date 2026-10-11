@@ -4,7 +4,9 @@ import {
   Get,
   HttpCode,
   Inject,
+  HttpException,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -21,12 +23,14 @@ import {
 
 import type {
   GatewayAuthSessionResponse,
+  RegisterAccountResponse,
   SignOutResponse,
 } from "@levantamiento-rq/shared-contracts";
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 import {
   ACCESS_COOKIE,
+  MICROSOFT_TRANSACTION_COOKIE,
   readCookie,
   REFRESH_COOKIE,
   serializeCookie,
@@ -43,6 +47,12 @@ interface ReplyLike {
   header(name: string, value: string | readonly string[]): unknown;
 }
 
+interface RedirectReplyLike extends ReplyLike {
+  redirect(url: string, statusCode?: number): unknown;
+}
+
+const MICROSOFT_TRANSACTION_PATH = "/api/v1/auth/microsoft";
+
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -55,6 +65,20 @@ export class AuthGatewayController {
     @Inject(GATEWAY_CONFIG)
     private readonly config: GatewayConfig,
   ) {}
+
+  @ApiOperation({ summary: "Registrar una cuenta pendiente de activación" })
+  @ApiResponse({ status: 201, description: "Solicitud de registro creada." })
+  @Post("register")
+  @UseGuards(AuthRateLimitGuard)
+  register(
+    @Body() body: unknown,
+    @Req() request: RequestLike,
+  ): Promise<RegisterAccountResponse> {
+    return this.identity.register(body, {
+      userAgent: firstHeader(request.headers["user-agent"]),
+      ipAddress: request.ip,
+    });
+  }
 
   @ApiOperation({ summary: "Iniciar sesión mediante el Gateway" })
   @ApiBody({
@@ -97,12 +121,99 @@ export class AuthGatewayController {
     };
   }
 
+  @ApiOperation({ summary: "Iniciar el acceso con Microsoft Entra ID" })
+  @ApiResponse({ status: 302, description: "Redirección a Microsoft." })
+  @Get("microsoft/start")
+  @UseGuards(AuthRateLimitGuard)
+  async microsoftStart(
+    @Query("origin") origin: string | undefined,
+    @Res() reply: RedirectReplyLike,
+  ): Promise<void> {
+    const webOrigin = this.resolveWebOrigin(origin);
+
+    try {
+      const { authorizationUrl, transaction } =
+        await this.identity.microsoftAuthorize(webOrigin);
+
+      reply.header(
+        "set-cookie",
+        serializeCookie(MICROSOFT_TRANSACTION_COOKIE, transaction, {
+          maxAge: 600,
+          path: MICROSOFT_TRANSACTION_PATH,
+          secure: this.config.cookieSecure,
+        }),
+      );
+      reply.redirect(authorizationUrl, 302);
+    } catch (error) {
+      reply.redirect(this.microsoftFailureUrl(webOrigin, error), 302);
+    }
+  }
+
+  @ApiOperation({ summary: "Completar el acceso con Microsoft Entra ID" })
+  @ApiResponse({ status: 302, description: "Redirección a la aplicación." })
+  @Get("microsoft/callback")
+  @UseGuards(AuthRateLimitGuard)
+  async microsoftCallback(
+    @Query("code") code: string | undefined,
+    @Query("state") state: string | undefined,
+    @Query("error") providerError: string | undefined,
+    @Req() request: RequestLike,
+    @Res() reply: RedirectReplyLike,
+  ): Promise<void> {
+    const transaction = readCookie(
+      firstHeader(request.headers.cookie),
+      MICROSOFT_TRANSACTION_COOKIE,
+    );
+    const clearTransaction = serializeCookie(MICROSOFT_TRANSACTION_COOKIE, "", {
+      maxAge: 0,
+      path: MICROSOFT_TRANSACTION_PATH,
+      secure: this.config.cookieSecure,
+    });
+    const fallbackOrigin = this.resolveWebOrigin(undefined);
+
+    if (providerError || !code || !state || !transaction) {
+      reply.header("set-cookie", clearTransaction);
+      reply.redirect(
+        `${fallbackOrigin}/sign-in?reason=${
+          providerError ? "microsoft-cancelled" : "microsoft-failed"
+        }`,
+        302,
+      );
+      return;
+    }
+
+    try {
+      const { session, webOrigin } = await this.identity.microsoftCallback(
+        { code, state, transaction },
+        {
+          userAgent: firstHeader(request.headers["user-agent"]),
+          ipAddress: request.ip,
+        },
+      );
+
+      reply.header("set-cookie", [
+        clearTransaction,
+        ...this.sessionCookies(session, session.user.mustChangePassword),
+      ]);
+      reply.redirect(
+        `${this.resolveWebOrigin(webOrigin)}${
+          session.user.mustChangePassword ? "/change-password" : "/workspace"
+        }`,
+        302,
+      );
+    } catch (error) {
+      reply.header("set-cookie", clearTransaction);
+      reply.redirect(this.microsoftFailureUrl(fallbackOrigin, error), 302);
+    }
+  }
+
   @ApiOperation({ summary: "Renovar la sesión" })
   @ApiCookieAuth("rq_refresh")
   @ApiResponse({ status: 200, description: "Sesión renovada." })
   @ApiResponse({ status: 401, description: "Sesión de renovación inválida." })
   @Post("refresh")
   @HttpCode(200)
+  @UseGuards(AuthRateLimitGuard)
   async refresh(
     @Req() request: RequestLike,
     @Res({ passthrough: true }) reply: ReplyLike,
@@ -222,8 +333,26 @@ export class AuthGatewayController {
     return this.identity.me(accessToken);
   }
 
-  private setSessionCookies(
-    reply: ReplyLike,
+  private resolveWebOrigin(candidate: string | undefined): string {
+    const normalized = candidate?.trim().replace(/\/$/u, "");
+    return normalized && this.config.webOrigins.includes(normalized)
+      ? normalized
+      : (this.config.webOrigins[0] as string);
+  }
+
+  private microsoftFailureUrl(webOrigin: string, error: unknown): string {
+    const status = error instanceof HttpException ? error.getStatus() : 500;
+    const reason =
+      status === 401 || status === 403
+        ? "microsoft-denied"
+        : status === 503
+          ? "microsoft-unavailable"
+          : "microsoft-failed";
+
+    return `${webOrigin}/sign-in?reason=${reason}`;
+  }
+
+  private sessionCookies(
     session: {
       accessToken: string;
       refreshToken: string;
@@ -231,8 +360,8 @@ export class AuthGatewayController {
       refreshTokenExpiresInSeconds: number;
     },
     restrictedToAuthentication: boolean,
-  ): void {
-    reply.header("set-cookie", [
+  ): string[] {
+    return [
       serializeCookie(ACCESS_COOKIE, session.accessToken, {
         maxAge: session.accessTokenExpiresInSeconds,
         path: restrictedToAuthentication ? "/api/v1/auth" : "/",
@@ -243,6 +372,22 @@ export class AuthGatewayController {
         path: "/api/v1/auth",
         secure: this.config.cookieSecure,
       }),
-    ]);
+    ];
+  }
+
+  private setSessionCookies(
+    reply: ReplyLike,
+    session: {
+      accessToken: string;
+      refreshToken: string;
+      accessTokenExpiresInSeconds: number;
+      refreshTokenExpiresInSeconds: number;
+    },
+    restrictedToAuthentication: boolean,
+  ): void {
+    reply.header(
+      "set-cookie",
+      this.sessionCookies(session, restrictedToAuthentication),
+    );
   }
 }

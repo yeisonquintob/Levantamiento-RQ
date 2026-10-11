@@ -1,0 +1,36 @@
+{
+  "name": "prototypes-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/prototypes-service/src",
+  "projectType": "application",
+  "tags": ["scope:prototypes", "type:app"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "env": { "NODE_ENV": "production" },
+        "cwd": "apps/prototypes-service"
+      },
+      "configurations": {
+        "development": { "env": { "NODE_ENV": "development" } }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "prototypes-service:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "prototypes-service:build:development"
+        },
+        "production": { "buildTarget": "prototypes-service:build:production" }
+      }
+    }
+  }
+}

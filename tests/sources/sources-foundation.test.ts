@@ -19,12 +19,26 @@ import {
   parseUploadMetadata,
 } from "../../apps/sources-service/src/sources/sources-input.js";
 import {
+  assertSafeOoxml,
   titleFromFileName,
   validateSourceFile,
 } from "../../apps/sources-service/src/sources/source-file-validation.js";
 import { loadSourcesStorageConfig } from "../../apps/sources-service/src/sources/sources-storage.config.js";
 import { SourceExtractionService } from "../../apps/sources-service/src/sources/source-extraction.service.js";
 import { SourcesService } from "../../apps/sources-service/src/sources/sources.service.js";
+
+// Pantalla de Fuentes: el espacio de trabajo y sus componentes de presentación.
+async function readSourcesScreen(): Promise<string> {
+  const dir = "apps/web/src/app/workspace/sources/";
+  const parts = await Promise.all(
+    [
+      "sources-workspace.tsx",
+      "sources-generation-panel.tsx",
+      "sources-generation-summary.ts",
+    ].map((file) => readFile(dir + file, "utf8")),
+  );
+  return parts.join("\n");
+}
 
 test("el contrato publica tipos, formatos y estados controlados", () => {
   assert.deepEqual(SOURCE_TYPES, [
@@ -57,6 +71,7 @@ test("el contrato publica tipos, formatos y estados controlados", () => {
     "docx",
     "xlsx",
     "txt",
+    "vtt",
     "csv",
     "png",
     "jpg",
@@ -236,8 +251,9 @@ test("la carga persiste archivos OTHER y PENDING sin encolarlos", async () => {
       (source) =>
         source.classification === "OTHER" &&
         source.processingStatus === "PENDING" &&
+        source.securityStatus === "QUARANTINED" &&
         source.processingMessage ===
-          "Archivo almacenado. Procesamiento pendiente.",
+          "Archivo almacenado en cuarentena. Escaneo pendiente.",
     ),
   );
 });
@@ -432,6 +448,27 @@ test("la validación de archivos controla extensión, tamaño y firma", () => {
   assert.equal(validText.mediaType, "text/plain; charset=utf-8");
   assert.equal(titleFromFileName("evidencia.txt"), "evidencia");
 
+  const validVtt = validateSourceFile(
+    "conversacion.vtt",
+    Buffer.from(
+      "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\n<v Yeison>Necesitamos validar el proceso.</v>",
+      "utf8",
+    ),
+    1024,
+  );
+
+  assert.equal(validVtt.extension, "vtt");
+  assert.equal(validVtt.mediaType, "text/vtt; charset=utf-8");
+  assert.throws(
+    () =>
+      validateSourceFile(
+        "invalido.vtt",
+        Buffer.from("Esto no es WebVTT", "utf8"),
+        1024,
+      ),
+    /WEBVTT válida/i,
+  );
+
   assert.throws(
     () =>
       validateSourceFile("falso.pdf", Buffer.from("no es pdf", "utf8"), 1024),
@@ -441,6 +478,74 @@ test("la validación de archivos controla extensión, tamaño y firma", () => {
   assert.throws(
     () => validateSourceFile("grande.txt", Buffer.alloc(20), 10),
     /tamaño máximo/i,
+  );
+});
+
+function simulatedOoxml(
+  entries: readonly {
+    name: string;
+    compressed: number;
+    uncompressed: number;
+  }[],
+): Buffer {
+  const records = entries.map((entry) => {
+    const name = Buffer.from(entry.name, "utf8");
+    const record = Buffer.alloc(46 + name.length);
+    record.writeUInt32LE(0x02014b50, 0);
+    record.writeUInt16LE(20, 4);
+    record.writeUInt16LE(20, 6);
+    record.writeUInt16LE(8, 10);
+    record.writeUInt32LE(entry.compressed, 20);
+    record.writeUInt32LE(entry.uncompressed, 24);
+    record.writeUInt16LE(name.length, 28);
+    name.copy(record, 46);
+    return record;
+  });
+  const central = Buffer.concat(records);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(0, 16);
+  return Buffer.concat([central, end]);
+}
+
+test("OOXML bloquea path traversal y bombas de descompresión", () => {
+  assert.throws(
+    () =>
+      assertSafeOoxml(
+        "docx",
+        simulatedOoxml([
+          { name: "[Content_Types].xml", compressed: 100, uncompressed: 100 },
+          { name: "../word/document.xml", compressed: 10, uncompressed: 100 },
+        ]),
+      ),
+    /ruta interna no segura/i,
+  );
+  assert.throws(
+    () =>
+      assertSafeOoxml(
+        "xlsx",
+        simulatedOoxml([
+          {
+            name: "[Content_Types].xml",
+            compressed: 1,
+            uncompressed: 1_000_000,
+          },
+          { name: "xl/workbook.xml", compressed: 1, uncompressed: 1_000_000 },
+        ]),
+      ),
+    /ratio de compresión sospechoso/i,
+  );
+  assert.doesNotThrow(() =>
+    assertSafeOoxml(
+      "docx",
+      simulatedOoxml([
+        { name: "[Content_Types].xml", compressed: 100, uncompressed: 200 },
+        { name: "word/document.xml", compressed: 200, uncompressed: 400 },
+      ]),
+    ),
   );
 });
 
@@ -460,7 +565,7 @@ test("la configuración aplica límites seguros de carga", () => {
   assert.equal(config.maxBatchBytes, 5242880);
 });
 
-test("la extracción prepara TXT, CSV e imágenes", async () => {
+test("la extracción prepara TXT, VTT, CSV e imágenes", async () => {
   const config = loadSourcesStorageConfig({
     AZURE_STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true",
     SOURCES_STORAGE_CONTAINER: "rq-sources",
@@ -475,6 +580,21 @@ test("la extracción prepara TXT, CSV e imágenes", async () => {
     "txt",
     Buffer.from("Necesidad\r\nfuncional", "utf8"),
   );
+  const vtt = await extractor.extract(
+    "vtt",
+    Buffer.from(
+      [
+        "WEBVTT",
+        "",
+        "00:00:00.000 --> 00:00:02.000",
+        "<v Yeison>Necesitamos validar el proceso.</v>",
+        "",
+        "00:00:02.000 --> 00:00:04.000",
+        "<v Ana>La validación debe quedar registrada.</v>",
+      ].join("\n"),
+      "utf8",
+    ),
+  );
   const csv = await extractor.extract(
     "csv",
     Buffer.from("campo,valor\nprioridad,alta", "utf8"),
@@ -485,6 +605,10 @@ test("la extracción prepara TXT, CSV e imágenes", async () => {
   );
 
   assert.equal(text.extractedText, "Necesidad\nfuncional");
+  assert.equal(
+    vtt.extractedText,
+    "Yeison: Necesitamos validar el proceso.\nAna: La validación debe quedar registrada.",
+  );
   assert.match(csv.extractedText ?? "", /prioridad,alta/);
   assert.equal(csv.sheetCount, 1);
   assert.equal(image.extractedText, null);
@@ -612,10 +736,7 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
     "apps/gateway/src/sources/sources-gateway.controller.ts",
     "utf8",
   );
-  const client = await readFile(
-    "apps/web/src/app/workspace/sources/sources-workspace.tsx",
-    "utf8",
-  );
+  const client = await readSourcesScreen();
 
   assert.match(gateway, /requestMultipart/);
   assert.match(gateway, /FormData/);
@@ -628,18 +749,26 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
   assert.match(client, /Clasificación/);
   assert.match(client, /Descripción opcional/);
   assert.match(client, />\s*Editar\s*</);
-  assert.match(client, />\s*Eliminar\s*</);
+  assert.match(client, />\s*Archivar\s*</);
   assert.match(client, /data\.append\(\s*"metadata"/);
-  assert.match(client, />\s*Reprocesar fuente\s*</);
-  assert.match(
-    client,
-    /Esta acción no ejecuta IA ni crea versiones documentales/,
-  );
+  assert.doesNotMatch(client, />\s*Reprocesar fuente\s*</);
   assert.match(client, /Descargar/);
-  assert.equal(
-    (client.match(/"Procesar y generar borrador"/g) ?? []).length,
-    1,
-  );
+  // Una sola acción de procesamiento: su etiqueta depende de los motores
+  // elegidos (local, nube o ambos) y cada variante se define una única vez.
+  for (const label of [
+    "Procesar con IA local",
+    "Procesar con IA nube",
+    "Procesar con IA local y nube",
+  ]) {
+    assert.equal(
+      (client.match(new RegExp(`"${label}"`, "g")) ?? []).length,
+      1,
+      `la etiqueta "${label}" debe definirse una sola vez`,
+    );
+  }
+  assert.equal((client.match(/<AiProcessingMenu/g) ?? []).length, 1);
+  assert.match(client, /<AiProcessingMenu/u);
+  assert.match(client, /engines: aiEngines\.engines/u);
   assert.doesNotMatch(client, /Procesar todos/);
   assert.match(client, /source\.processingStatus !== "PROCESSING"/);
   assert.match(client, /classification: "OTHER" as const/);
@@ -651,18 +780,53 @@ test("Gateway y frontend usan una sola experiencia Nueva fuente", async () => {
   assert.doesNotMatch(client, /127\.0\.0\.1:3003/);
 });
 
-test("KPI y Nueva fuente aparecen antes del selector de proyecto", async () => {
-  const client = await readFile(
-    "apps/web/src/app/workspace/sources/sources-workspace.tsx",
-    "utf8",
-  );
+test("KPI aparece arriba y Nueva fuente está junto a los filtros", async () => {
+  const client = await readSourcesScreen();
 
   assert.ok(
     client.indexOf('className="rq-module-commandbar"') <
-      client.indexOf('className="rq-source-project-card"'),
+      client.indexOf('className="rq-projects-filters"'),
   );
-  assert.match(client, /Etapa del proyecto/);
-  assert.match(client, /Paso 13 completo/);
+  // La barra superior ya no muestra una tarjeta «Estado del proyecto»: presenta
+  // el resumen de fuentes (registradas, archivos, textuales, listas y discusión).
+  const commandbar = client.slice(
+    client.indexOf('className="rq-module-commandbar"'),
+    client.indexOf('className="rq-projects-filters"'),
+  );
+  assert.match(commandbar, /RqKpiGrid label="Resumen de fuentes"/);
+  // Solo los indicadores importantes, con el componente estándar de KPI.
+  for (const title of ["Fuentes", "Discusión", "Procesamiento IA"]) {
+    assert.match(commandbar, new RegExp(`title="${title}"`));
+  }
+  assert.equal((commandbar.match(/<RqKpiCard/gu) ?? []).length, 3);
+  assert.doesNotMatch(commandbar, />\s*Nueva fuente\s*</);
+
+  const filterBar = client.slice(
+    client.indexOf('className="rq-projects-filters"'),
+    client.indexOf('<RqTableShell title="Fuentes">'),
+  );
+  assert.match(filterBar, />\s*Limpiar\s*</);
+  assert.match(filterBar, />\s*Nueva fuente\s*</);
+  // «Listas» sumaba total − archivadas; ahora se llama Activas.
+  assert.doesNotMatch(commandbar, /title="Listas"/);
+  assert.match(commandbar, /description="Activas \/ preparadas"/);
+  assert.doesNotMatch(client, /Estado del proyecto/);
+});
+
+test("la purga de proyecto elimina blobs antes de eliminar las fuentes", async () => {
+  const service = await readFile(
+    "apps/sources-service/src/sources/sources.service.ts",
+    "utf8",
+  );
+  const purge = service.slice(
+    service.indexOf("async purgeProject"),
+    service.indexOf("private async persistFile"),
+  );
+  assert.match(purge, /access\.role !== "ADMIN"/);
+  assert.match(purge, /storage\.deleteIfExists/);
+  assert.ok(
+    purge.indexOf("storage.deleteIfExists") < purge.indexOf("sources.remove"),
+  );
 });
 
 test("el arranque local garantiza la infraestructura de Fuentes", async () => {
@@ -672,4 +836,62 @@ test("el arranque local garantiza la infraestructura de Fuentes", async () => {
 
   assert.match(up, /scripts\/infrastructure-up\.sh/);
   assert.ok(up.indexOf(infrastructure) < up.indexOf(sourcesService));
+});
+
+test("el procesamiento publica progreso real y la UI lo conserva entre pestañas", async () => {
+  const [contracts, queue, worker, processing, workspace] = await Promise.all([
+    readFile("libs/shared/contracts/src/lib/sources.ts", "utf8"),
+    readFile(
+      "apps/sources-service/src/sources/source-processing.queue.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/sources-service/src/sources/source-processing.worker.ts",
+      "utf8",
+    ),
+    readFile(
+      "apps/sources-service/src/sources/source-processing.service.ts",
+      "utf8",
+    ),
+    readSourcesScreen(),
+  ]);
+
+  assert.match(contracts, /SOURCE_PROCESSING_STAGES/);
+
+  assert.match(contracts, /processingProgress:\s*number/);
+
+  assert.match(queue, /getProgressBySourceIds/);
+
+  assert.match(worker, /job\.updateProgress\(progress\)/);
+
+  assert.match(processing, /"DOWNLOADING"/);
+
+  assert.match(processing, /"VALIDATING"/);
+
+  assert.match(processing, /"EXTRACTING"/);
+
+  assert.match(processing, /"PERSISTING"/);
+
+  assert.match(processing, /"COMPLETED"/);
+
+  assert.match(workspace, /rq-source-prep/);
+
+  // mini barra por cada fuente
+  assert.match(workspace, /sourceProcessingPercentage\(source\)/);
+
+  assert.match(workspace, /Preparación del archivo/);
+
+  assert.doesNotMatch(workspace, /sourceProcessingOverview/);
+
+  assert.match(workspace, /rq-source-prep/);
+
+  assert.match(workspace, /Preparación del archivo \$\{source\.title\}/);
+
+  assert.match(workspace, /sourceProcessingPercentage\(source\)/);
+
+  assert.doesNotMatch(workspace, /sourceProcessingOverview/);
+
+  assert.match(workspace, /visibilitychange/);
+
+  assert.match(workspace, /document\.visibilityState/);
 });

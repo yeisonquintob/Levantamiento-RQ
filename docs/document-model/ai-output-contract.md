@@ -8,13 +8,17 @@ la plantilla 1.0.0. No devolverá únicamente texto libre.
 ## Reglas
 
 - Responder en español formal y claro.
-- Mantener las trece secciones.
+- Mantener las catorce secciones base y la sección 15 cuando la plantilla incluye Scrum.
+- Generar la solución propuesta con objetivo, elementos involucrados y alineación AS-IS, evaluación y TO-BE.
+- Incluir siempre la fuente de discusión activa del proyecto en el contexto.
+- Excluir elaborado por, revisado por y aprobado por del encabezado.
+- Dejar vacío el control de cambios durante una generación.
 - No inventar información.
 - Marcar datos faltantes con `[PENDIENTE POR DEFINIR]`.
 - Incluir evidencias mediante identificadores técnicos.
 - Separar hechos, inferencias, contradicciones y preguntas abiertas.
 - No aprobar automáticamente.
-- No cambiar el texto fijo de las secciones 11, 12 y 13.
+- No cambiar el texto fijo de las secciones 12, 13 y 14.
 
 ## Resultado por campo generado
 

@@ -1,4 +1,4 @@
-export const EXPORT_FORMATS = ["PDF", "DOCX"] as const;
+export const EXPORT_FORMATS = ["PDF", "DOCX", "MARKDOWN"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export const EXPORT_STATUSES = [
@@ -66,6 +66,7 @@ export const NOTIFICATION_TYPES = [
   "DOCUMENT_REJECTED",
   "EXPORT_READY",
   "EXPORT_FAILED",
+  "ANALYSIS_COMPLETED",
   "ANALYSIS_FAILED",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -94,6 +95,11 @@ export interface NotificationListResponse {
   unreadItems: number;
 }
 
+export interface NotificationClearResult {
+  deleted: true;
+  count: number;
+}
+
 export const AUDIT_RESULTS = ["SUCCEEDED", "FAILED", "DENIED"] as const;
 export type AuditResult = (typeof AUDIT_RESULTS)[number];
 
@@ -118,4 +124,38 @@ export interface AuditEventListResponse {
   pageSize: number;
   totalItems: number;
   totalPages: number;
+}
+
+/** Seguimiento de ejecución: estado de cada tarea del plan de trabajo de un proyecto. */
+export const EXECUTION_TASK_STATES = ["PENDING", "IN_PROGRESS", "DONE"] as const;
+export type ExecutionTaskState = (typeof EXECUTION_TASK_STATES)[number];
+
+export const EXECUTION_TASK_SOURCES = ["MANUAL", "AZURE_CSV"] as const;
+export type ExecutionTaskSource = (typeof EXECUTION_TASK_SOURCES)[number];
+
+export interface ExecutionTaskStatusDetail {
+  /** Código de la tarea en el plan documental (HU/TA…), normalizado en mayúsculas. */
+  taskCode: string;
+  state: ExecutionTaskState;
+  source: ExecutionTaskSource;
+  note: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+  updatedByUserId: string;
+}
+
+export interface ExecutionTaskStatusListResponse {
+  items: readonly ExecutionTaskStatusDetail[];
+}
+
+export interface ExecutionTaskStatusUpdate {
+  taskCode: string;
+  state: ExecutionTaskState;
+  source?: ExecutionTaskSource;
+  note?: string | null;
+  completedAt?: string | null;
+}
+
+export interface UpdateExecutionTaskStatusesRequest {
+  items: readonly ExecutionTaskStatusUpdate[];
 }

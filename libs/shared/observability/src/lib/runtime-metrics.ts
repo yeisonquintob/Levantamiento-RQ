@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { timingSafeEqual } from "node:crypto";
 
 type OperationResult = "failed" | "succeeded";
 type QueueJobState = "completed" | "enqueued" | "failed";
@@ -11,6 +12,7 @@ interface Aggregate {
 interface RuntimeTelemetryOptions {
   serviceName: string;
   globalPrefix?: string;
+  metricsToken?: string;
 }
 
 const registries = new Map<string, RuntimeMetrics>();
@@ -183,7 +185,21 @@ export function registerRuntimeTelemetry(
       uptimeSeconds: process.uptime(),
     };
   });
-  fastify.get(`/${prefix}/metrics`, async (_request, reply) => {
+  fastify.get(`/${prefix}/metrics`, async (request, reply) => {
+    const configuredToken = options.metricsToken?.trim() || process.env.METRICS_BEARER_TOKEN?.trim();
+    const authorization = request.headers.authorization;
+    const supplied = authorization?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
+    const tokenAllowed = Boolean(
+      configuredToken &&
+      supplied.length === configuredToken.length &&
+      timingSafeEqual(Buffer.from(supplied), Buffer.from(configuredToken)),
+    );
+    const localDevelopment =
+      process.env.NODE_ENV !== "production" &&
+      (request.ip === "127.0.0.1" || request.ip === "::1");
+    if (!tokenAllowed && !localDevelopment) {
+      return reply.status(404).send({ statusCode: 404, message: "Not Found" });
+    }
     reply.header("cache-control", "no-store");
     reply.type("text/plain; version=0.0.4; charset=utf-8");
     return metrics.toPrometheus();

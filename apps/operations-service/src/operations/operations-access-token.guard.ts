@@ -9,7 +9,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { jwtVerify } from "jose";
+import { verifyAccessJwt } from "@levantamiento-rq/shared-http";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 
@@ -76,29 +76,22 @@ export class OperationsAccessTokenGuard implements CanActivate {
     if (!match?.[1])
       throw new UnauthorizedException("Token de acceso requerido.");
     try {
-      const verified = await jwtVerify(
-        match[1],
-        new TextEncoder().encode(this.config.accessSecret),
-        {
-          issuer: this.config.issuer,
-          audience: this.config.audience,
-          algorithms: ["HS256"],
-        },
-      );
-      if (verified.payload.typ !== "access") {
-        throw new UnauthorizedException("Tipo de token inválido.");
-      }
-      if (verified.payload.mustChangePassword === true) {
+      const payload = await verifyAccessJwt(match[1], {
+        issuer: this.config.issuer,
+        audience: this.config.audience,
+        publicJwks: this.config.accessPublicJwks,
+      });
+      if (payload.mustChangePassword === true) {
         throw new ForbiddenException(
           "Debes cambiar la contraseña temporal antes de continuar.",
         );
       }
       request.authPrincipal = {
-        id: requiredText(verified.payload.sub),
-        email: requiredText(verified.payload.email),
-        displayName: requiredText(verified.payload.name),
-        roles: stringArray(verified.payload.roles),
-        permissions: stringArray(verified.payload.permissions),
+        id: requiredText(payload.sub),
+        email: requiredText(payload.email),
+        displayName: requiredText(payload.name),
+        roles: stringArray(payload.roles),
+        permissions: stringArray(payload.permissions),
         mustChangePassword: false,
       } satisfies AuthenticatedUser;
       request.accessToken = match[1];

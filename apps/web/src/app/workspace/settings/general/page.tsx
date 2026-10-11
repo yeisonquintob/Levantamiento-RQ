@@ -70,8 +70,8 @@ export default async function GeneralSettingsPage() {
             </div>
           </header>
           <p>
-            El tema y el tamaño de texto se almacenan únicamente en este
-            navegador.
+            El tema, el tamaño de texto y el movimiento se almacenan
+            únicamente en este navegador.
           </p>
           <AppearanceControls />
         </article>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -87,6 +88,19 @@ export class DocumentsGatewayController {
     );
   }
 
+  @ApiOperation({ summary: "Listar todas las versiones del documento" })
+  @Get("documents/:documentId/versions")
+  listVersions(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+  ) {
+    return this.documents.listVersions(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+    );
+  }
+
   @ApiOperation({ summary: "Consultar una versión" })
   @Get("documents/:documentId/versions/:versionNumber")
   getVersion(
@@ -95,6 +109,22 @@ export class DocumentsGatewayController {
     @Param("versionNumber") versionNumber: string,
   ) {
     return this.documents.getVersion(
+      accessToken(req),
+      correlationId(req),
+      documentId,
+      versionNumber,
+    );
+  }
+
+  @ApiOperation({ summary: "Eliminar una versión en borrador" })
+  @Delete("documents/:documentId/versions/:versionNumber")
+  @HttpCode(200)
+  deleteDraftVersion(
+    @Req() req: RequestLike,
+    @Param("documentId") documentId: string,
+    @Param("versionNumber") versionNumber: string,
+  ) {
+    return this.documents.deleteDraftVersion(
       accessToken(req),
       correlationId(req),
       documentId,

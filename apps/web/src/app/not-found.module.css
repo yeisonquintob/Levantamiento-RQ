@@ -1,0 +1,71 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--rq-space-5);
+  background: var(--rq-color-page);
+  color: var(--rq-color-text);
+}
+
+.card {
+  display: grid;
+  gap: var(--rq-space-3);
+  width: min(100%, 32rem);
+  padding: var(--rq-space-5);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-lg);
+  background: var(--rq-color-surface);
+  box-shadow: var(--rq-shadow-sm);
+  text-align: center;
+}
+
+.code {
+  margin: 0;
+  color: var(--rq-color-institutional);
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.text {
+  margin: 0;
+  color: var(--rq-color-muted);
+}
+
+.link {
+  justify-self: center;
+  padding: var(--rq-space-2) var(--rq-space-4);
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-color-institutional);
+  color: var(--rq-color-on-institutional);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.link:hover,
+.link:focus-visible {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: var(--rq-space-3);
+  }
+
+  .card {
+    padding: var(--rq-space-4);
+  }
+
+  .title {
+    font-size: 1.25rem;
+  }
+
+  .link {
+    justify-self: stretch;
+  }
+}

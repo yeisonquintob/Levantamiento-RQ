@@ -40,11 +40,6 @@ test("Web llama IA solo al generar el borrador o una versión IA explícita", as
   const batchGeneration = between(
     sources,
     "async function processBatch",
-    "async function reprocessSource",
-  );
-  const technicalReprocess = between(
-    sources,
-    "async function reprocessSource",
     "async function archiveSource",
   );
   const save = between(
@@ -73,7 +68,6 @@ test("Web llama IA solo al generar el borrador o una versión IA explícita", as
   assert.match(batchGeneration, /INITIAL_DRAFT/);
   assert.match(batchGeneration, /AI_VERSION/);
   assert.match(batchGeneration, /idempotencyKey: operationKey/);
-  assert.doesNotMatch(technicalReprocess, /analysis-requests|\/documents\//);
   assert.doesNotMatch(save, /analysis-requests/);
   assert.doesNotMatch(manualVersion, /analysis-requests/);
   assert.doesNotMatch(historyAndCompare, /analysis-requests/);
@@ -152,7 +146,17 @@ test("un reintento con resultado persistido no vuelve a resolver ni llamar al pr
     } as never,
     {
       requireCurrentVersion: async () => ({
-        currentVersionDetail: { revision: 3, status: "DRAFT" },
+        currentVersionDetail: {
+          revision: 3,
+          status: "DRAFT",
+          sections: DOCUMENT_SECTION_DEFINITIONS.map((section, index) => ({
+            key: section.key,
+            title: section.title,
+            order: index + 1,
+            content: `Contenido ${section.key}`,
+            templateControlled: index >= 10,
+          })),
+        },
       }),
       applyAiDraft: async () => {
         applications += 1;
@@ -169,4 +173,209 @@ test("un reintento con resultado persistido no vuelve a resolver ni llamar al pr
   assert.equal(applications, 1);
   assert.ok(transactionUpdates.some((values) => values.status === "ACCEPTED"));
   assert.ok(transactionUpdates.some((values) => values.status === "COMPLETED"));
+});
+
+function fakeQueryBuilder(claimAffected: number) {
+  return {
+    update: () => ({
+      set: () => ({
+        where: () => ({
+          andWhere: () => ({
+            execute: async () => ({ affected: claimAffected }),
+          }),
+        }),
+      }),
+    }),
+  };
+}
+
+function fakePromptsRepository() {
+  return {
+    findOneBy: async () => ({
+      id: "prompt-1",
+      code: "REQUIREMENT_DOCUMENT",
+      isActive: true,
+      systemInstruction: "Instrucción de prueba.",
+    }),
+  };
+}
+
+function fakeExecutionsRepository() {
+  return {
+    find: async () => [],
+    create: (input: unknown) => input,
+    save: async () => undefined,
+    update: async () => undefined,
+  };
+}
+
+function fakeRequestsRepository(request: unknown, claimAffected: number) {
+  return {
+    findOneBy: async () => request,
+    createQueryBuilder: () => fakeQueryBuilder(claimAffected),
+  };
+}
+
+function buildGenerationRequest(requestId: string) {
+  const sections = DOCUMENT_SECTION_DEFINITIONS.map((section, index) => ({
+    key: section.key,
+    title: section.title,
+    order: index + 1,
+    content: `Contenido ${section.key}`,
+    templateControlled: false,
+  }));
+  return {
+    id: requestId,
+    projectId: "33333333-3333-4333-8333-333333333333",
+    documentId: "44444444-4444-4444-8444-444444444444",
+    documentVersionId: "55555555-5555-4555-8555-555555555555",
+    generatedVersionNumber: 1,
+    generatedVersion: "v1",
+    purpose: "INITIAL_DRAFT",
+    instruction: null,
+    useLocalAi: false,
+    useCloudAi: true,
+    providerSelectionsJson: null,
+    requestedByUserId: "66666666-6666-4666-8666-666666666666",
+    status: "PENDING",
+    documentSnapshotJson: JSON.stringify({
+      template: { id: "t1", version: 1, templateType: "MEDIUM_REQUIREMENT" },
+      currentVersionDetail: {
+        revision: 1,
+        status: "DRAFT",
+        sections,
+        evidence: [],
+      },
+    }),
+  };
+}
+
+test("cancelar durante la generación evita aplicar el resultado al documento", async () => {
+  const requestId = "11111111-1111-4111-8111-111111111111";
+  const request = buildGenerationRequest(requestId);
+  const events: string[] = [];
+  let applyAiDraftCalls = 0;
+  let requireCurrentVersionCalls = 0;
+
+  const service = new AiAnalysisExecutionService(
+    fakeRequestsRepository(request, 1) as never,
+    { find: async () => [] } as never,
+    fakeExecutionsRepository() as never,
+    fakePromptsRepository() as never,
+    {
+      findOneBy: async () => undefined,
+      findOneByOrFail: async () => {
+        throw new Error("No debe consultarse un resultado tras cancelar.");
+      },
+    } as never,
+    {
+      transaction: async (
+        work: (manager: {
+          save: (...args: unknown[]) => Promise<void>;
+          create: (entity: unknown, input: unknown) => unknown;
+          update: (...args: unknown[]) => Promise<void>;
+          createQueryBuilder: () => ReturnType<typeof fakeQueryBuilder>;
+        }) => Promise<void>,
+      ) =>
+        work({
+          save: async () => undefined,
+          create: (_entity, input) => input,
+          update: async () => undefined,
+          // Simula que cancel() ya marcó CANCELLED antes de este update.
+          createQueryBuilder: () => fakeQueryBuilder(0),
+        }),
+    } as never,
+    {} as never,
+    {
+      requireCurrentVersion: async () => {
+        requireCurrentVersionCalls += 1;
+        throw new Error("No debe aplicarse un resultado tras cancelar.");
+      },
+      applyAiDraft: async () => {
+        applyAiDraftCalls += 1;
+      },
+    } as never,
+    { issue: async () => "service-token" } as never,
+    { executionMode: "FAKE" } as never,
+    {
+      publish: async ({ eventName }: { eventName: string }) => {
+        events.push(eventName);
+      },
+    } as never,
+  );
+
+  await service.process(requestId, false, "cancel-race-test");
+
+  assert.equal(requireCurrentVersionCalls, 0);
+  assert.equal(applyAiDraftCalls, 0);
+  assert.ok(events.includes("analysis.started"));
+  assert.ok(!events.includes("analysis.completed"));
+});
+
+test("sin cancelación concurrente, la generación se aplica normalmente", async () => {
+  const requestId = "11111111-1111-4111-8111-111111111112";
+  const request = buildGenerationRequest(requestId);
+  const events: string[] = [];
+  let applyAiDraftCalls = 0;
+  let capturedResult: Readonly<Record<string, unknown>> | null = null;
+
+  const service = new AiAnalysisExecutionService(
+    fakeRequestsRepository(request, 1) as never,
+    { find: async () => [] } as never,
+    fakeExecutionsRepository() as never,
+    fakePromptsRepository() as never,
+    {
+      findOneBy: async () => undefined,
+      findOneByOrFail: async () => capturedResult,
+    } as never,
+    {
+      transaction: async (
+        work: (manager: {
+          save: (...args: unknown[]) => Promise<void>;
+          create: (entity: unknown, input: unknown) => unknown;
+          update: (...args: unknown[]) => Promise<void>;
+          createQueryBuilder: () => ReturnType<typeof fakeQueryBuilder>;
+        }) => Promise<void>,
+      ) =>
+        work({
+          save: async (input: unknown) => {
+            capturedResult = input as Readonly<Record<string, unknown>>;
+          },
+          create: (_entity, input) => input,
+          update: async () => undefined,
+          createQueryBuilder: () => fakeQueryBuilder(1),
+        }),
+    } as never,
+    {} as never,
+    {
+      requireCurrentVersion: async () => ({
+        currentVersionDetail: {
+          revision: 1,
+          status: "DRAFT",
+          sections: DOCUMENT_SECTION_DEFINITIONS.map((section, index) => ({
+            key: section.key,
+            title: section.title,
+            order: index + 1,
+            content: `Contenido ${section.key}`,
+            templateControlled: index >= 10,
+          })),
+        },
+      }),
+      applyAiDraft: async () => {
+        applyAiDraftCalls += 1;
+      },
+    } as never,
+    { issue: async () => "service-token" } as never,
+    { executionMode: "FAKE" } as never,
+    {
+      publish: async ({ eventName }: { eventName: string }) => {
+        events.push(eventName);
+      },
+    } as never,
+  );
+
+  await service.process(requestId, false, "no-cancel-race-test");
+
+  assert.equal(applyAiDraftCalls, 1);
+  assert.ok(events.includes("analysis.completed"));
 });

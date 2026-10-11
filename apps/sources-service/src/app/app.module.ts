@@ -12,6 +12,7 @@ import { AppService } from "./app.service";
 import { SourceBlobStorage } from "../sources/source-blob-storage.service";
 import { SourceEntity } from "../sources/entities";
 import { SourceExtractionService } from "../sources/source-extraction.service";
+import { SourceAntimalwareService } from "../sources/source-antimalware.service";
 import { SourceProcessingQueue } from "../sources/source-processing.queue";
 import { SourceProcessingService } from "../sources/source-processing.service";
 import { SourceProcessingWorker } from "../sources/source-processing.worker";
@@ -74,6 +75,7 @@ const sourceEntities = [SourceEntity];
           ProjectsAccessClient,
           SourceBlobStorage,
           SourceExtractionService,
+          SourceAntimalwareService,
           SourceProcessingQueue,
           SourceProcessingService,
           SourceProcessingWorker,

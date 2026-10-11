@@ -40,6 +40,12 @@ export class AnalysisRequestSourceEntity {
   })
   sourceClassification!: string | null;
 
+  @Column("nvarchar", { name: "SourceMediaType", length: 160, nullable: true })
+  sourceMediaType!: string | null;
+
+  @Column("nvarchar", { name: "SourceFileExtension", length: 24, nullable: true })
+  sourceFileExtension!: string | null;
+
   @Column("nvarchar", { name: "SnapshotText", nullable: true })
   snapshotText!: string | null;
 

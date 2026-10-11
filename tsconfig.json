@@ -59,6 +59,9 @@
     },
     {
       "path": "./libs/shared/messaging"
+    },
+    {
+      "path": "./apps/prototypes-service"
     }
   ]
 }

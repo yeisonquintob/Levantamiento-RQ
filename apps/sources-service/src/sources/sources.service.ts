@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -13,6 +15,7 @@ import type {
   AuthenticatedUser,
   CreateTextSourceRequest,
   ProcessSourcesRequest,
+  ProjectDomainPurgeResult,
   SourceBatchProcessingResponse,
   SourceBatchProcessingResult,
   SourceClassification,
@@ -132,6 +135,9 @@ export class SourcesService {
       content: request.content,
       extractedText: request.content,
       processingStatus: "READY",
+      securityStatus: "CLEAN",
+      securityScanner: "not-applicable-text",
+      securityScannedAt: now,
       processingMessage: null,
       processedAt: now,
       status: "ACTIVE",
@@ -293,12 +299,35 @@ export class SourcesService {
       .take(query.pageSize)
       .getMany();
 
+    const runtimeCandidates = rows
+      .filter(
+        (source) =>
+          source.processingStatus === "PROCESSING" ||
+          source.processingStatus === "FAILED",
+      )
+      .map((source) => source.id);
+
+    const runtimeProgress =
+      runtimeCandidates.length > 0
+        ? await this.processingQueue.getProgressBySourceIds(
+            runtimeCandidates,
+          )
+        : new Map();
+
     return {
-      items: rows.map((source) => this.toSummary(source)),
+      items: rows.map((source) =>
+        this.toSummary(
+          source,
+          runtimeProgress.get(canonicalUuid(source.id)),
+        ),
+      ),
       page: query.page,
       pageSize: query.pageSize,
       totalItems,
-      totalPages: totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize),
+      totalPages:
+        totalItems === 0
+          ? 0
+          : Math.ceil(totalItems / query.pageSize),
     };
   }
 
@@ -499,6 +528,12 @@ export class SourcesService {
     await this.projectAccess.requireRead(projectId, accessToken, actor);
     const source = await this.requireFileSource(projectId, sourceId);
 
+    if (source.securityStatus !== "CLEAN") {
+      throw new ConflictException(
+        "El archivo permanece en cuarentena hasta completar el análisis antimalware.",
+      );
+    }
+
     if (!source.storagePath || !source.originalFileName) {
       throw new BadRequestException(
         "La fuente no contiene un archivo descargable.",
@@ -522,6 +557,44 @@ export class SourcesService {
     }
   }
 
+  async downloadInternalImage(
+    projectId: string,
+    sourceId: string,
+  ): Promise<SourceDownloadPayload & { sha256: string }> {
+    const source = await this.requireFileSource(projectId, sourceId);
+    if (source.securityStatus !== "CLEAN") {
+      throw new ConflictException(
+        "La imagen permanece en cuarentena hasta completar el análisis antimalware.",
+      );
+    }
+    const allowed = new Set([
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+    ]);
+    if (!source.mediaType || !allowed.has(source.mediaType)) {
+      throw new BadRequestException(
+        "La fuente no es una imagen compatible con análisis multimodal.",
+      );
+    }
+    if (!source.storagePath || !source.originalFileName || !source.sha256) {
+      throw new BadRequestException("La imagen no tiene almacenamiento íntegro.");
+    }
+    try {
+      return {
+        buffer: await this.storage.download(source.storagePath),
+        mediaType: source.mediaType,
+        fileName: source.originalFileName,
+        sha256: source.sha256,
+      };
+    } catch (error) {
+      if (error instanceof SourceBlobNotFoundError) {
+        throw new NotFoundException("La imagen privada ya no está disponible.");
+      }
+      throw error;
+    }
+  }
+
   async archive(
     actor: AuthenticatedUser,
     accessToken: string,
@@ -536,6 +609,33 @@ export class SourcesService {
     source.updatedAt = new Date();
 
     return this.toDetail(await this.sources.save(source));
+  }
+
+  async purgeProject(
+    actor: AuthenticatedUser,
+    accessToken: string,
+    projectId: string,
+  ): Promise<ProjectDomainPurgeResult> {
+    const access = await this.projectAccess.requireManage(
+      projectId,
+      accessToken,
+      actor,
+    );
+    if (access.role !== "ADMIN" && access.role !== "OWNER") {
+      throw new ForbiddenException(
+        "Solo ADMIN o el propietario pueden eliminar todas las fuentes.",
+      );
+    }
+    const sources = await this.sources.find({ where: { projectId } });
+
+    for (const source of sources) {
+      if (source.storagePath) {
+        await this.storage.deleteIfExists(source.storagePath);
+      }
+    }
+
+    if (sources.length > 0) await this.sources.remove(sources);
+    return { deleted: true, count: sources.length };
   }
 
   private async persistFile(
@@ -575,7 +675,10 @@ export class SourcesService {
         content: null,
         extractedText: null,
         processingStatus: "PENDING",
-        processingMessage: "Archivo almacenado. Procesamiento pendiente.",
+        securityStatus: "QUARANTINED",
+        securityScanner: null,
+        securityScannedAt: null,
+        processingMessage: "Archivo almacenado en cuarentena. Escaneo pendiente.",
         processedAt: null,
         status: "ACTIVE",
         originalFileName,
@@ -786,7 +889,28 @@ export class SourcesService {
     return source;
   }
 
-  private toSummary(source: SourceEntity): SourceSummary {
+  private toSummary(
+    source: SourceEntity,
+    runtimeProgress?: {
+      percentage: number;
+      stage: SourceSummary["processingStage"];
+      message: string;
+    },
+  ): SourceSummary {
+    const fallbackProgress =
+      source.processingStatus === "READY"
+        ? 100
+        : source.processingStatus === "PROCESSING"
+          ? 5
+          : 0;
+
+    const fallbackStage: SourceSummary["processingStage"] =
+      source.processingStatus === "READY"
+        ? "COMPLETED"
+        : source.processingStatus === "FAILED"
+          ? "FAILED"
+          : "QUEUED";
+
     return {
       id: source.id,
       projectId: source.projectId,
@@ -796,7 +920,12 @@ export class SourcesService {
       classification: source.classification,
       contentPreview: contentPreview(source.extractedText ?? source.content),
       processingStatus: source.processingStatus,
-      processingMessage: source.processingMessage,
+      processingProgress:
+        runtimeProgress?.percentage ?? fallbackProgress,
+      processingStage:
+        runtimeProgress?.stage ?? fallbackStage,
+      processingMessage:
+        runtimeProgress?.message ?? source.processingMessage,
       processedAt: optionalIso(source.processedAt),
       status: source.status,
       originalFileName: source.originalFileName,

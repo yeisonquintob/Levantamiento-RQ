@@ -8,6 +8,7 @@ import {
 import type {
   AuthSessionResponse,
   AuthenticatedUser,
+  RegisterAccountResponse,
   SignOutResponse,
 } from "@levantamiento-rq/shared-contracts";
 
@@ -34,6 +35,18 @@ export class IdentityClientService {
     );
   }
 
+  register(
+    body: unknown,
+    context: ClientContext,
+  ): Promise<RegisterAccountResponse> {
+    return this.request<RegisterAccountResponse>(
+      "/api/v1/auth/register",
+      "POST",
+      body,
+      context,
+    );
+  }
+
   refresh(
     refreshToken: string,
     context: ClientContext,
@@ -52,6 +65,29 @@ export class IdentityClientService {
       "POST",
       { refreshToken },
       {},
+    );
+  }
+
+  microsoftAuthorize(
+    webOrigin: string,
+  ): Promise<{ authorizationUrl: string; transaction: string }> {
+    return this.request(
+      "/api/v1/auth/microsoft/authorize",
+      "POST",
+      { webOrigin },
+      {},
+    );
+  }
+
+  microsoftCallback(
+    body: { code: string; state: string; transaction: string },
+    context: ClientContext,
+  ): Promise<{ session: AuthSessionResponse; webOrigin: string }> {
+    return this.request(
+      "/api/v1/auth/microsoft/callback",
+      "POST",
+      body,
+      context,
     );
   }
 

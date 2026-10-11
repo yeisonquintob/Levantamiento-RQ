@@ -1,4 +1,4 @@
-import type { ConnectionOptions } from "bullmq";
+import type { RedisOptions } from "ioredis";
 
 export const AI_ANALYSIS_PROCESSING_CONFIG = Symbol(
   "AI_ANALYSIS_PROCESSING_CONFIG",
@@ -6,7 +6,7 @@ export const AI_ANALYSIS_PROCESSING_CONFIG = Symbol(
 
 export interface AiAnalysisProcessingConfig {
   queueName: string;
-  connection: ConnectionOptions;
+  connection: RedisOptions;
   attempts: number;
   backoffMs: number;
   concurrency: number;

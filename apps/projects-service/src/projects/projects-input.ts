@@ -1,10 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 
 import {
+  PROJECT_ACTIVITY_STATES,
   PROJECT_PARTICIPANT_ROLES,
   PROJECT_STATUSES,
   type AddProjectParticipantRequest,
   type CreateProjectRequest,
+  type ProjectActivityState,
   type ProjectParticipantRole,
   type ProjectStatus,
   type UpdateProjectRequest,
@@ -12,7 +14,11 @@ import {
 
 export interface ProjectListQuery {
   search: string;
+  /** Área solicitante exacta; vacío = todas. */
+  area: string;
   status: ProjectStatus | null;
+  /** `null`: todos menos los eliminados; `"ALL"`: todos, incluidos los eliminados. */
+  activityState: ProjectActivityState | "ALL" | null;
   page: number;
   pageSize: number;
 }
@@ -85,6 +91,23 @@ function optionalProjectStatus(value: unknown): ProjectStatus | undefined {
   return value as ProjectStatus;
 }
 
+function optionalActivityState(
+  value: unknown,
+): ProjectActivityState | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    typeof value !== "string" ||
+    !PROJECT_ACTIVITY_STATES.includes(value as ProjectActivityState)
+  ) {
+    throw new BadRequestException("La situación del proyecto no es válida.");
+  }
+
+  return value as ProjectActivityState;
+}
+
 function requiredUuid(value: unknown, field: string): string {
   if (
     typeof value !== "string" ||
@@ -151,6 +174,10 @@ export function parseUpdateProject(value: unknown): UpdateProjectRequest {
     result.status = optionalProjectStatus(record.status);
   }
 
+  if (record.activityState !== undefined) {
+    result.activityState = optionalActivityState(record.activityState);
+  }
+
   if (Object.keys(result).length === 0) {
     throw new BadRequestException(
       "Debes enviar al menos un campo para actualizar.",
@@ -170,6 +197,9 @@ export function parseProjectListQuery(value: unknown): ProjectListQuery {
   const search =
     typeof rawSearch === "string" ? rawSearch.trim().slice(0, 200) : "";
 
+  const rawArea = record.area;
+  const area = typeof rawArea === "string" ? rawArea.trim().slice(0, 160) : "";
+
   const rawStatus = record.status;
   let status: ProjectStatus | null = null;
 
@@ -177,9 +207,20 @@ export function parseProjectListQuery(value: unknown): ProjectListQuery {
     status = optionalProjectStatus(rawStatus) ?? null;
   }
 
+  const rawActivity = record.activityState;
+  let activityState: ProjectListQuery["activityState"] = null;
+
+  if (rawActivity === "ALL") {
+    activityState = "ALL";
+  } else if (rawActivity !== undefined && rawActivity !== "") {
+    activityState = optionalActivityState(rawActivity) ?? null;
+  }
+
   return {
     search,
+    area,
     status,
+    activityState,
     page: readInteger(record.page, 1, 1, 100000, "page"),
     pageSize: readInteger(record.pageSize, 20, 1, 50, "pageSize"),
   };

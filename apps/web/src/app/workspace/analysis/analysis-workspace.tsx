@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type {
+  AiAnalysisDraft,
+  AiAnalysisLocalOnlyV2Draft,
   AiAnalysisRequestDetail,
   AiAnalysisRequestListResponse,
   ProjectListResponse,
@@ -20,9 +22,14 @@ import {
 } from "@levantamiento-rq/shared-ui";
 
 import { useDialogAccessibility } from "../../use-dialog-accessibility";
+import { useAutoDismiss } from "../../use-auto-dismiss";
+import { WorkspaceKpiIcon } from "../workspace-kpi-icon";
+import { AiEngineChips, useAiEngineSelection } from "../ai-engine-selection";
 
 const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000";
+  process.env.NODE_ENV === "development" && typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000");
 
 const EMPTY_REQUESTS: AiAnalysisRequestListResponse = {
   items: [],
@@ -68,6 +75,12 @@ function statusTone(status: string) {
   return "pending" as const;
 }
 
+function isLocalOnlyV2Draft(
+  draft: AiAnalysisDraft | AiAnalysisLocalOnlyV2Draft,
+): draft is AiAnalysisLocalOnlyV2Draft {
+  return "pipelineId" in draft && draft.pipelineId === "LOCAL_ONLY_V2";
+}
+
 export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
   const projects = initialProjects?.items ?? [];
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
@@ -82,6 +95,12 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
     useState<RequirementDocumentDetail | null>(null);
   const [comment, setComment] = useState("");
   const [modal, setModal] = useState<ModalMode>(null);
+  // La nube nunca se preselecciona; los motores salen de la elección explícita.
+  const aiEngines = useAiEngineSelection(
+    modal === "create" ? projectId : "",
+    "analysis-workspace",
+  );
+  const aiEnginesMissing = aiEngines.engines.length === 0;
   const dialogRef = useDialogAccessibility<HTMLDivElement>(
     Boolean(modal),
     () => {
@@ -90,6 +109,7 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
   );
   const [busy, setBusy] = useState(false);
   const [alert, setAlert] = useState(initialError ?? "");
+  useAutoDismiss(alert, () => setAlert(""));
   const [alertTone, setAlertTone] = useState<"success" | "danger">("danger");
 
   const metrics = useMemo(
@@ -149,7 +169,19 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
         (await requestsResponse.json()) as AiAnalysisRequestListResponse,
       );
       setDocumentId(nextDocuments.items[0]?.id ?? "");
-      setSelectedSourceIds([]);
+      setSelectedSourceIds(
+        nextSources.items
+          .filter(
+            (source) =>
+              source.sourceType === "CONVERSATION" &&
+              source.title
+                .trim()
+                .toLocaleLowerCase("es")
+                .startsWith("preguntas de análisis ·"),
+          )
+          .slice(0, 1)
+          .map((source) => source.id),
+      );
     } catch (error) {
       show(error instanceof Error ? error.message : String(error), "danger");
     } finally {
@@ -174,6 +206,15 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
   }, [projectId, requests.items]);
 
   function toggleSource(id: string) {
+    const source = sources?.items.find((item) => item.id === id);
+    if (
+      source?.sourceType === "CONVERSATION" &&
+      source.title
+        .trim()
+        .toLocaleLowerCase("es")
+        .startsWith("preguntas de análisis ·")
+    )
+      return;
     setSelectedSourceIds((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
@@ -183,6 +224,10 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
 
   async function createAnalysis() {
     if (!projectId || !documentId || selectedSourceIds.length === 0) return;
+    if (aiEngines.engines.length === 0) {
+      show("Selecciona al menos un motor de IA antes de generar.", "danger");
+      return;
+    }
     setBusy(true);
     try {
       const documentResponse = await fetch(
@@ -204,6 +249,8 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
             documentId,
             documentVersionId: currentDocument.currentVersionDetail.id,
             sourceIds: selectedSourceIds,
+            engines: aiEngines.engines,
+            providerSelections: aiEngines.providerSelections,
           }),
         },
       );
@@ -312,25 +359,19 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
         <RqKpiGrid label="Estado del análisis asistido">
           <RqKpiCard
             description="Solicitudes registradas"
-            icon="A"
+            icon={<WorkspaceKpiIcon name="layers" />}
             title="Total"
             value={String(metrics.total)}
           />
           <RqKpiCard
-            description="Esperando trabajador"
-            icon="P"
-            title="Pendientes"
-            value={String(metrics.pending)}
-          />
-          <RqKpiCard
-            description="Proveedor ejecutando"
-            icon="E"
-            title="Procesando"
-            value={String(metrics.processing)}
+            description="Pendientes (esperando trabajador) / procesando (proveedor ejecutando)"
+            icon={<WorkspaceKpiIcon name="spinner" />}
+            title="Pendientes / procesando"
+            value={`${metrics.pending} / ${metrics.processing}`}
           />
           <RqKpiCard
             description="Listas para revisión"
-            icon="R"
+            icon={<WorkspaceKpiIcon name="check" />}
             title="Completadas"
             value={String(metrics.completed)}
           />
@@ -501,7 +542,14 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                       <label key={source.id}>
                         <input
                           checked={selectedSourceIds.includes(source.id)}
-                          disabled={busy}
+                          disabled={
+                            busy ||
+                            (source.sourceType === "CONVERSATION" &&
+                              source.title
+                                .trim()
+                                .toLocaleLowerCase("es")
+                                .startsWith("preguntas de análisis ·"))
+                          }
                           onChange={() => toggleSource(source.id)}
                           type="checkbox"
                         />
@@ -509,6 +557,13 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                           <strong>{source.title}</strong>
                           <small>
                             {source.classification} · {source.sourceType}
+                            {source.sourceType === "CONVERSATION" &&
+                            source.title
+                              .trim()
+                              .toLocaleLowerCase("es")
+                              .startsWith("preguntas de análisis ·")
+                              ? " · incluida siempre"
+                              : ""}
                           </small>
                         </span>
                       </label>
@@ -516,6 +571,27 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                   ) : (
                     <p>No hay fuentes READY disponibles.</p>
                   )}
+                </fieldset>
+                <fieldset>
+                  <legend>Motores de IA</legend>
+                  <AiEngineChips
+                    capabilities={aiEngines.capabilities}
+                    loading={aiEngines.loading}
+                    locked={busy}
+                    providerSelections={aiEngines.providerSelections}
+                    selectProvider={aiEngines.selectProvider}
+                    selection={aiEngines.selection}
+                    toggle={aiEngines.toggle}
+                  />
+                  {aiEngines.error ? (
+                    <small role="alert">{aiEngines.error}</small>
+                  ) : null}
+                  {!aiEngines.loading && aiEnginesMissing ? (
+                    <small id="analysis-engines-required" role="status">
+                      Enciende y configura un motor de IA (local o nube) para
+                      generar. La IA nube nunca se activa sin tu elección.
+                    </small>
+                  ) : null}
                 </fieldset>
                 <div className="rq-project-modal__actions">
                   <RqActionButton
@@ -526,7 +602,11 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                   </RqActionButton>
                   <RqActionButton
                     disabled={
-                      busy || !documentId || selectedSourceIds.length === 0
+                      busy ||
+                      aiEngines.loading ||
+                      aiEnginesMissing ||
+                      !documentId ||
+                      selectedSourceIds.length === 0
                     }
                     onClick={() => void createAnalysis()}
                     tone="affirmative"
@@ -561,16 +641,33 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                 </div>
                 {detail.result ? (
                   <>
-                    <section className="rq-analysis-review__warnings">
-                      <strong>Control de calidad</strong>
-                      <span>
-                        Pendientes:{" "}
-                        {detail.result.draft.pendingQuestions.length} ·
-                        Contradicciones:{" "}
-                        {detail.result.draft.contradictions.length} ·
-                        Advertencias: {detail.result.draft.warnings.length}
-                      </span>
-                    </section>
+                    {isLocalOnlyV2Draft(detail.result.draft) ? (
+                      <section className="rq-analysis-review__warnings">
+                        <strong>Control de calidad</strong>
+                        <span>
+                          Cobertura:{" "}
+                          {Math.round(
+                            detail.result.draft.coverage.coverageRatio * 100,
+                          )}
+                          % · Completados:{" "}
+                          {detail.result.draft.coverage.completedPointCount}/
+                          {detail.result.draft.coverage.requestedPointCount} ·
+                          Faltantes:{" "}
+                          {detail.result.draft.coverage.missingPointCount}
+                        </span>
+                      </section>
+                    ) : (
+                      <section className="rq-analysis-review__warnings">
+                        <strong>Control de calidad</strong>
+                        <span>
+                          Pendientes:{" "}
+                          {detail.result.draft.pendingQuestions.length} ·
+                          Contradicciones:{" "}
+                          {detail.result.draft.contradictions.length} ·
+                          Advertencias: {detail.result.draft.warnings.length}
+                        </span>
+                      </section>
+                    )}
                     <div className="rq-analysis-sections">
                       {detail.result.draft.sections.map((section) => (
                         <article key={section.key}>
@@ -579,27 +676,30 @@ export function AnalysisWorkspace({ initialProjects, initialError }: Props) {
                         </article>
                       ))}
                     </div>
-                    <section>
-                      <h3>
-                        Requisitos propuestos (
-                        {detail.result.draft.requirements.length})
-                      </h3>
-                      {detail.result.draft.requirements.map((requirement) => (
-                        <article
-                          className="rq-analysis-requirement"
-                          key={requirement.clientId}
-                        >
-                          <strong>
-                            {requirement.code} · {requirement.title}
-                          </strong>
-                          <p>{requirement.description}</p>
-                          <small>
-                            {requirement.acceptanceCriteria.length} criterio(s)
-                            · {requirement.sourceIds.length} fuente(s)
-                          </small>
-                        </article>
-                      ))}
-                    </section>
+                    {isLocalOnlyV2Draft(detail.result.draft) ? null : (
+                      <section>
+                        <h3>
+                          Requisitos propuestos (
+                          {detail.result.draft.requirements.length})
+                        </h3>
+                        {detail.result.draft.requirements.map((requirement) => (
+                          <article
+                            className="rq-analysis-requirement"
+                            key={requirement.clientId}
+                          >
+                            <strong>
+                              {requirement.code} · {requirement.title}
+                            </strong>
+                            <p>{requirement.description}</p>
+                            <small>
+                              {requirement.acceptanceCriteria.length}{" "}
+                              criterio(s) · {requirement.sourceIds.length}{" "}
+                              fuente(s)
+                            </small>
+                          </article>
+                        ))}
+                      </section>
+                    )}
                     {detail.result.status === "GENERATED" ? (
                       <>
                         <label className="rq-field">

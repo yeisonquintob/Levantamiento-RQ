@@ -14,6 +14,7 @@ export interface SourcesRequest {
   headers: Readonly<Record<string, string | string[] | undefined>>;
   authPrincipal?: AuthenticatedUser;
   accessToken?: string;
+  serviceIdentity?: string;
   isMultipart(): boolean;
   parts(): AsyncIterableIterator<SourcesMultipartPart>;
 }

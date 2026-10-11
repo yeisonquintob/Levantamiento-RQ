@@ -19,6 +19,7 @@ import {
 } from "./correlation-id.js";
 
 interface SendableResponse {
+  header?(name: string, value: string): SendableResponse;
   status(statusCode: number): SendableResponse;
   send(body: unknown): unknown;
 }
@@ -29,6 +30,7 @@ interface ResolvedError {
   title: string;
   detail: string;
   errors?: Readonly<Record<string, readonly string[]>>;
+  retryAfterSeconds?: number;
 }
 
 function titleForStatus(statusCode: number): string {
@@ -61,13 +63,20 @@ function resolveHttpException(exception: HttpException): ResolvedError {
   const rawMessage = record.message;
   const rawDetail = record.detail;
   const rawTitle = record.title;
+  const rawCode = record.code;
+  const retryAfterSeconds =
+    typeof record.retryAfterSeconds === "number" &&
+    Number.isInteger(record.retryAfterSeconds) &&
+    record.retryAfterSeconds > 0
+      ? record.retryAfterSeconds
+      : undefined;
 
   if (Array.isArray(rawMessage)) {
     const messages = rawMessage.map(String);
 
     return {
       statusCode,
-      code: "VALIDATION_ERROR",
+      code: typeof rawCode === "string" ? rawCode : "VALIDATION_ERROR",
       title:
         typeof rawTitle === "string" ? rawTitle : titleForStatus(statusCode),
       detail:
@@ -77,12 +86,13 @@ function resolveHttpException(exception: HttpException): ResolvedError {
       errors: {
         request: messages,
       },
+      retryAfterSeconds,
     };
   }
 
   return {
     statusCode,
-    code: "HTTP_ERROR",
+    code: typeof rawCode === "string" ? rawCode : "HTTP_ERROR",
     title:
       typeof rawTitle === "string"
         ? rawTitle
@@ -95,6 +105,7 @@ function resolveHttpException(exception: HttpException): ResolvedError {
         : typeof rawMessage === "string"
           ? rawMessage
           : exception.message,
+    retryAfterSeconds,
   };
 }
 
@@ -192,6 +203,10 @@ export class ApplicationExceptionFilter implements ExceptionFilter {
       },
       ...(resolved.errors === undefined ? {} : { errors: resolved.errors }),
     };
+
+    if (resolved.retryAfterSeconds !== undefined) {
+      response.header?.("retry-after", String(resolved.retryAfterSeconds));
+    }
 
     response.status(resolved.statusCode).send(body);
   }

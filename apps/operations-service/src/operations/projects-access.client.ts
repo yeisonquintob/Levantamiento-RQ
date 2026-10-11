@@ -65,13 +65,71 @@ export class OperationsProjectsAccessClient {
     const admin =
       actor.roles.some((role) => role.toUpperCase() === "ADMIN") ||
       actor.permissions.includes("system.admin");
+    const serviceReader = actor.permissions.includes("projects.read.all");
     if (
       !admin &&
+      !serviceReader &&
       !project.participants.some(
         (item) => item.userId.toLowerCase() === actor.id.toLowerCase(),
       )
     ) {
       throw new ForbiddenException("No tienes acceso a este proyecto.");
+    }
+    return project;
+  }
+
+  /** Marcar tareas exige ser ADMIN, propietario o editor del proyecto. */
+  async requireEditor(
+    projectId: string,
+    accessToken: string,
+    actor: AuthenticatedUser,
+    correlationId: string,
+  ): Promise<ProjectDetail> {
+    const project = await this.requireRead(
+      projectId,
+      accessToken,
+      actor,
+      correlationId,
+    );
+    const admin =
+      actor.roles.some((role) => role.toUpperCase() === "ADMIN") ||
+      actor.permissions.includes("system.admin");
+    const role = project.participants.find(
+      (item) => item.userId.toLowerCase() === actor.id.toLowerCase(),
+    )?.role;
+    if (!admin && role !== "OWNER" && role !== "EDITOR") {
+      throw new ForbiddenException(
+        "Solo ADMIN, el propietario o un editor pueden actualizar la ejecución.",
+      );
+    }
+    return project;
+  }
+
+
+  async requireOwner(
+    projectId: string,
+    accessToken: string,
+    actor: AuthenticatedUser,
+    correlationId: string,
+  ): Promise<ProjectDetail> {
+    const project = await this.requireRead(
+      projectId,
+      accessToken,
+      actor,
+      correlationId,
+    );
+    const admin =
+      actor.roles.some((role) => role.toUpperCase() === "ADMIN") ||
+      actor.permissions.includes("system.admin");
+    const owner = project.participants.some(
+      (item) =>
+        item.userId.toLowerCase() === actor.id.toLowerCase() &&
+        item.role === "OWNER",
+    );
+    if (!admin && !owner) {
+      throw new ForbiddenException(
+        "Solo ADMIN o el propietario pueden eliminar las operaciones del proyecto.",
+      );
     }
     return project;
   }

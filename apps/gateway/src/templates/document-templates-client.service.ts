@@ -10,13 +10,15 @@ import type {
   CreateDocumentTemplateRequest,
   DocumentTemplateDetail,
   DocumentTemplateListResponse,
+  DocumentTemplateLogo,
   DocumentTemplateMetrics,
   UpdateDocumentTemplateRequest,
+  UpdateDocumentTemplateLogoRequest,
 } from "@levantamiento-rq/shared-contracts";
 
 import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 
-type DocumentsMethod = "GET" | "POST" | "PATCH";
+type DocumentsMethod = "GET" | "POST" | "PATCH" | "PUT";
 
 @Injectable()
 export class DocumentTemplatesClientService {
@@ -69,6 +71,17 @@ export class DocumentTemplatesClientService {
     );
   }
 
+  getLogo(
+    accessToken: string,
+    templateId: string,
+  ): Promise<DocumentTemplateLogo | null> {
+    return this.request<DocumentTemplateLogo | null>(
+      `/api/v1/templates/${encodeURIComponent(templateId)}/logo`,
+      "GET",
+      accessToken,
+    );
+  }
+
   create(
     accessToken: string,
     body: CreateDocumentTemplateRequest | unknown,
@@ -89,6 +102,19 @@ export class DocumentTemplatesClientService {
     return this.request<DocumentTemplateDetail>(
       `/api/v1/templates/${encodeURIComponent(templateId)}`,
       "PATCH",
+      accessToken,
+      body,
+    );
+  }
+
+  updateLogo(
+    accessToken: string,
+    templateId: string,
+    body: UpdateDocumentTemplateLogoRequest | unknown,
+  ): Promise<DocumentTemplateDetail> {
+    return this.request<DocumentTemplateDetail>(
+      `/api/v1/templates/${encodeURIComponent(templateId)}/logo`,
+      "PUT",
       accessToken,
       body,
     );

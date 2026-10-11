@@ -113,6 +113,85 @@ async function main(): Promise<void> {
       )
         AND definition LIKE '%CONCAT%'
     `);
+    const scrumSectionMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AllowScrumPlanDocumentSection1786924800000'
+    `);
+    const scrumSectionConstraint = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.check_constraints
+      WHERE parent_object_id = OBJECT_ID('dbo.DocumentSections')
+        AND name = 'CK_DocumentSections_Order'
+        AND CHARINDEX('>=(1)', definition) > 0
+        AND CHARINDEX('<=(15)', definition) > 0
+    `);
+    const requestedChangesMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AllowRequestedChangesDocumentStatus1787007600000'
+    `);
+    const requestedChangesConstraints = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.check_constraints
+      WHERE name IN (
+        'CK_RequirementDocuments_Status',
+        'CK_DocumentVersions_Status'
+      )
+        AND definition LIKE '%CHANGES_REQUESTED%'
+    `);
+    const currentTemplatesMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'PublishCurrentDocumentTemplateVersions1787007601000'
+    `);
+    const currentPublishedTemplates = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.DocumentTemplates
+      WHERE Code IN ('RQ-SMALL', 'RQ-MEDIUM', 'RQ-LARGE', 'ERP-FDD')
+        AND Version = '1.3.0'
+        AND Status = 'PUBLISHED'
+        AND DefinitionJson LIKE '%Presentar en dos grupos%'
+        AND DefinitionJson LIKE '%Organizar el backlog canónico%'
+        AND DefinitionJson LIKE '%solutionProposal%'
+    `);
+    const requirementsBacklogMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'PublishRequirementsBacklogTemplateVersions1787875203000'
+    `);
+    const solutionProposalMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddSolutionProposalSection1788470400000'
+    `);
+    const templateLogosMigration = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM dbo.migrations
+      WHERE name = 'AddDocumentTemplateLogos1787007602000'
+    `);
+    const templateLogoColumns = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.columns
+      WHERE object_id = OBJECT_ID('dbo.DocumentTemplates')
+        AND name IN (
+          'LogoFileName',
+          'LogoMediaType',
+          'LogoSizeBytes',
+          'LogoData',
+          'LogoUpdatedAt',
+          'LogoUpdatedByUserId'
+        )
+    `);
+    const templateLogoConstraint = await count(`
+      SELECT COUNT(1) AS countValue
+      FROM sys.check_constraints
+      WHERE parent_object_id = OBJECT_ID('dbo.DocumentTemplates')
+        AND name = 'CK_DocumentTemplates_Logo'
+        AND definition LIKE '%524288%'
+        AND definition LIKE '%image/png%'
+        AND definition LIKE '%image/jpeg%'
+    `);
     const crossDatabaseForeignKeys = await count(`
       SELECT COUNT(1) AS countValue
       FROM sys.foreign_keys
@@ -120,25 +199,46 @@ async function main(): Promise<void> {
          OR name LIKE 'FK_%Sources%'
     `);
 
-    if (
-      templatesTable !== 1 ||
-      migration !== 1 ||
-      publishedTemplates < 4 ||
-      canonicalDefinitions < 4 ||
-      uniqueIndex !== 1 ||
-      domainMigration !== 1 ||
-      domainTables !== 9 ||
-      versionUniqueIndex !== 1 ||
-      aiApplicationMigration !== 1 ||
-      aiApplicationTable !== 1 ||
-      aiResultUniqueIndex !== 1 ||
-      aiApplicationForeignKeys !== 2 ||
-      scalarJsonMigration !== 1 ||
-      scalarJsonConstraints !== 2 ||
-      crossDatabaseForeignKeys !== 0
-    ) {
+    const checks: Readonly<Record<string, readonly [number, number]>> = {
+      templatesTable: [templatesTable, 1],
+      migration: [migration, 1],
+      publishedTemplatesMinimum: [Math.min(publishedTemplates, 4), 4],
+      canonicalDefinitionsMinimum: [Math.min(canonicalDefinitions, 4), 4],
+      uniqueIndex: [uniqueIndex, 1],
+      domainMigration: [domainMigration, 1],
+      domainTables: [domainTables, 9],
+      versionUniqueIndex: [versionUniqueIndex, 1],
+      aiApplicationMigration: [aiApplicationMigration, 1],
+      aiApplicationTable: [aiApplicationTable, 1],
+      aiResultUniqueIndex: [aiResultUniqueIndex, 1],
+      aiApplicationForeignKeys: [aiApplicationForeignKeys, 2],
+      scalarJsonMigration: [scalarJsonMigration, 1],
+      scalarJsonConstraints: [scalarJsonConstraints, 2],
+      scrumSectionMigration: [scrumSectionMigration, 1],
+      scrumSectionConstraint: [scrumSectionConstraint, 1],
+      requestedChangesMigration: [requestedChangesMigration, 1],
+      requestedChangesConstraints: [requestedChangesConstraints, 2],
+      currentTemplatesMigration: [currentTemplatesMigration, 1],
+      currentPublishedTemplates: [currentPublishedTemplates, 4],
+      requirementsBacklogMigration: [requirementsBacklogMigration, 1],
+      solutionProposalMigration: [solutionProposalMigration, 1],
+      templateLogosMigration: [templateLogosMigration, 1],
+      templateLogoColumns: [templateLogoColumns, 6],
+      templateLogoConstraint: [templateLogoConstraint, 1],
+      crossDatabaseForeignKeys: [crossDatabaseForeignKeys, 0],
+    };
+    const failedChecks = Object.entries(checks).filter(
+      ([, [actual, expected]]) => actual !== expected,
+    );
+
+    if (failedChecks.length > 0) {
       throw new Error(
-        "RqDocumentsDb no contiene el dominio documental y la aplicación IA completos.",
+        `RqDocumentsDb no contiene el dominio documental y la aplicación IA completos: ${failedChecks
+          .map(
+            ([name, [actual, expected]]) =>
+              `${name}=${actual} (esperado ${expected})`,
+          )
+          .join(", ")}.`,
       );
     }
 
@@ -166,6 +266,34 @@ async function main(): Promise<void> {
     console.log(
       "Migración confirmada: AllowJsonScalarDocumentValues1786838400000",
     );
+    console.log(
+      "Plan Scrum confirmado como sección documental opcional número 15.",
+    );
+    console.log(
+      "Migración confirmada: AllowScrumPlanDocumentSection1786924800000",
+    );
+    console.log(
+      "Estado CHANGES_REQUESTED confirmado en documentos y versiones.",
+    );
+    console.log(
+      "Migración confirmada: AllowRequestedChangesDocumentStatus1787007600000",
+    );
+    console.log(
+      "Plantillas 1.3.0 publicadas con solución propuesta y puntos normalizados: 4",
+    );
+    console.log(
+      "Migración confirmada: PublishCurrentDocumentTemplateVersions1787007601000",
+    );
+    console.log(
+      "Migración confirmada: PublishRequirementsBacklogTemplateVersions1787875203000",
+    );
+    console.log(
+      "Migración confirmada: AddSolutionProposalSection1788470400000",
+    );
+    console.log(
+      "Logos de plantilla confirmados: 6 columnas, formato y límite de 512 KB.",
+    );
+    console.log("Migración confirmada: AddDocumentTemplateLogos1787007602000");
     console.log("Versionado único y autonomía de base de datos confirmados.");
   } finally {
     await dataSource.destroy();

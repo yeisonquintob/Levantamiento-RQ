@@ -6,7 +6,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig*.json ./
 COPY apps ./apps
 COPY libs ./libs
 ARG APP_NAME
-RUN test -n "$APP_NAME" && pnpm install --frozen-lockfile && pnpm nx build "$APP_NAME" --skip-nx-cache
+RUN test -n "$APP_NAME" && pnpm install --frozen-lockfile && pnpm nx build "$APP_NAME" --skip-nx-cache && pnpm prune --prod
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000

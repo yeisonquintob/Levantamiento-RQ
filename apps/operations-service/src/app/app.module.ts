@@ -9,6 +9,8 @@ import {
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { ExecutionTrackingController } from "../operations/execution-tracking.controller";
+import { ExecutionTrackingService } from "../operations/execution-tracking.service";
 import { OperationsDocumentsAccessClient } from "../operations/documents-access.client";
 import { ExportArtifactStorage } from "../operations/export-artifact-storage.service";
 import { ExportProcessingQueue } from "../operations/export-processing.queue";
@@ -60,7 +62,11 @@ const databaseConfig = loadSqlServerDatabaseConfig({
   controllers: [
     AppController,
     ...(databaseConfig.enabled
-      ? [ExportRequestsController, NotificationsAuditController]
+      ? [
+          ExportRequestsController,
+          NotificationsAuditController,
+          ExecutionTrackingController,
+        ]
       : []),
   ],
   providers: [
@@ -95,6 +101,7 @@ const databaseConfig = loadSqlServerDatabaseConfig({
           IntegrationEventInboxService,
           IntegrationEventsConsumer,
           NotificationsAuditService,
+          ExecutionTrackingService,
         ]
       : []),
   ],

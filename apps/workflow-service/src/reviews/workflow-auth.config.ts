@@ -1,23 +1,15 @@
+import { requiredPublicJwks } from "@levantamiento-rq/shared-http";
+
 export const WORKFLOW_AUTH_CONFIG = Symbol("WORKFLOW_AUTH_CONFIG");
 
 export interface WorkflowAuthConfig {
   issuer: string;
   audience: string;
-  accessSecret: string;
+  accessPublicJwks: string;
   projectsServiceUrl: string;
   projectsTimeoutMs: number;
   documentsServiceUrl: string;
   documentsTimeoutMs: number;
-}
-
-function requiredSecret(value: string | undefined, name: string): string {
-  const resolved = value?.trim() ?? "";
-
-  if (resolved.length < 32) {
-    throw new Error(`${name} debe tener mínimo 32 caracteres.`);
-  }
-
-  return resolved;
 }
 
 function readUrl(
@@ -50,10 +42,7 @@ export function loadWorkflowAuthConfig(
   return {
     issuer: environment.JWT_ISSUER?.trim() || "levantamiento-rq-identity",
     audience: environment.JWT_AUDIENCE?.trim() || "levantamiento-rq",
-    accessSecret: requiredSecret(
-      environment.JWT_ACCESS_SECRET,
-      "JWT_ACCESS_SECRET",
-    ),
+    accessPublicJwks: requiredPublicJwks(environment.JWT_ACCESS_PUBLIC_JWKS_BASE64),
     projectsServiceUrl: readUrl(
       environment.PROJECTS_SERVICE_URL,
       "http://127.0.0.1:3002",

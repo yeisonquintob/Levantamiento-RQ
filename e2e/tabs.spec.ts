@@ -1,0 +1,51 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { requireCredentials } from "./support";
+
+/** Cada pestaña debe apuntar (aria-controls) a un panel que exista y esté etiquetado por ella. */
+async function expectTabsControlPanels(page: Page) {
+  const report = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="tab"]')].map((tab) => {
+      const target = tab.getAttribute("aria-controls");
+      const panel = target ? document.getElementById(target) : null;
+      return {
+        label: (tab.textContent ?? "").trim().slice(0, 40),
+        controls: target,
+        panelExists: Boolean(panel),
+      };
+    }),
+  );
+  expect(report.length).toBeGreaterThan(0);
+  const broken = report.filter((item) => !item.controls || !item.panelExists);
+  expect(broken, JSON.stringify(broken)).toEqual([]);
+}
+
+test.describe("Pestañas accesibles", () => {
+  test.beforeEach(() => requireCredentials());
+
+  test("Ejecución: las pestañas controlan su panel y el panel se etiqueta con la pestaña activa", async ({ page }) => {
+    await page.goto("/workspace/execution");
+    const rows = page.getByRole("button", { name: "Abrir" });
+    let opened = false;
+    for (let index = 0; index < (await rows.count()) && !opened; index += 1) {
+      await page.goto("/workspace/execution");
+      await rows.nth(index).click();
+      opened = await page.getByRole("tab", { name: /Resumen de cumplimiento/u }).isVisible({ timeout: 4_000 }).catch(() => false);
+    }
+    test.skip(!opened, "No hay un proyecto aprobado con plan de trabajo.");
+    await expectTabsControlPanels(page);
+    const panel = page.getByRole("tabpanel");
+    await expect(panel).toHaveAttribute("aria-labelledby", "rq-exec-tab-summary");
+    await page.getByRole("tab", { name: /Actividades y tareas/u }).click();
+    await expect(panel).toHaveAttribute("aria-labelledby", "rq-exec-tab-tasks");
+    await expectTabsControlPanels(page);
+  });
+
+  test("Configuración de proveedores de IA: las tres vistas comparten un panel etiquetado", async ({ page }) => {
+    await page.goto("/workspace/settings/ai-providers");
+    test.skip(!(await page.getByRole("tab").first().isVisible({ timeout: 6_000 }).catch(() => false)), "El usuario de prueba no accede a esta configuración.");
+    await expectTabsControlPanels(page);
+    await page.getByRole("tab", { name: /Por proveedor/u }).click();
+    await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "ai-provider-tab-PROVIDERS");
+  });
+});

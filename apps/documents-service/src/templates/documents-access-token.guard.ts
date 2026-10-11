@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { jwtVerify } from "jose";
+import { verifyAccessJwt } from "@levantamiento-rq/shared-http";
 
 import type { AuthenticatedUser } from "@levantamiento-rq/shared-contracts";
 
@@ -65,22 +65,13 @@ export class DocumentsAccessTokenGuard implements CanActivate {
     const token = readBearerToken(request.headers.authorization);
 
     try {
-      const result = await jwtVerify(
-        token,
-        new TextEncoder().encode(this.config.accessSecret),
-        {
-          issuer: this.config.issuer,
-          audience: this.config.audience,
-          algorithms: ["HS256"],
-        },
-      );
+      const payload = await verifyAccessJwt(token, {
+        issuer: this.config.issuer,
+        audience: this.config.audience,
+        publicJwks: this.config.accessPublicJwks,
+      });
 
-      if (result.payload.typ !== "access") {
-        throw new UnauthorizedException("Tipo de token inválido.");
-      }
-
-      const mustChangePassword =
-        result.payload.mustChangePassword === true;
+      const mustChangePassword = payload.mustChangePassword === true;
 
       if (mustChangePassword) {
         throw new ForbiddenException(
@@ -89,11 +80,11 @@ export class DocumentsAccessTokenGuard implements CanActivate {
       }
 
       request.authPrincipal = {
-        id: requiredText(result.payload.sub),
-        email: requiredText(result.payload.email),
-        displayName: requiredText(result.payload.name),
-        roles: requiredStringArray(result.payload.roles),
-        permissions: requiredStringArray(result.payload.permissions),
+        id: requiredText(payload.sub),
+        email: requiredText(payload.email),
+        displayName: requiredText(payload.name),
+        roles: requiredStringArray(payload.roles),
+        permissions: requiredStringArray(payload.permissions),
         mustChangePassword,
       } satisfies AuthenticatedUser;
       request.accessToken = token;

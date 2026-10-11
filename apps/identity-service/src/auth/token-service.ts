@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
-import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { importJWK, SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { verifyAccessJwt } from "@levantamiento-rq/shared-http";
 
 import type {
   AuthSessionResponse,
@@ -15,6 +16,7 @@ interface RefreshClaims {
   userId: string;
   sessionId: string;
   sessionVersion: number;
+  familyId: string;
 }
 
 interface AccessPrincipal {
@@ -77,10 +79,14 @@ export class TokenService {
   async issueSession(
     identityUser: IdentityUserRecord,
     sessionId: string = randomUUID(),
+    familyId: string = randomUUID(),
   ): Promise<AuthSessionResponse> {
     const now = Math.floor(Date.now() / 1000);
-    const accessSecret = new TextEncoder().encode(this.config.accessSecret);
     const refreshSecret = new TextEncoder().encode(this.config.refreshSecret);
+    const privateJwk = JSON.parse(
+      Buffer.from(this.config.accessPrivateJwk, "base64").toString("utf8"),
+    ) as Parameters<typeof importJWK>[0];
+    const accessPrivateKey = await importJWK(privateJwk, "EdDSA");
 
     const user = toAuthenticatedUser(identityUser);
     const accessToken = await new SignJWT({
@@ -93,18 +99,19 @@ export class TokenService {
       mustChangePassword: user.mustChangePassword,
       sv: identityUser.sessionVersion,
     })
-      .setProtectedHeader({ alg: "HS256" })
+      .setProtectedHeader({ alg: "EdDSA", kid: this.config.accessKeyId, typ: "JWT" })
       .setSubject(user.id)
       .setIssuer(this.config.issuer)
       .setAudience(this.config.audience)
       .setIssuedAt(now)
       .setExpirationTime(now + this.config.accessTtlSeconds)
       .setJti(randomUUID())
-      .sign(accessSecret);
+      .sign(accessPrivateKey);
 
     const refreshToken = await new SignJWT({
       typ: "refresh",
       sid: sessionId,
+      fid: familyId,
       sv: identityUser.sessionVersion,
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -126,11 +133,16 @@ export class TokenService {
   }
 
   async verifyAccessToken(token: string): Promise<AccessPrincipal> {
-    const { payload } = await this.verify(
-      token,
-      this.config.accessSecret,
-      "access",
-    );
+    let payload: JWTPayload;
+    try {
+      payload = await verifyAccessJwt(token, {
+        issuer: this.config.issuer,
+        audience: this.config.audience,
+        publicJwks: this.config.accessPublicJwks,
+      });
+    } catch {
+      throw new UnauthorizedException("Token inválido o vencido.");
+    }
 
     return {
       user: {
@@ -156,6 +168,7 @@ export class TokenService {
       userId: requireText(payload.sub, "sub"),
       sessionId: requireText(payload.sid, "sid"),
       sessionVersion: requirePositiveInteger(payload.sv),
+      familyId: requireText(payload.fid, "fid"),
     };
   }
 

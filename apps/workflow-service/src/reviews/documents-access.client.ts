@@ -27,7 +27,7 @@ export class WorkflowDocumentsAccessClient {
     private readonly config: WorkflowAuthConfig,
   ) {}
 
-  async requireDraftVersion(
+  async requireEditableVersion(
     projectId: string,
     documentId: string,
     versionNumber: number,
@@ -59,9 +59,9 @@ export class WorkflowDocumentsAccessClient {
       );
     }
 
-    if (version.status !== "DRAFT") {
+    if (version.status !== "DRAFT" && version.status !== "CHANGES_REQUESTED") {
       throw new ConflictException(
-        "La versión debe estar en estado DRAFT para iniciar una revisión.",
+        "La versión debe estar en borrador o con correcciones solicitadas para iniciar una revisión.",
       );
     }
 
@@ -90,7 +90,7 @@ export class WorkflowDocumentsAccessClient {
   transition(
     documentId: string,
     versionNumber: number,
-    action: "submit-review" | "approve" | "reject",
+    action: "submit-review" | "request-changes" | "approve" | "reject",
     expectedRevision: number,
     comment: string | null | undefined,
     accessToken: string,

@@ -1,15 +1,16 @@
 # Propiedad de bases de datos
 
-| Servicio      | Base prevista    | Estado       |
-| ------------- | ---------------- | ------------ |
-| Identity      | RqIdentityDb     | Implementada |
-| Projects      | RqProjectsDb     | Implementada |
-| Sources       | RqSourcesDb      | Implementada |
-| Documents     | RqDocumentsDb    | Implementada |
-| AI Analysis   | RqAiDb           | Implementada |
-| ERP Knowledge | RqErpKnowledgeDb | Futura       |
-| Workflow      | RqWorkflowDb     | Implementada |
-| Operations    | RqOperationsDb   | Implementada |
+| Servicio      | Base prevista    | Estado                         |
+| ------------- | ---------------- | ------------------------------ |
+| Identity      | RqIdentityDb     | Implementada                   |
+| Projects      | RqProjectsDb     | Implementada                   |
+| Sources       | RqSourcesDb      | Implementada                   |
+| Documents     | RqDocumentsDb    | Implementada                   |
+| AI Analysis   | RqAiDb           | Implementada                   |
+| ERP Knowledge | RqErpKnowledgeDb | Futura                         |
+| Workflow      | RqWorkflowDb     | Implementada                   |
+| Operations    | RqOperationsDb   | Implementada                   |
+| Prototypes    | RqPrototypesDb   | En validación (posterior a V1) |
 
 ## Reglas
 
@@ -59,6 +60,17 @@ en Keychain o Azure Key Vault; SQL solo guarda una referencia opaca.
 `RqOperationsDb` conserva solicitudes y metadatos de exportación,
 notificaciones, entregas, auditoría e inbox de eventos. Los artefactos PDF/DOCX
 pertenecen al contenedor privado `rq-exports`.
+
+## Prototypes Service
+
+`RqPrototypesDb` (en validación, posterior a V1) conserva las generaciones de
+prototipo, sus pantallas planificadas, las especificaciones visuales y las
+imágenes generadas con sus intentos y trazas. Las imágenes viven en un
+contenedor privado de Blob propio (`PROTOTYPE_IMAGES_STORAGE_CONTAINER`) y la
+generación de imágenes usa su propia cola BullMQ (`PROTOTYPE_IMAGE_QUEUE`). El
+servicio no abre conexiones a otras bases: referencia proyectos, documentos y
+usuarios solo por identificador, y obtiene planificación e imágenes de IA
+mediante la API interna de AI Analysis.
 
 ## ERP Knowledge Service
 

@@ -3,6 +3,7 @@ import type { DocumentTemplateType } from "./document-templates.js";
 export const DOCUMENT_STATUSES = [
   "DRAFT",
   "IN_REVIEW",
+  "CHANGES_REQUESTED",
   "APPROVED",
   "REJECTED",
   "ARCHIVED",
@@ -15,14 +16,18 @@ export const DOCUMENT_SECTION_DEFINITIONS = [
   { key: "objectives", title: "Objetivos del proyecto" },
   { key: "problemDescription", title: "Descripción del problema" },
   { key: "scope", title: "Alcance" },
+  {
+    key: "solutionProposal",
+    title: "Solución propuesta del profesional de soluciones",
+  },
   { key: "processFlow", title: "Diagrama de flujo" },
   {
     key: "milestones",
-    title: "Requerimientos por hito o funcionalidad",
+    title: "Requerimientos",
   },
   {
-    key: "nonFunctionalRequirements",
-    title: "Requerimientos no funcionales",
+    key: "backlogStructure",
+    title: "Esquema",
   },
   { key: "tests", title: "Pruebas" },
   {
@@ -33,16 +38,35 @@ export const DOCUMENT_SECTION_DEFINITIONS = [
     key: "approvalsAndChangeControl",
     title: "Aprobaciones y control de cambios",
   },
-  { key: "writingRules", title: "Reglas de redacción" },
-  { key: "visualFormat", title: "Formato visual recomendado" },
+  { key: "writingRules", title: "Plantilla aplicada" },
+  { key: "visualFormat", title: "Prototipo" },
   {
     key: "automationInstruction",
-    title: "Instrucción para automatización",
+    title: "KPIs",
   },
 ] as const;
 
+export const DOCUMENT_SCRUM_SECTION_DEFINITION = {
+  key: "scrumPlan",
+  title: "Plan de trabajo",
+} as const;
+
+/** Transport key; membership is validated against the exact document version. */
+export type DocumentTemplateSectionKey = string;
+
 export type DocumentSectionKey =
-  (typeof DOCUMENT_SECTION_DEFINITIONS)[number]["key"];
+  | (typeof DOCUMENT_SECTION_DEFINITIONS)[number]["key"]
+  | (typeof DOCUMENT_SCRUM_SECTION_DEFINITION)["key"]
+  /** Clave histórica: solo lectura/adaptación; no se crea en plantillas nuevas. */
+  | "nonFunctionalRequirements";
+
+export function getDocumentSectionDefinitions(
+  includesScrum: boolean,
+): readonly { readonly key: DocumentSectionKey; readonly title: string }[] {
+  return includesScrum
+    ? [...DOCUMENT_SECTION_DEFINITIONS, DOCUMENT_SCRUM_SECTION_DEFINITION]
+    : [...DOCUMENT_SECTION_DEFINITIONS];
+}
 
 export type DocumentJsonValue =
   | string
@@ -59,6 +83,7 @@ export interface AppliedDocumentTemplate {
   name: string;
   version: string;
   templateType: DocumentTemplateType;
+  includesScrum?: boolean;
   definition: DocumentJsonValue;
   appliedAt: string;
 }
@@ -131,6 +156,8 @@ export interface DocumentVersionDetail extends DocumentVersionSummary {
 }
 
 export interface RequirementDocumentSummary {
+  /** Number of versions still present, independent of their sequence numbers. */
+  versionCount?: number;
   id: string;
   projectId: string;
   title: string;
@@ -138,6 +165,8 @@ export interface RequirementDocumentSummary {
   revision: number;
   currentVersionNumber: number;
   currentVersion: string;
+  /** La sección de prototipo de la versión vigente contiene texto real. */
+  hasPrototype?: boolean;
   template: Omit<AppliedDocumentTemplate, "definition">;
   createdByUserId: string;
   createdAt: string;
@@ -146,6 +175,8 @@ export interface RequirementDocumentSummary {
 }
 
 export interface RequirementDocumentDetail extends RequirementDocumentSummary {
+  /** Exact immutable applied definition, used by template-directed generation. */
+  appliedTemplate?: AppliedDocumentTemplate;
   currentVersionDetail: DocumentVersionDetail;
 }
 
@@ -202,7 +233,7 @@ export interface AcceptanceCriterionInput {
 
 export interface DocumentRequirementInput {
   clientId?: string;
-  sectionKey: DocumentSectionKey;
+  sectionKey: DocumentTemplateSectionKey;
   code: string;
   title: string;
   description: string;
@@ -214,7 +245,7 @@ export interface DocumentRequirementInput {
 
 export interface DocumentEvidenceInput {
   sourceId: string;
-  sectionKey?: DocumentSectionKey | null;
+  sectionKey?: DocumentTemplateSectionKey | null;
   requirementClientId?: string | null;
   excerpt?: string | null;
   note?: string | null;
@@ -228,7 +259,7 @@ export interface ReplaceDocumentFieldsRequest {
 }
 
 export interface AiDraftSectionInput {
-  key: DocumentSectionKey;
+  key: DocumentTemplateSectionKey;
   content: DocumentJsonValue;
 }
 

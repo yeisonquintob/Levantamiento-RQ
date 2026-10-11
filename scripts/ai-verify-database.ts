@@ -24,7 +24,10 @@ async function main(): Promise<void> {
           'AiProviderConfigurations',
           'AiProviderAuditEvents',
           'AnalysisPromptVersions',
-          'AnalysisResults'
+          'AnalysisResults',
+          'SourceLocalAnalyses',
+          'ProjectKnowledgeSnapshots',
+          'LocalAiAuditEvents'
         )
     `);
     const migration = await count(`
@@ -35,7 +38,10 @@ async function main(): Promise<void> {
         'AddAiProviderConfiguration1786492800000',
         'AddAiExecutionPipeline1786579200000',
         'AddDraftGenerationLifecycle1786752000000',
-        'UpgradeRequirementAnalystPrompt1786924800000'
+        'UpgradeRequirementAnalystPrompt1786924800000',
+        'AddLocalAiKnowledgeCache1787094000000',
+        'AddLocalAiFallbackAudit1787180400000',
+        'AllowOllamaProviderConfiguration1787266800000'
       )
     `);
     const indexes = await count(`
@@ -58,7 +64,11 @@ async function main(): Promise<void> {
         'UQ_AnalysisPromptVersions_ActiveCode',
         'IX_AnalysisExecutions_ProviderConfigurationId',
         'UQ_AnalysisResults_Request',
-        'UQ_AnalysisResults_Execution'
+        'UQ_AnalysisResults_Execution',
+        'UQ_SourceLocalAnalyses_Cache',
+        'IX_SourceLocalAnalyses_Project',
+        'IX_ProjectKnowledgeSnapshots_Project',
+        'IX_LocalAiAuditEvents_Project_CreatedAt'
       )
     `);
     const internalForeignKeys = await count(`
@@ -91,6 +101,10 @@ async function main(): Promise<void> {
           OR (
             TABLE_NAME = 'AnalysisRequestSources'
             AND COLUMN_NAME = 'SourceId'
+          )
+          OR (
+            TABLE_NAME = 'SourceLocalAnalyses'
+            AND COLUMN_NAME IN ('ProjectId', 'SourceId')
           )
         )
     `);
@@ -139,21 +153,21 @@ async function main(): Promise<void> {
           (TABLE_NAME = 'AnalysisRequests' AND COLUMN_NAME = 'DocumentSnapshotJson')
           OR (
             TABLE_NAME = 'AnalysisRequestSources'
-            AND COLUMN_NAME IN ('SourceTitle', 'SourceClassification', 'SnapshotText')
+            AND COLUMN_NAME IN ('SourceTitle', 'SourceClassification', 'SnapshotText', 'SourceMediaType', 'SourceFileExtension')
           )
         )
     `);
 
     if (
-      tables !== 7 ||
-      migration !== 5 ||
-      indexes !== 17 ||
+      tables !== 10 ||
+      migration !== 8 ||
+      indexes !== 21 ||
       internalForeignKeys !== 7 ||
-      externalReferenceColumns !== 5 ||
+      externalReferenceColumns !== 7 ||
       unexpectedForeignKeys !== 0 ||
       secretValueColumns !== 0 ||
       activePrompt !== 1 ||
-      snapshotColumns !== 4
+      snapshotColumns !== 6
     ) {
       throw new Error(
         "RqAiDb no contiene la estructura aprobada del Paso 18.1B.",
@@ -161,16 +175,16 @@ async function main(): Promise<void> {
     }
 
     console.log("RqAiDb verificada correctamente.");
-    console.log("Tablas confirmadas: 7");
-    console.log("Índices confirmados: 17");
+    console.log("Tablas confirmadas: 10");
+    console.log("Índices confirmados: 21");
     console.log("Claves foráneas internas confirmadas: 7");
-    console.log("Referencias externas sin claves foráneas confirmadas: 5");
+    console.log("Referencias externas sin claves foráneas confirmadas: 7");
     console.log(
-      "Migraciones confirmadas: foundation, proveedores seguros, ejecución, ciclo de borradores y prompt 1.1.0.",
+      "Migraciones confirmadas: foundation, proveedores seguros, ejecución, ciclo de borradores, prompt 1.1.0 e IA local.",
     );
     console.log("Columnas de secretos en SQL confirmadas: 0");
     console.log(
-      "Prompt 1.1.0 activo y cuatro columnas de snapshot confirmados.",
+      "Prompt 1.1.0 activo y seis columnas de snapshot confirmadas.",
     );
   } finally {
     await dataSource.destroy();

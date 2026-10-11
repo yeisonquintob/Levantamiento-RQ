@@ -13,12 +13,20 @@ const MEDIA_TYPES: Readonly<Record<SourceFileExtension, string>> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   txt: "text/plain; charset=utf-8",
+  vtt: "text/vtt; charset=utf-8",
   csv: "text/csv; charset=utf-8",
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   webp: "image/webp",
 };
+
+const OOXML_LIMITS = {
+  maxEntries: 2_000,
+  maxUncompressedBytes: 100 * 1024 * 1024,
+  maxCompressionRatio: 100,
+  maxPathDepth: 12,
+} as const;
 
 export interface ValidatedSourceFile {
   originalFileName: string;
@@ -71,6 +79,81 @@ function isZip(buffer: Buffer): boolean {
   );
 }
 
+function findEndOfCentralDirectory(buffer: Buffer): number {
+  const minimum = Math.max(0, buffer.length - 65_557);
+  for (let offset = buffer.length - 22; offset >= minimum; offset -= 1) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50) return offset;
+  }
+  throw new BadRequestException("El contenedor OOXML no tiene un directorio ZIP válido.");
+}
+
+export function assertSafeOoxml(
+  extension: "docx" | "xlsx",
+  buffer: Buffer,
+): void {
+  const eocd = findEndOfCentralDirectory(buffer);
+  const entries = buffer.readUInt16LE(eocd + 10);
+  const centralSize = buffer.readUInt32LE(eocd + 12);
+  const centralOffset = buffer.readUInt32LE(eocd + 16);
+  if (entries < 1 || entries > OOXML_LIMITS.maxEntries) {
+    throw new BadRequestException("El OOXML contiene una cantidad sospechosa de archivos internos.");
+  }
+  if (centralOffset + centralSize > eocd || centralOffset < 0) {
+    throw new BadRequestException("El directorio ZIP del OOXML es inconsistente.");
+  }
+
+  let offset = centralOffset;
+  let totalCompressed = 0;
+  let totalUncompressed = 0;
+  let hasContentTypes = false;
+  let hasApplicationRoot = false;
+  for (let index = 0; index < entries; index += 1) {
+    if (offset + 46 > eocd || buffer.readUInt32LE(offset) !== 0x02014b50) {
+      throw new BadRequestException("El directorio ZIP del OOXML está dañado.");
+    }
+    const flags = buffer.readUInt16LE(offset + 8);
+    const method = buffer.readUInt16LE(offset + 10);
+    const compressed = buffer.readUInt32LE(offset + 20);
+    const uncompressed = buffer.readUInt32LE(offset + 24);
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const next = offset + 46 + nameLength + extraLength + commentLength;
+    if (next > eocd || compressed === 0xffffffff || uncompressed === 0xffffffff) {
+      throw new BadRequestException("El OOXML usa una estructura ZIP no permitida.");
+    }
+    if ((flags & 0x1) !== 0 || (method !== 0 && method !== 8)) {
+      throw new BadRequestException("El OOXML está cifrado o usa una compresión no permitida.");
+    }
+    const name = buffer.subarray(offset + 46, offset + 46 + nameLength).toString("utf8");
+    if (
+      !name ||
+      name.includes("\\") ||
+      name.startsWith("/") ||
+      /^[a-zA-Z]:/.test(name) ||
+      name.split("/").includes("..") ||
+      name.split("/").filter(Boolean).length > OOXML_LIMITS.maxPathDepth
+    ) {
+      throw new BadRequestException("El OOXML contiene una ruta interna no segura.");
+    }
+    hasContentTypes ||= name === "[Content_Types].xml";
+    hasApplicationRoot ||= name.startsWith(extension === "docx" ? "word/" : "xl/");
+    totalCompressed += compressed;
+    totalUncompressed += uncompressed;
+    if (totalUncompressed > OOXML_LIMITS.maxUncompressedBytes) {
+      throw new BadRequestException("El OOXML supera el tamaño expandido permitido.");
+    }
+    offset = next;
+  }
+  const ratio = totalUncompressed / Math.max(1, totalCompressed);
+  if (ratio > OOXML_LIMITS.maxCompressionRatio) {
+    throw new BadRequestException("El OOXML presenta un ratio de compresión sospechoso.");
+  }
+  if (!hasContentTypes || !hasApplicationRoot) {
+    throw new BadRequestException(`El archivo no contiene la estructura interna de un ${extension.toUpperCase()} válido.`);
+  }
+}
+
 function isWebp(buffer: Buffer): boolean {
   return (
     buffer.length >= 12 &&
@@ -91,6 +174,16 @@ function assertUtf8Text(buffer: Buffer, fileName: string): void {
   } catch {
     throw new BadRequestException(
       `${fileName} no contiene texto UTF-8 válido.`,
+    );
+  }
+}
+
+function assertWebVtt(buffer: Buffer, fileName: string): void {
+  const text = buffer.toString("utf8").replace(/^\uFEFF/, "");
+
+  if (!/^WEBVTT(?:[ \t].*)?(?:\r?\n|$)/.test(text)) {
+    throw new BadRequestException(
+      `${fileName} no contiene una cabecera WEBVTT válida.`,
     );
   }
 }
@@ -119,8 +212,16 @@ function assertSignature(
     );
   }
 
-  if (extension === "txt" || extension === "csv") {
+  if (extension === "txt" || extension === "csv" || extension === "vtt") {
     assertUtf8Text(buffer, fileName);
+  }
+
+  if (extension === "vtt") {
+    assertWebVtt(buffer, fileName);
+  }
+
+  if (extension === "docx" || extension === "xlsx") {
+    assertSafeOoxml(extension, buffer);
   }
 }
 

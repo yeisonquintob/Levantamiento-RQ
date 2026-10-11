@@ -3,33 +3,7 @@
 const path = require("node:path");
 
 /** @type {import('next').NextConfig} */
-const gatewayOrigin = (() => {
-  try {
-    return new URL(
-      process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:3000",
-    ).origin;
-  } catch {
-    return "http://127.0.0.1:3000";
-  }
-})();
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-  `connect-src 'self' ${gatewayOrigin}${process.env.NODE_ENV === "development" ? " ws: http:" : ""}`,
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-].join("; ");
-
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "no-referrer" },
@@ -39,8 +13,42 @@ const securityHeaders = [
   },
 ];
 
+function isValidDevOriginHost(value) {
+  if (
+    !value ||
+    value.includes("://") ||
+    value.includes("/") ||
+    value.includes("*") ||
+    value.includes(":")
+  ) {
+    return false;
+  }
+
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
+    return value
+      .split(".")
+      .map(Number)
+      .every((part) => Number.isInteger(part) && part >= 0 && part <= 255);
+  }
+
+  return /^(?:localhost|[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)$/i.test(value);
+}
+
+function resolveAllowedDevOrigins(value) {
+  const configured = String(value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(isValidDevOriginHost);
+
+  return [...new Set(["127.0.0.1", "localhost", ...configured])];
+}
+
+const allowedDevOrigins = resolveAllowedDevOrigins(
+  process.env.RQ_ALLOWED_DEV_ORIGINS,
+);
+
 const nextConfig = {
-  allowedDevOrigins: ["127.0.0.1", "localhost"],
+  allowedDevOrigins,
   devIndicators: false,
   logging: { incomingRequests: false },
   output: "standalone",

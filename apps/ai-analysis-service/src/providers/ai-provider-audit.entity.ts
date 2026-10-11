@@ -27,7 +27,7 @@ export class AiProviderAuditEntity {
   @Column("nvarchar", { name: "Outcome", length: 24 })
   outcome!: string;
 
-  @Column("nvarchar", { name: "MetadataJson", length: 2000, nullable: true })
+  @Column("nvarchar", { name: "MetadataJson", length: "MAX", nullable: true })
   metadataJson!: string | null;
 
   @Column("datetime2", {

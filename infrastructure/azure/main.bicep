@@ -7,6 +7,8 @@ param prefix string
 
 param location string = resourceGroup().location
 param environmentName string = 'prod'
+@description('Deshabilita acceso público y conecta Container Apps a una VNet. Los Private Endpoints/DNS corporativos deben existir antes de activarlo.')
+param enablePrivateNetworking bool = false
 param sqlAdministratorLogin string
 @secure()
 param sqlAdministratorPassword string
@@ -49,10 +51,34 @@ resource insights 'Microsoft.Insights/components@2020-02-02' = {
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: replace('${prefix}${environmentName}${suffix}', '-', '')
   location: location
-  sku: { name: 'Basic' }
+  sku: { name: enablePrivateNetworking ? 'Premium' : 'Basic' }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+  }
+}
+
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-05-01' = if (enablePrivateNetworking) {
+  name: '${resourcePrefix}-vnet'
+  location: location
+  properties: {
+    addressSpace: { addressPrefixes: ['10.42.0.0/16'] }
+    subnets: [
+      {
+        name: 'container-apps'
+        properties: {
+          addressPrefix: '10.42.0.0/23'
+          delegations: [{ name: 'aca', properties: { serviceName: 'Microsoft.App/environments' } }]
+        }
+      }
+      {
+        name: 'private-endpoints'
+        properties: {
+          addressPrefix: '10.42.2.0/24'
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
+    ]
   }
 }
 
@@ -60,6 +86,10 @@ resource containerEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: '${resourcePrefix}-cae'
   location: location
   properties: {
+    vnetConfiguration: enablePrivateNetworking ? {
+      infrastructureSubnetId: virtualNetwork.properties.subnets[0].id
+      internal: false
+    } : null
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
@@ -79,7 +109,7 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enablePurgeProtection: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     sku: { family: 'A', name: 'standard' }
   }
 }
@@ -93,7 +123,7 @@ resource aiVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enablePurgeProtection: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     sku: { family: 'A', name: 'standard' }
   }
 }
@@ -109,6 +139,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     defaultToOAuthAuthentication: true
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
   }
 }
 
@@ -141,12 +172,12 @@ resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
     administratorLogin: sqlAdministratorLogin
     administratorLoginPassword: sqlAdministratorPassword
     minimalTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     restrictOutboundNetworkAccess: 'Disabled'
   }
 }
 
-resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = {
+resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-preview' = if (!enablePrivateNetworking) {
   parent: sqlServer
   name: 'AllowAzureServices'
   properties: {
@@ -172,7 +203,7 @@ resource redis 'Microsoft.Cache/redis@2024-03-01' = {
   properties: {
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     redisVersion: '6'
     sku: { name: 'Standard', family: 'C', capacity: 1 }
   }
@@ -184,7 +215,7 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   sku: { name: 'Standard', tier: 'Standard' }
   properties: {
     minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
     disableLocalAuth: true
   }
 }
@@ -224,7 +255,7 @@ resource applications 'Microsoft.App/containerApps@2024-03-01' = [for workload i
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: workload.external
+        external: contains(['gateway', 'web'], workload.name) ? workload.external : false
         targetPort: workload.port
         transport: 'http'
         allowInsecure: false
