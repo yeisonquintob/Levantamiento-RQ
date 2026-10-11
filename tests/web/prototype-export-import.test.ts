@@ -110,3 +110,12 @@ test("Procesar Markdown explica el bloqueo por proveedor sin ofrecer probar la c
   assert.match(css, /\.rq-prototype-generate span \{[^}]*white-space: nowrap;/u);
   assert.match(css, /\.rq-prototype-generate small \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/u);
 });
+
+test("interpretar el Markdown exige elegir la IA de imágenes, no que esté probada; generar imágenes sí la exige", () => {
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  assert.match(source, /imageProviderSelected/u);
+  assert.doesNotMatch(source, /imageProviderAvailable/u);
+  // El botón «Generar N pantallas» queda deshabilitado con el motivo y ofrece exportar los prompts.
+  assert.match(source, /Boolean\(imageProviderBlockReason\)/u);
+  assert.match(source, /Mientras tanto puedes/u);
+});

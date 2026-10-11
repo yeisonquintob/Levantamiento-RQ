@@ -770,9 +770,12 @@ export function PrototypeWorkspace() {
     !generation && aiOptions
       ? selectedPlannerOption && !selectedPlannerOption.available
         ? "Prueba la IA del Markdown en Configuración"
-        : selectedImageOption && !selectedImageOption.available
-          ? "Prueba la IA de imágenes en Configuración"
-          : null
+        : null
+      : null;
+  // La IA de imágenes se exige al generarlas, no al interpretar el texto.
+  const imageProviderBlockReason =
+    selectedImageOption && !selectedImageOption.available
+      ? "Prueba la IA de imágenes en Configuración"
       : null;
 
   async function processMarkdown(force = false) {
@@ -780,8 +783,9 @@ export function PrototypeWorkspace() {
       (provider) =>
         provider.id === plannerConfigurationId && provider.available,
     );
-    const imageProviderAvailable = aiOptions?.images.some(
-      (provider) => provider.id === imageConfigurationId && provider.available,
+    // La IA de imágenes se usa después de interpretar el texto: basta con haberla elegido.
+    const imageProviderSelected = aiOptions?.images.some(
+      (provider) => provider.id === imageConfigurationId,
     );
 
     if (!generation && !planningProviderAvailable) {
@@ -789,8 +793,8 @@ export function PrototypeWorkspace() {
       return;
     }
 
-    if (!generation && !imageProviderAvailable) {
-      setError("Selecciona una IA disponible para generar las imágenes.");
+    if (!generation && !imageProviderSelected) {
+      setError("Selecciona una IA para generar las imágenes.");
       return;
     }
 
@@ -1866,9 +1870,7 @@ export function PrototypeWorkspace() {
                         provider.available,
                     ) ||
                     !aiOptions.images.some(
-                      (provider) =>
-                        provider.id === imageConfigurationId &&
-                        provider.available,
+                      (provider) => provider.id === imageConfigurationId,
                     ))) ||
                 (!generation && !markdownContent)
               }
@@ -2051,17 +2053,25 @@ export function PrototypeWorkspace() {
                             disabled={
                               (generation.status === "PLANNED" &&
                                 !selectedScreenCodes.length) ||
+                              Boolean(imageProviderBlockReason) ||
                               startingImages ||
                               exportingPrompts ||
                               Boolean(detailProgress)
                             }
                             onClick={() => void continueWithImages(generation)}
+                            title={imageProviderBlockReason ?? undefined}
                             type="button"
                           >
                             {startingImages
                               ? "Preparando imágenes…"
                               : `Generar ${generationScreenCount} pantalla${generationScreenCount === 1 ? "" : "s"} seleccionada${generationScreenCount === 1 ? "" : "s"}`}
                           </button>
+                          {imageProviderBlockReason ? (
+                            <p className={styles.selectionHint} role="status">
+                              {imageProviderBlockReason}. Mientras tanto puedes
+                              exportar los prompts en TXT.
+                            </p>
+                          ) : null}
                           <button
                             className={styles.exportSelection}
                             disabled={

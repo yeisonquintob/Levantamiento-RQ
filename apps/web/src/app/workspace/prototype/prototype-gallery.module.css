@@ -1348,6 +1348,12 @@ button.secondaryAction:focus-visible,
 .selectionActions > button {
   flex: 1 1 200px;
 }
+.selectionHint {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--rq-color-muted);
+  font-size: 0.84rem;
+}
 .exportSelection {
   background: var(--rq-color-surface, white);
   border: 1px solid var(--rq-action-operation);

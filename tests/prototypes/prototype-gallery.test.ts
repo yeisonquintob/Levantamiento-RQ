@@ -126,7 +126,7 @@ test("al terminar el Markdown espera selección antes de generar imágenes", asy
   assert.match(pipeline, /visual-specifications/);
   assert.match(pipeline, /PrototypeImageGenerationResult/);
   assert.match(pipeline, /setPreviewTab\("IMAGES"\)/);
-  assert.match(source, /imageProviderAvailable/);
+  assert.match(source, /imageProviderSelected/);
   assert.match(source, /selectedScreenCodes/);
   assert.match(source, /Generar imagen de/);
   assert.match(source, /Generar.*pantalla/);

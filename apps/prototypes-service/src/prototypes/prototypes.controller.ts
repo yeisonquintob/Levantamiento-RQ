@@ -47,22 +47,29 @@ export class PrototypesController {
     if (!request.authPrincipal)
       throw new Error("No se resolvió el contexto autenticado.");
     const input = parsePrototypeGenerationCreate(body);
-    if (input.plannerConfigurationId || input.imageConfigurationId) {
+    const { plannerConfigurationId, imageConfigurationId } = input;
+    if (plannerConfigurationId || imageConfigurationId) {
       const options = await this.aiClient.options();
-      for (const [id, choices] of [
-        [input.plannerConfigurationId, options.planning],
-        [input.imageConfigurationId, options.images],
-      ] as const) {
-        if (
-          id &&
-          !choices.some(
-            (p) => p.id.toLowerCase() === id.toLowerCase() && p.available,
-          )
+      const sameId = (a: string, b: string) =>
+        a.toLowerCase() === b.toLowerCase();
+      // La IA que interpreta el Markdown se usa ahora: debe estar disponible.
+      if (
+        plannerConfigurationId &&
+        !options.planning.some(
+          (p) => sameId(p.id, plannerConfigurationId) && p.available,
         )
-          throw new ConflictException(
-            "Selecciona modelos habilitados y compatibles con cada paso.",
-          );
-      }
+      )
+        throw new ConflictException(
+          "Selecciona modelos habilitados y compatibles con cada paso.",
+        );
+      // La IA de imágenes se usa después: basta con que exista; su disponibilidad se exige al generar.
+      if (
+        imageConfigurationId &&
+        !options.images.some((p) => sameId(p.id, imageConfigurationId))
+      )
+        throw new ConflictException(
+          "Selecciona modelos habilitados y compatibles con cada paso.",
+        );
     }
     return this.prototypes.createSource(input, request.authPrincipal.id);
   }
@@ -116,7 +123,11 @@ export class PrototypesController {
 
   @Post(":id/images")
   @ApiOperation({ summary: "Iniciar la generación asíncrona de imágenes" })
-  imagesStart(@Req() request: PrototypesRequest, @Param("id") id: string) {
+  async imagesStart(
+    @Req() request: PrototypesRequest,
+    @Param("id") id: string,
+  ) {
+    await this.requireImageProviderAvailable(request, id);
     return this.images.start(parseGenerationId(id), this.actorId(request));
   }
 
@@ -134,10 +145,11 @@ export class PrototypesController {
 
   @Post(":id/images/retry-failed")
   @ApiOperation({ summary: "Reintentar únicamente las imágenes fallidas" })
-  retryFailedImages(
+  async retryFailedImages(
     @Req() request: PrototypesRequest,
     @Param("id") id: string,
   ) {
+    await this.requireImageProviderAvailable(request, id);
     return this.images.retryFailed(
       parseGenerationId(id),
       this.actorId(request),
@@ -229,6 +241,28 @@ export class PrototypesController {
       parseGenerationId(id),
       this.actorId(request),
     );
+  }
+
+  /** La IA de imágenes elegida debe estar habilitada y con la prueba de conexión correcta. */
+  private async requireImageProviderAvailable(
+    request: PrototypesRequest,
+    id: string,
+  ): Promise<void> {
+    const generation = await this.prototypes.getGeneration(
+      parseGenerationId(id),
+      this.actorId(request),
+    );
+    const selected = generation.imageConfigurationId;
+    if (!selected) return;
+    const options = await this.aiClient.options();
+    if (
+      !options.images.some(
+        (p) => p.id.toLowerCase() === selected.toLowerCase() && p.available,
+      )
+    )
+      throw new ConflictException(
+        "La IA de imágenes seleccionada no está disponible. Pruébala en Configuración → Proveedores de IA antes de generar las imágenes.",
+      );
   }
 
   private actorId(request: PrototypesRequest): string {
