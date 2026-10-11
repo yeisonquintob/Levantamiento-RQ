@@ -29,6 +29,7 @@ import {
 import { authenticatedFetch } from "../../authenticated-fetch";
 import { downloadTextFile } from "../execution/azure-devops-csv";
 import { ensureApprovedPrototypeDrafts } from "./prototype-drafts";
+import { hasCompletedPrototypePlan } from "./prototype-plan-state";
 import {
   buildPromptExportTxt,
   importPayload,
@@ -357,7 +358,7 @@ export function PrototypeWorkspace() {
       setMarkdownSizeBytes(restored.generation.sourceSizeBytes);
       setMarkdownSha256(restored.generation.sourceSha256);
       setPlan(
-        hasCompletedPrototypePlan(restored.generation.status)
+        hasCompletedPrototypePlan(restored.generation)
           ? planFrom(restored.generation, restored.screens)
           : null,
       );
@@ -556,7 +557,7 @@ export function PrototypeWorkspace() {
 
         setGeneration(restored.generation);
 
-        if (hasCompletedPrototypePlan(restored.generation.status)) {
+        if (hasCompletedPrototypePlan(restored.generation)) {
           setPlan(planFrom(restored.generation, restored.screens));
           setPreviewTab("TEXT");
           setProgressError(null);
@@ -890,13 +891,7 @@ export function PrototypeWorkspace() {
         return;
       }
 
-      if (
-        current.status === "PLANNED" ||
-        current.status === "VISUAL_SPEC_READY" ||
-        current.status === "IMAGE_GENERATING" ||
-        current.status === "COMPLETED" ||
-        current.status === "PARTIALLY_COMPLETED"
-      ) {
+      if (hasCompletedPrototypePlan(current)) {
         setPreviewTab("TEXT");
         return;
       }
@@ -2504,19 +2499,6 @@ function imageStatusLabel(image: PrototypeGeneratedImage) {
       : image.status === "FAILED"
         ? "Error"
         : "Pendiente";
-}
-
-function hasCompletedPrototypePlan(
-  status: PrototypeGenerationDetail["status"],
-): boolean {
-  return [
-    "PLANNED",
-    "VISUAL_SPEC_BUILDING",
-    "VISUAL_SPEC_READY",
-    "IMAGE_GENERATING",
-    "COMPLETED",
-    "PARTIALLY_COMPLETED",
-  ].includes(status);
 }
 
 function planFrom(
