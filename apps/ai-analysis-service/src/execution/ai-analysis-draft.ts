@@ -1,3 +1,4 @@
+import { requireDefined } from "../common/require-defined";
 import {
   AI_BACKLOG_CODE_PATTERNS,
   AI_FUNCTIONAL_CODE_PATTERNS,
@@ -1698,7 +1699,7 @@ function classifyFuzzyObjectiveReference(
 
   if (ranked.length === 0) return { status: "NONE" };
 
-  const best = ranked[0]!;
+  const best = requireDefined(ranked[0], "Invariante: existe al menos un candidato clasificado.");
   const second = ranked[1];
 
   /*
@@ -2418,7 +2419,10 @@ function parseSections(
       let canonicalObjective: string | null = null;
       let repairMethod = "";
       if (normalizedCandidates.length === 1) {
-        canonicalObjective = normalizedCandidates[0]!;
+        canonicalObjective = requireDefined(
+          normalizedCandidates[0],
+          "Invariante: existe exactamente un candidato normalizado.",
+        );
         repairMethod = "normalización textual";
       } else if (normalizedCandidates.length > 1) {
         kpiFailures.push({ kpiIndex: index, reason: "AMBIGUOUS" });

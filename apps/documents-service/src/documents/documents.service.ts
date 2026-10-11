@@ -65,11 +65,17 @@ const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS = [
   },
   ...LEGACY_DOCUMENT_SECTION_DEFINITIONS.slice(7),
 ] as const;
+const SOLUTION_PROPOSAL_SECTION_DEFINITION = DOCUMENT_SECTION_DEFINITIONS.find(
+  (section) => section.key === "solutionProposal",
+);
+if (!SOLUTION_PROPOSAL_SECTION_DEFINITION) {
+  throw new Error(
+    "La definición de la sección solutionProposal es obligatoria.",
+  );
+}
 const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION = [
   ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(0, 4),
-  DOCUMENT_SECTION_DEFINITIONS.find(
-    (section) => section.key === "solutionProposal",
-  )!,
+  SOLUTION_PROPOSAL_SECTION_DEFINITION,
   ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(4),
 ] as const;
 import {

@@ -5356,14 +5356,18 @@ class PdfLayout {
     diagram.entities.forEach((entity, index) => {
       const column = index % columns;
       const row = Math.floor(index / columns);
+      const rowHeight = rowHeights[row];
+      if (rowHeight === undefined) {
+        throw new Error("Invariante: cada fila del diagrama tiene altura calculada.");
+      }
       const offset = rowHeights
         .slice(0, row)
         .reduce((sum, height) => sum + height + gapY, 0);
       positions.set(entity.id, {
         x: this.left + column * (boxWidth + gapX),
-        y: top - offset - rowHeights[row]!,
+        y: top - offset - rowHeight,
         width: boxWidth,
-        height: rowHeights[row]!,
+        height: rowHeight,
       });
     });
     for (const relationship of diagram.relationships) {

@@ -10,6 +10,7 @@
 // - no se regeneran otros bloques ni dependientes;
 // - no existe bucle de reparación dentro de este módulo.
 
+import { omitKey } from "../common/require-defined";
 import { createHash } from "node:crypto";
 
 import type { OllamaClient } from "../local-ai/ollama.client";
@@ -198,7 +199,7 @@ export function validateLocalOnlyV2MicroDraft(
     );
   }
 
-  const { fingerprint: _ignored, ...withoutFingerprint } = draft;
+  const withoutFingerprint = omitKey(draft, "fingerprint");
   if (draft.fingerprint !== expectedDraftFingerprint(withoutFingerprint)) {
     issues.push(
       issue(

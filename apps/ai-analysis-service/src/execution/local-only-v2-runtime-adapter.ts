@@ -1,3 +1,4 @@
+import { requireDefined } from "../common/require-defined";
 import type { AiDraftGenerationPurpose } from "@levantamiento-rq/shared-contracts";
 import {
   createLocalOnlyV2AtomicExtractionTasks,
@@ -458,9 +459,9 @@ function splitNumberedProcessSteps(answer: string): readonly string[] | null {
     for (const line of lines) {
       const match = numberedLinePattern.exec(line);
       if (!match) return null;
-      const text = match[2]!.trim();
+      const text = requireDefined(match[2], "Invariante: grupo de texto presente.").trim();
       if (!text) return null;
-      steps.push({ number: Number.parseInt(match[1]!, 10), text });
+      steps.push({ number: Number.parseInt(requireDefined(match[1], "Invariante: grupo numérico presente."), 10), text });
     }
     return steps.map(({ number, text }) => stepOrdinalDescription(number, text));
   }
@@ -478,7 +479,7 @@ function splitNumberedProcessSteps(answer: string): readonly string[] | null {
         : trimmed.length;
       const text = trimmed.slice(start, end).trim();
       if (!text) continue;
-      steps.push({ number: Number.parseInt(marker[1]!, 10), text });
+      steps.push({ number: Number.parseInt(requireDefined(marker[1], "Invariante: grupo numérico presente."), 10), text });
     }
     if (steps.length > 1) {
       return steps.map(({ number, text }) => stepOrdinalDescription(number, text));

@@ -11,6 +11,7 @@
 // El transporte Ollama mantiene compatibilidad: runtimeLimits es opt-in.
 // Otros flujos no cambian si no envían ese campo.
 
+import { requireDefined } from "../common/require-defined";
 import { createHash } from "node:crypto";
 
 import {
@@ -580,7 +581,7 @@ export function buildLocalOnlyV2BudgetedMicroDraftPlan(
     for (let index = 0; index < groups.length; index += 1) {
       const partPacket = slicedPacket(
         packet,
-        groups[index]!,
+        requireDefined(groups[index], "Invariante: el grupo existe."),
         index + 1,
         partTotal,
       );
@@ -685,8 +686,17 @@ function combinePartDrafts(
     );
   }
 
-  if (drafts.length === 1 && partPlan.parts[0]!.packet === originalPacket) {
-    return drafts[0]!;
+  const firstPart = requireDefined(
+    partPlan.parts[0],
+    "LOCAL_ONLY_V2 no puede combinar un plan sin partes.",
+  );
+  const firstDraft = drafts[0];
+  if (
+    drafts.length === 1 &&
+    firstDraft !== undefined &&
+    firstPart.packet === originalPacket
+  ) {
+    return firstDraft;
   }
 
   const coveredFindingIds = uniqueInOrder(
@@ -713,7 +723,7 @@ function combinePartDrafts(
     );
   }
 
-  const firstTask = partPlan.parts[0]!.task;
+  const firstTask = firstPart.task;
   return materializePartDraft(
     Object.freeze({
       ...firstTask,

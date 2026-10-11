@@ -1,3 +1,4 @@
+import { requireDefined } from "../common/require-defined";
 import type {
   DocumentJsonValue,
 } from "@levantamiento-rq/shared-contracts";
@@ -501,11 +502,13 @@ function structuredFlowModel(
     const parts = line.split(/\s*\|\s*/u).filter(Boolean);
     const actor =
       parts.length >= 2
-        ? parts[0]!
+        ? requireDefined(parts[0], "Invariante: el actor está presente.")
         : future
           ? "Solución propuesta"
           : "Proceso actual";
-    const kindToken = parts.length >= 3 ? parts[1]! : "PROCESO";
+    const kindToken = parts.length >= 3
+        ? requireDefined(parts[1], "Invariante: el tipo está presente.")
+        : "PROCESO";
     const label =
       parts.length >= 3
         ? parts.slice(2).join(" | ")
@@ -530,7 +533,8 @@ function structuredFlowModel(
   }));
   const nodes = usable.map((item, index) => ({
     id: `${future ? "to-be" : "as-is"}-${index + 1}`,
-    laneId: lanes.find((lane) => lane.name === item.actor)?.id ?? lanes[0]!.id,
+    laneId: lanes.find((lane) => lane.name === item.actor)?.id ??
+      requireDefined(lanes[0], "Invariante: existe al menos un carril.").id,
     kind: item.nodeKind,
     label: item.label,
   }));
@@ -542,7 +546,7 @@ function structuredFlowModel(
     lanes,
     nodes,
     edges: nodes.slice(1).map((node, index) => ({
-      from: nodes[index]!.id,
+      from: requireDefined(nodes[index], "Invariante: existe el nodo previo.").id,
       to: node.id,
       label: "",
     })),
@@ -559,9 +563,12 @@ function entityRelationshipFromText(value: string) {
   const entities = entityLines.flatMap((line) => {
     const match = line.match(/^([^|:]+)\s*\|\s*(.+)$/u);
     if (!match) return [];
-    const name = match[1]!.trim();
+    const name = requireDefined(match[1], "Invariante: grupo de nombre presente.").trim();
     const id = slug(name);
-    const attributes = match[2]!.split(/\s*,\s*/u).flatMap((attribute) => {
+    const attributes = requireDefined(
+      match[2],
+      "Invariante: grupo de atributos presente.",
+    ).split(/\s*,\s*/u).flatMap((attribute) => {
       const parts = attribute.split(/\s*:\s*/u).filter(Boolean);
       if (!parts[0]) return [];
       const flags = parts.slice(2).join(":");
@@ -606,14 +613,25 @@ function entityRelationshipFromText(value: string) {
       /^([^|]+?)\s+(1:1|1:N|N:1|N:M)\s+([^|]+?)(?:\s*\|\s*(.+))?$/iu,
     );
     if (!match) return [];
-    const from = entityIds.get(normalizeEntityName(match[1]!));
-    const to = entityIds.get(normalizeEntityName(match[3]!));
+    const from = entityIds.get(
+      normalizeEntityName(
+        requireDefined(match[1], "Invariante: grupo de origen presente."),
+      ),
+    );
+    const to = entityIds.get(
+      normalizeEntityName(
+        requireDefined(match[3], "Invariante: grupo de destino presente."),
+      ),
+    );
     if (!from || !to) return [];
     return [
       {
         from,
         to,
-        cardinality: match[2]!.toUpperCase(),
+        cardinality: requireDefined(
+          match[2],
+          "Invariante: grupo de cardinalidad presente.",
+        ).toUpperCase(),
         label: match[4]?.trim() || "relaciona",
       },
     ];
@@ -816,6 +834,8 @@ function pendingSectionFromText(text: string): DocumentJsonValue {
     warnings: [],
     contradictions: [],
   };
+  const listFor = (key: string): string[] =>
+    requireDefined(lists[key], `Invariante: lista ${key} inicializada.`);
   const narrative = text.slice(0, matches[0]?.index ?? text.length).trim();
   matches.forEach((match, index) => {
     const label = PENDING_SECTION_LABELS.find((candidate) =>
@@ -825,21 +845,21 @@ function pendingSectionFromText(text: string): DocumentJsonValue {
     const start = (match.index ?? 0) + match[0].length;
     const end = matches[index + 1]?.index ?? text.length;
     for (const item of splitTextItems(text.slice(start, end))) {
-      lists[label.key]!.push(`${label.prefix ?? ""}${item}`);
+      listFor(label.key).push(`${label.prefix ?? ""}${item}`);
     }
   });
   const unique = (values: string[]) =>
     values.filter((item, position) => values.indexOf(item) === position);
   return {
     narrative: matches.length === 0 ? text : narrative,
-    assumptions: unique(lists.assumptions!),
-    dependencies: unique(lists.dependencies!),
-    pendingItems: unique(lists.pendingItems!),
-    pendingQuestions: unique(lists.pendingQuestions!),
-    warnings: unique(lists.warnings!),
+    assumptions: unique(listFor("assumptions")),
+    dependencies: unique(listFor("dependencies")),
+    pendingItems: unique(listFor("pendingItems")),
+    pendingQuestions: unique(listFor("pendingQuestions")),
+    warnings: unique(listFor("warnings")),
     // Solo se registra como contradicción lo que el texto rotula como tal; no
     // se crea ninguna contradicción artificial.
-    contradictions: unique(lists.contradictions!).map((statement) => ({
+    contradictions: unique(listFor("contradictions")).map((statement) => ({
       statementA: statement,
       statementB: PENDING,
       decision: PENDING,
@@ -864,7 +884,9 @@ function scopeFromText(text: string): DocumentJsonValue {
       item,
     );
     const isExcluded = explicit
-      ? /^(?:excluido|fuera de alcance)$/iu.test(explicit[1]!)
+      ? /^(?:excluido|fuera de alcance)$/iu.test(
+          requireDefined(explicit[1], "Invariante: rótulo presente."),
+        )
       : SCOPE_EXCLUSION.test(item);
     (isExcluded ? excluded : included).push(stripLabelPrefix(item));
   }
@@ -1833,6 +1855,8 @@ export function normalizeLocalOnlyV2SectionContent(
       // única pasada sobre el texto completo que produce ambos lados, y cada
       // lado se usa solo si su propio artefacto no tiene encabezado canónico
       // (compatibilidad con documentos previos a este contrato).
+      const LEGACY_FLOW_INVARIANT =
+        "Invariante: el parseo heredado se calcula cuando algún lado lo requiere.";
       const legacy =
         !hasCanonicalArtifactSignal || !asIsHeadingPresent || !toBeHeadingPresent
           ? legacyProcessFlowModels(text)
@@ -1849,7 +1873,7 @@ export function normalizeLocalOnlyV2SectionContent(
           : emptyFlowModel("Flujo AS-IS", false)
         : asIsHeadingPresent && hasCanonicalArtifactSignal
           ? emptyFlowModel("Flujo AS-IS", false)
-          : legacy!.asIs;
+          : requireDefined(legacy, LEGACY_FLOW_INVARIANT).asIs;
 
       const toBe = canonicalToBeFlow
         ? canonicalToBeValid
@@ -1865,7 +1889,7 @@ export function normalizeLocalOnlyV2SectionContent(
           : emptyFlowModel("Flujo TO-BE", true)
         : toBeHeadingPresent && hasCanonicalArtifactSignal
           ? emptyFlowModel("Flujo TO-BE", true)
-          : legacy!.toBe;
+          : requireDefined(legacy, LEGACY_FLOW_INVARIANT).toBe;
 
       return {
         processFlows: { asIs, toBe },

@@ -285,15 +285,12 @@ export function DocumentsWorkspace({
   const deletionLock = useRef(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const initialProject = projects.find((project) =>
+    sameProjectId(project.id, initialProjectId),
+  );
   const [search, setSearch] = useQueryState<string>(
     "q",
-    projects.find((project) => sameProjectId(project.id, initialProjectId))
-      ? projectOptionLabel(
-          projects.find((project) =>
-            sameProjectId(project.id, initialProjectId),
-          )!,
-        )
-      : "",
+    initialProject ? projectOptionLabel(initialProject) : "",
   );
   const [status, setStatus] = useQueryState<"" | DocumentStatus | ProjectStatus>(
     "estado",
@@ -696,7 +693,10 @@ export function DocumentsWorkspace({
     )
       return;
     deletionLock.current = true;
-    setDeletingVersionId(drafts.length === 1 ? drafts[0]!.id : "bulk");
+    const [onlyDraft] = drafts;
+    setDeletingVersionId(
+      drafts.length === 1 && onlyDraft ? onlyDraft.id : "bulk",
+    );
     setAlert(null);
     const failures: string[] = [];
     let deleted = 0;

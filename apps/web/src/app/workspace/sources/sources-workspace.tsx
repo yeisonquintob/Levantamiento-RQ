@@ -3,7 +3,11 @@
 import type { DragEvent, FormEvent, KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildTokenBreakdownRows } from "./source-token-breakdown";
-import { BlockDuration, StallNotice, formatGenerationElapsed } from "./live-clock";
+import {
+  BlockDuration,
+  StallNotice,
+  formatGenerationElapsed,
+} from "./live-clock";
 
 export { formatGenerationElapsed };
 import { SourcesGenerationPanel } from "./sources-generation-panel";
@@ -356,7 +360,6 @@ export function analysisGenerationPercentage(
     AiAnalysisRequestDetail,
     "status" | "result" | "executions" | "processing"
   >,
-  _now = Date.now(),
 ): number {
   if (request.status === "COMPLETED") return 100;
   if (!request.processing) return 0;
@@ -3317,7 +3320,9 @@ export function SourcesWorkspace({
           }
           disabledActions={disabledOutcomeActions}
           elapsedSince={
-            trackedGenerationActive ? (latestExecution?.startedAt ?? null) : null
+            trackedGenerationActive
+              ? (latestExecution?.startedAt ?? null)
+              : null
           }
           generationMode={displayedGenerationMode}
           onAction={handleOutcomeAction}

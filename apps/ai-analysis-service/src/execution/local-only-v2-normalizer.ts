@@ -12,6 +12,7 @@
 // NO realiza deduplicación semántica, inferencias, relaciones nuevas ni resuelve
 // contradicciones. Hallazgos parecidos pero no exactos permanecen separados.
 
+import { requireDefined } from "../common/require-defined";
 import { createHash } from "node:crypto";
 
 import {
@@ -196,7 +197,10 @@ export function normalizeLocalOnlyV2AtomicFindings(
   const provisional = [...groups.entries()].map(([key, group]) => {
     const occurrences = [...group.occurrences].sort(compareOccurrence);
     const descriptions = [...group.descriptions].sort(compareText);
-    const description = descriptions[0]!;
+    const description = requireDefined(
+      descriptions[0],
+      "Invariante: cada grupo tiene al menos una descripción.",
+    );
     const sourceIds = uniqueInOrder(
       occurrences.map((occurrence) => occurrence.sourceId),
     );

@@ -1,3 +1,4 @@
+import { requireDefined } from "../common/require-defined";
 import { createHash } from "node:crypto";
 import type { AiDraftGenerationPurpose } from "@levantamiento-rq/shared-contracts";
 import { LocalAiError, type OllamaClient } from "../local-ai/ollama.client";
@@ -1042,9 +1043,11 @@ function hasStructuredProcessFlowContract(content: string): boolean {
 
   const positions = requiredHeadings.map(headingIndex);
   if (positions.some((position) => position < 0)) return false;
+  const positionAt = (index: number): number =>
+    requireDefined(positions[index], "Invariante: posición de encabezado presente.");
   if (
     !positions.every(
-      (position, index) => index === 0 || position > positions[index - 1]!,
+      (position, index) => index === 0 || position > positionAt(index - 1),
     )
   ) {
     return false;
@@ -1053,8 +1056,8 @@ function hasStructuredProcessFlowContract(content: string): boolean {
   const flowLine =
     /^[^|\n]{2,}\s*\|\s*(?:INICIO|PROCESO|DECISI(?:Ó|O)N|SISTEMA|FIN)\s*\|\s*.+$/iu;
 
-  const asIsLines = lines.slice(positions[0]! + 1, positions[1]!);
-  const toBeLines = lines.slice(positions[2]! + 1, positions[3]!);
+  const asIsLines = lines.slice(positionAt(0) + 1, positionAt(1));
+  const toBeLines = lines.slice(positionAt(2) + 1, positionAt(3));
 
   return (
     asIsLines.some((line) => flowLine.test(line)) &&
@@ -1801,7 +1804,11 @@ function deterministicPendingMilestonesFallbackContent(
   const fixedStoryOverhead = storyCodes.reduce(
     (total, code, index) =>
       total +
-      localOnlyV2MilestonesFallbackStoryLines(code, titles[index]!, "").reduce(
+      localOnlyV2MilestonesFallbackStoryLines(
+        code,
+        requireDefined(titles[index], "Invariante: existe un título por HU."),
+        "",
+      ).reduce(
         (subtotal, line) => subtotal + line.length + 1,
         0,
       ),
@@ -1829,11 +1836,11 @@ function deterministicPendingMilestonesFallbackContent(
     milestoneLine,
     ...findings.flatMap((findingItem, index) =>
       localOnlyV2MilestonesFallbackStoryLines(
-        storyCodes[index]!,
-        titles[index]!,
+        requireDefined(storyCodes[index], "Invariante: existe un código por HU."),
+        requireDefined(titles[index], "Invariante: existe un título por HU."),
         truncateAtBoundary(
           findingItem.description.trim().replace(/\s*\|\s*/gu, " / "),
-          budgets[index]!,
+          requireDefined(budgets[index], "Invariante: existe un presupuesto por HU."),
         ) || "[PENDIENTE POR DEFINIR]",
       ),
     ),

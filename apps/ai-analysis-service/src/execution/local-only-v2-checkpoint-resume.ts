@@ -11,6 +11,7 @@
 // El primer checkpoint faltante/incompatible/corrupto define resumeFromUnitId.
 // Desde ese punto, las unidades posteriores vuelven a quedar pendientes.
 
+import { omitKey, requireDefined } from "../common/require-defined";
 import { createHash } from "node:crypto";
 
 import type {
@@ -250,7 +251,7 @@ export function buildLocalOnlyV2ExecutionPlan(
   );
   if (duplicateIds.length > 0) {
     throw new Error(
-      `LOCAL_ONLY_V2 produjo unitId duplicado: ${duplicateIds[0]!.unitId}.`,
+      `LOCAL_ONLY_V2 produjo unitId duplicado: ${requireDefined(duplicateIds[0], "Invariante: existe un unitId duplicado.").unitId}.`,
     );
   }
 
@@ -395,7 +396,7 @@ function checkpointIssue(
   if (sha256(checkpoint.payloadJson) !== checkpoint.payloadSha256)
     return "PAYLOAD_CORRUPT";
 
-  const { checkpointFingerprint: _ignored, ...withoutFingerprint } = checkpoint;
+  const withoutFingerprint = omitKey(checkpoint, "checkpointFingerprint");
   if (
     checkpoint.checkpointFingerprint !==
     checkpointFingerprint(withoutFingerprint)
@@ -439,7 +440,10 @@ export function buildLocalOnlyV2ResumePlan(
   let resumeIndex = executionPlan.units.length;
 
   for (let index = 0; index < executionPlan.units.length; index += 1) {
-    const unit = executionPlan.units[index]!;
+    const unit = requireDefined(
+      executionPlan.units[index],
+      "Invariante: el índice de unidad está dentro del plan.",
+    );
     const checkpoint = checkpointByUnit.get(unit.unitId);
     if (!checkpoint) {
       resumeIndex = index;
@@ -466,7 +470,10 @@ export function buildLocalOnlyV2ResumePlan(
       index < executionPlan.units.length;
       index += 1
     ) {
-      const later = executionPlan.units[index]!;
+      const later = requireDefined(
+        executionPlan.units[index],
+        "Invariante: el índice de unidad posterior está dentro del plan.",
+      );
       if (checkpointByUnit.has(later.unitId)) {
         invalidated.push(
           Object.freeze({
@@ -500,7 +507,7 @@ export async function persistLocalOnlyV2Checkpoint(
   checkpoint: LocalOnlyV2CompletedCheckpoint,
 ): Promise<void> {
   const payloadSha = sha256(checkpoint.payloadJson);
-  const { checkpointFingerprint: _ignored, ...withoutFingerprint } = checkpoint;
+  const withoutFingerprint = omitKey(checkpoint, "checkpointFingerprint");
   if (
     payloadSha !== checkpoint.payloadSha256 ||
     checkpoint.checkpointFingerprint !==

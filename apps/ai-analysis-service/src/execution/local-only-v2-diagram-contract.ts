@@ -18,6 +18,7 @@
 // Este módulo NO decide qué evidencia se envía al modelo ni cómo se llama a
 // Ollama: solo entiende el contrato de texto y las estructuras que produce.
 
+import { requireDefined } from "../common/require-defined";
 import { truncateAtBoundary } from "./local-only-v2-text-hygiene";
 
 export type LocalOnlyV2DiagramArtifact =
@@ -359,7 +360,9 @@ export function validateCanonicalDiagramFlow(
   if (
     flow.lanes.length === 1 &&
     distinctActorHintCount >= 2 &&
-    GENERIC_LANE_NAMES.has(normalizeCompare(flow.lanes[0]!.name))
+    GENERIC_LANE_NAMES.has(normalizeCompare(
+        requireDefined(flow.lanes[0], "Invariante: el flujo tiene un carril.").name,
+      ))
   ) {
     issues.push("GENERIC_LANE_WITH_MULTIPLE_ACTORS_IN_EVIDENCE");
   }
@@ -839,7 +842,7 @@ export function deterministicDiagramFlowFallback(
               ? "END"
               : "PROCESS"
           : baseKind;
-      return `NODO | ${stepIds[index]} | ${matchingLane?.id ?? actorLanes[0]!.id} | ${kind} | ${shortStepLabel(step.description)}`;
+      return `NODO | ${stepIds[index]} | ${matchingLane?.id ?? requireDefined(actorLanes[0], "Invariante: existe al menos un carril de actor.").id} | ${kind} | ${shortStepLabel(step.description)}`;
     });
     const edgeLines = stepIds
       .slice(1)

@@ -15,6 +15,7 @@
 // La selección lexical es deliberadamente simple y auditable. Paso 10 recibe
 // únicamente este paquete compacto; Paso 15 verificará cobertura global.
 
+import { requireDefined } from "../common/require-defined";
 import { createHash } from "node:crypto";
 
 import {
@@ -670,10 +671,18 @@ function roundRobinByCategory(
     advanced = false;
     for (const category of categories) {
       if (result.length >= cap) break;
-      const bucket = byCategory.get(category)!;
-      const cursor = cursors.get(category)!;
+      const bucket = requireDefined(
+        byCategory.get(category),
+        "Invariante: cada categoría tiene su lista de evidencia.",
+      );
+      const cursor = requireDefined(
+        cursors.get(category),
+        "Invariante: cada categoría tiene su cursor.",
+      );
       if (cursor >= bucket.length) continue;
-      result.push(bucket[cursor]!);
+      result.push(
+        requireDefined(bucket[cursor], "Invariante: el cursor está dentro de la lista."),
+      );
       cursors.set(category, cursor + 1);
       advanced = true;
     }

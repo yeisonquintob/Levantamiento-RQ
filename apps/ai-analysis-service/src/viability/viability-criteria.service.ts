@@ -1,3 +1,4 @@
+import { omitKey } from "../common/require-defined";
 import { randomUUID } from "node:crypto";
 import { ConflictException, ForbiddenException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -20,7 +21,7 @@ export class ViabilityCriteriaService {
       this.criteria.find({ order: { order: "ASC" } }),
       this.settings.findOneBy({ key: "discrepancyThreshold" }),
     ]);
-    return { criteria: criteria.map(({ createdAt: _createdAt, updatedAt: _updatedAt, ...item }) => item), discrepancyThreshold: threshold?.integerValue ?? 25 };
+    return { criteria: criteria.map((item) => omitKey(omitKey(item, "createdAt"), "updatedAt")), discrepancyThreshold: threshold?.integerValue ?? 25 };
   }
 
   async update(actor: AuthenticatedUser, input: unknown): Promise<ViabilityConfiguration> {

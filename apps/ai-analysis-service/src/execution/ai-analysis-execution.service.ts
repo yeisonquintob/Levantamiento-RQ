@@ -426,8 +426,9 @@ export class AiAnalysisExecutionService {
     blocks: readonly LocalDraftLogicalBlock[],
   ): Promise<void> {
     if (!this.localDraftBlockCheckpoints) return;
+    const checkpointRepository = this.localDraftBlockCheckpoints;
 
-    const existing = await this.localDraftBlockCheckpoints.find({
+    const existing = await checkpointRepository.find({
       where: { analysisRequestId },
     });
     const existingKeys = new Set(existing.map((item) => item.blockKey));
@@ -436,7 +437,7 @@ export class AiAnalysisExecutionService {
     const missing = blocks
       .filter((block) => !existingKeys.has(block.blockKey))
       .map((block) =>
-        this.localDraftBlockCheckpoints!.create({
+        checkpointRepository.create({
           id: randomUUID(),
           analysisRequestId,
           blockKey: block.blockKey,
@@ -453,7 +454,7 @@ export class AiAnalysisExecutionService {
       );
 
     if (missing.length > 0) {
-      await this.localDraftBlockCheckpoints.save(missing);
+      await checkpointRepository.save(missing);
     }
   }
 
@@ -508,19 +509,20 @@ export class AiAnalysisExecutionService {
         }
       }
 
+      const resolvedValues: Record<string, unknown> | null = parsedValues;
       const completeCheckpoint =
-        parsedValues !== null &&
+        resolvedValues !== null &&
         ((expectedPaths.length === 0 &&
           block.presentationSource !== "AI_STAGE" &&
           block.presentationSource !== "UNMAPPED") ||
           (expectedPaths.length > 0 &&
             expectedPaths.every((stagePath) =>
-              Object.hasOwn(parsedValues!, stagePath),
+              Object.hasOwn(resolvedValues, stagePath),
             )));
 
       if (completeCheckpoint) {
         for (const stagePath of expectedPaths) {
-          resumedValues[stagePath] = parsedValues![stagePath];
+          resumedValues[stagePath] = resolvedValues[stagePath];
         }
         this.localDraftBlockProgress.update(analysisRequestId, {
           blockNumber: block.blockNumber,

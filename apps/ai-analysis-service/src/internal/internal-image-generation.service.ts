@@ -488,20 +488,20 @@ export class InternalImageGenerationService {
         signal: AbortSignal.timeout(Math.min(configuration.timeoutMs, 30_000)),
       });
     } catch (error) {
-      this.throwComfyUiTransport(error);
+      throw this.throwComfyUiTransport(error);
     }
 
-    const promptText = await promptResponse!.text();
-    if (!promptResponse!.ok) {
+    const promptText = await promptResponse.text();
+    if (!promptResponse.ok) {
       const body = promptText.slice(0, 500);
-      if (promptResponse!.status >= 500) {
+      if (promptResponse.status >= 500) {
         throw new ServiceUnavailableException({
-          errorCode: `COMFYUI_PROMPT_HTTP_${promptResponse!.status}`,
+          errorCode: `COMFYUI_PROMPT_HTTP_${promptResponse.status}`,
           message: `ComfyUI no pudo aceptar temporalmente el workflow. ${body}`,
         });
       }
       throw new ConflictException({
-        errorCode: `COMFYUI_PROMPT_HTTP_${promptResponse!.status}`,
+        errorCode: `COMFYUI_PROMPT_HTTP_${promptResponse.status}`,
         message: `ComfyUI rechazó el workflow configurado. ${body}`,
       });
     }
@@ -533,23 +533,23 @@ export class InternalImageGenerationService {
           },
         );
       } catch (error) {
-        this.throwComfyUiTransport(error);
+        throw this.throwComfyUiTransport(error);
       }
 
-      if (!historyResponse!.ok) {
-        if (historyResponse!.status >= 500) {
+      if (!historyResponse.ok) {
+        if (historyResponse.status >= 500) {
           throw new ServiceUnavailableException({
-            errorCode: `COMFYUI_HISTORY_HTTP_${historyResponse!.status}`,
+            errorCode: `COMFYUI_HISTORY_HTTP_${historyResponse.status}`,
             message: "ComfyUI no pudo consultar temporalmente el trabajo.",
           });
         }
         throw new BadGatewayException({
-          errorCode: `COMFYUI_HISTORY_HTTP_${historyResponse!.status}`,
+          errorCode: `COMFYUI_HISTORY_HTTP_${historyResponse.status}`,
           message: "ComfyUI no permitió consultar el trabajo generado.",
         });
       }
 
-      const history = record(await historyResponse!.json().catch(() => null));
+      const history = record(await historyResponse.json().catch(() => null));
       const entry = history ? record(history[promptId]) : null;
       if (entry) {
         const status = record(entry.status);
@@ -584,15 +584,15 @@ export class InternalImageGenerationService {
               signal: AbortSignal.timeout(Math.min(remaining, 30_000)),
             });
           } catch (error) {
-            this.throwComfyUiTransport(error);
+            throw this.throwComfyUiTransport(error);
           }
-          if (!imageResponse!.ok) {
+          if (!imageResponse.ok) {
             throw new BadGatewayException({
-              errorCode: `COMFYUI_VIEW_HTTP_${imageResponse!.status}`,
+              errorCode: `COMFYUI_VIEW_HTTP_${imageResponse.status}`,
               message: "No fue posible recuperar la imagen generada por ComfyUI.",
             });
           }
-          const binary = Buffer.from(await imageResponse!.arrayBuffer());
+          const binary = Buffer.from(await imageResponse.arrayBuffer());
           if (binary.length === 0) {
             throw new BadGatewayException({
               errorCode: "COMFYUI_EMPTY_IMAGE",
@@ -633,12 +633,12 @@ export class InternalImageGenerationService {
         signal: AbortSignal.timeout(Math.min(configuration.timeoutMs, 15_000)),
       });
     } catch (error) {
-      this.throwComfyUiTransport(error);
+      throw this.throwComfyUiTransport(error);
     }
-    if (!response!.ok) {
-      if (response!.status >= 500) {
+    if (!response.ok) {
+      if (response.status >= 500) {
         throw new ServiceUnavailableException({
-          errorCode: `COMFYUI_CHECKPOINT_HTTP_${response!.status}`,
+          errorCode: `COMFYUI_CHECKPOINT_HTTP_${response.status}`,
           message: "ComfyUI no pudo consultar temporalmente sus checkpoints.",
         });
       }
@@ -648,7 +648,7 @@ export class InternalImageGenerationService {
       });
     }
     const checkpoints = comfyUiCheckpointNames(
-      await response!.json().catch(() => null),
+      await response.json().catch(() => null),
     );
     if (checkpoints.length === 0) {
       throw new ConflictException({

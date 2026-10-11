@@ -245,16 +245,10 @@ test("Punto 6 mantiene el porcentaje local exactamente en el valor medido por ba
     },
   } as Parameters<typeof analysisGenerationPercentage>[0];
 
+  // La función ya no acepta un reloj: el porcentaje solo depende del progreso
+  // medido por el backend, sin importar cuánto tiempo haya pasado.
   assert.equal(
-    analysisGenerationPercentage(request, Date.parse(startedAt)),
-    10,
-  );
-  assert.equal(
-    analysisGenerationPercentage(request, Date.parse(startedAt) + 60_000),
-    10,
-  );
-  assert.equal(
-    analysisGenerationPercentage(request, Date.parse(startedAt) + 30 * 60_000),
+    analysisGenerationPercentage(request),
     10,
     "El tiempo no puede fabricar avance que el backend no haya medido.",
   );
@@ -274,14 +268,7 @@ test("Punto 6 mantiene validación en 95 hasta que backend confirme otro estado"
     },
   } as Parameters<typeof analysisGenerationPercentage>[0];
 
-  assert.equal(
-    analysisGenerationPercentage(request, Date.parse(finishedAt) + 8_000),
-    95,
-  );
-  assert.equal(
-    analysisGenerationPercentage(request, Date.parse(finishedAt) + 60_000),
-    95,
-  );
+  assert.equal(analysisGenerationPercentage(request), 95);
 });
 
 test("Punto 6 elimina interpolaciones temporales del porcentaje visual", async () => {
@@ -608,7 +595,10 @@ test("el monitor conserva accesibilidad, retry, reloj local y estados específic
     "apps/web/src/app/workspace/sources/live-clock.tsx",
     "utf8",
   );
-  assert.match(clock, /setInterval\(\(\) => setNow\(Date\.now\(\)\), intervalMs\)/u);
+  assert.match(
+    clock,
+    /setInterval\(\(\) => setNow\(Date\.now\(\)\), intervalMs\)/u,
+  );
   assert.doesNotMatch(source, /setVisualNow/u);
   assert.match(source, /setInterval\(refresh, 1500\)/u);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/u);

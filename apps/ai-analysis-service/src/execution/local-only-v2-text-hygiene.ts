@@ -6,6 +6,8 @@
 // contenido. Ninguna función inventa texto: solo recorta, elimina o separa
 // lo que el modelo ya escribió.
 
+import { requireDefined } from "../common/require-defined";
+
 const CONNECTORS = [
   "de",
   "del",
@@ -145,7 +147,10 @@ export function sanitizeLocalOnlyV2GeneratedContent(
   if (!value) return value;
 
   const lines = value.split("\n");
-  let last = lines[lines.length - 1]!;
+  let last = requireDefined(
+    lines[lines.length - 1],
+    "Invariante: split devuelve al menos una línea.",
+  );
   const filledBudget = content.length >= maxCharacters - 2;
   if (filledBudget && !/[.!?;:)\]"”»]$/u.test(last.trim())) {
     last = last.replace(/\s*\S+$/u, "");
