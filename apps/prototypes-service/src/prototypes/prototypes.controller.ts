@@ -74,6 +74,39 @@ export class PrototypesController {
     return this.prototypes.createSource(input, request.authPrincipal.id);
   }
 
+  @Post(":id/image-provider")
+  @ApiOperation({
+    summary: "Cambiar la IA que genera las imágenes de un prototipo",
+  })
+  async changeImageProvider(
+    @Req() request: PrototypesRequest,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const actorId = this.actorId(request);
+    const raw =
+      body && typeof body === "object"
+        ? (body as { imageConfigurationId?: unknown }).imageConfigurationId
+        : undefined;
+    const imageConfigurationId = parseGenerationId(String(raw ?? ""));
+    const options = await this.aiClient.options();
+    if (
+      !options.images.some(
+        (p) =>
+          p.id.toLowerCase() === imageConfigurationId.toLowerCase() &&
+          p.available,
+      )
+    )
+      throw new ConflictException(
+        "La IA de imágenes seleccionada no está disponible. Pruébala en Configuración → Proveedores de IA.",
+      );
+    return this.prototypes.updateImageConfiguration(
+      parseGenerationId(id),
+      actorId,
+      imageConfigurationId,
+    );
+  }
+
   @Get("providers")
   aiOptions(@Req() request: PrototypesRequest) {
     this.actorId(request);

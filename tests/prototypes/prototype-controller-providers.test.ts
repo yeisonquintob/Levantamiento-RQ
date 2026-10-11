@@ -15,6 +15,7 @@ function build(options: {
   imagesAvailable: boolean;
 }) {
   const created: unknown[] = [];
+  const changed: Array<{ id: string; actor: string; image: string }> = [];
   let started = 0;
   let retried = 0;
   const controller = new PrototypesController(
@@ -27,6 +28,14 @@ function build(options: {
         id: GENERATION,
         imageConfigurationId: IMAGES,
       }),
+      updateImageConfiguration: async (
+        id: string,
+        actor: string,
+        image: string,
+      ) => {
+        changed.push({ id, actor, image });
+        return { id, imageConfigurationId: image };
+      },
     } as never,
     {} as never,
     {} as never,
@@ -47,7 +56,7 @@ function build(options: {
       }),
     } as never,
   );
-  return { controller, created, counts: () => ({ started, retried }) };
+  return { controller, created, changed, counts: () => ({ started, retried }) };
 }
 
 const body = {
@@ -95,4 +104,49 @@ test("generar o reintentar imágenes exige la IA de imágenes disponible", async
   await ready.controller.imagesStart(request, GENERATION);
   await ready.controller.retryFailedImages(request, GENERATION);
   assert.deepEqual(ready.counts(), { started: 1, retried: 1 });
+});
+
+const COMFY = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+
+test("cambiar la IA de imágenes de un prototipo exige que la nueva IA esté disponible", async () => {
+  const { controller, changed } = build({
+    plannerAvailable: true,
+    imagesAvailable: false,
+  });
+  await assert.rejects(
+    () =>
+      controller.changeImageProvider(request, GENERATION, {
+        imageConfigurationId: IMAGES,
+      }),
+    /Pruébala en Configuración/u,
+  );
+  assert.equal(changed.length, 0);
+});
+
+test("cambiar la IA de imágenes actualiza el prototipo del usuario autenticado", async () => {
+  const { controller, changed } = build({
+    plannerAvailable: true,
+    imagesAvailable: true,
+  });
+  const result = (await controller.changeImageProvider(request, GENERATION, {
+    imageConfigurationId: IMAGES.toUpperCase(),
+  })) as { imageConfigurationId: string };
+  assert.deepEqual(changed, [
+    {
+      id: GENERATION,
+      actor: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      image: IMAGES.toUpperCase(),
+    },
+  ]);
+  assert.equal(result.imageConfigurationId, IMAGES.toUpperCase());
+  // Un identificador inválido se rechaza antes de consultar nada.
+  await assert.rejects(() =>
+    controller.changeImageProvider(request, GENERATION, {
+      imageConfigurationId: "no-es-uuid",
+    }),
+  );
+  await assert.rejects(() =>
+    controller.changeImageProvider(request, GENERATION, {}),
+  );
+  assert.equal(COMFY.length, 36);
 });

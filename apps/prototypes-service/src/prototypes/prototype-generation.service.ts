@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type { Repository } from "typeorm";
 import type {
@@ -71,6 +75,25 @@ export class PrototypeGenerationService {
     if (!entity)
       throw new NotFoundException("La generación de prototipo no existe.");
     return this.toDetail(entity);
+  }
+
+  /** Cambia la IA que genera las imágenes antes de generar o reintentar. */
+  async updateImageConfiguration(
+    id: string,
+    requestedByUserId: string,
+    imageConfigurationId: string,
+  ): Promise<PrototypeGenerationDetail> {
+    const entity = await this.generations.findOne({
+      where: { id, requestedByUserId },
+    });
+    if (!entity)
+      throw new NotFoundException("La generación de prototipo no existe.");
+    if (entity.status === "IMAGE_GENERATING")
+      throw new ConflictException(
+        "Detén la generación de imágenes en curso antes de cambiar la IA.",
+      );
+    entity.imageConfigurationId = imageConfigurationId;
+    return this.toDetail(await this.generations.save(entity));
   }
 
   async listGenerations(

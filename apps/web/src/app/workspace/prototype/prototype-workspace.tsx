@@ -351,6 +351,8 @@ export function PrototypeWorkspace() {
       setGalleryDevice(
         restored.generation.targetDevice === "MOBILE" ? "MOBILE" : "WEB",
       );
+      if (restored.generation.imageConfigurationId)
+        setImageConfigurationId(restored.generation.imageConfigurationId);
       setFileName(restored.generation.sourceFileName);
       setMarkdownContent("");
       setMarkdownSizeBytes(restored.generation.sourceSizeBytes);
@@ -772,6 +774,32 @@ export function PrototypeWorkspace() {
         ? "Prueba la IA del Markdown en Configuración"
         : null
       : null;
+  // Con el texto ya interpretado se puede cambiar la IA de imágenes (p. ej. de Ollama a ComfyUI)
+  // mientras no haya una generación de imágenes en curso.
+  const imageProviderChangeable =
+    !generation ||
+    (hasCompletedPrototypePlan(generation) &&
+      generation.status !== "IMAGE_GENERATING" &&
+      generation.status !== "VISUAL_SPEC_BUILDING");
+
+  /** Aplica en el prototipo la IA de imágenes elegida si es distinta de la que tiene guardada. */
+  async function ensureImageProvider(
+    current: PrototypeGenerationDetail,
+  ): Promise<PrototypeGenerationDetail> {
+    if (
+      !imageConfigurationId ||
+      current.imageConfigurationId?.toLowerCase() ===
+        imageConfigurationId.toLowerCase()
+    )
+      return current;
+    const updated = await postJson<PrototypeGenerationDetail>(
+      `/api/v1/prototypes/generations/${encodeURIComponent(current.id)}/image-provider`,
+      { imageConfigurationId },
+    );
+    setGeneration(updated);
+    return updated;
+  }
+
   // La IA de imágenes se exige al generarlas, no al interpretar el texto.
   const imageProviderBlockReason =
     selectedImageOption && !selectedImageOption.available
@@ -899,7 +927,7 @@ export function PrototypeWorkspace() {
     setError(null);
 
     try {
-      let next = current;
+      let next = await ensureImageProvider(current);
       if (next.status === "PLANNED") {
         const visual = await postJson<PrototypeVisualSpecificationBuildResult>(
           `/api/v1/prototypes/generations/${encodeURIComponent(next.id)}/visual-specifications`,
@@ -1085,6 +1113,7 @@ export function PrototypeWorkspace() {
     setActionBusy(imageId);
     setError(null);
     try {
+      if (generation) await ensureImageProvider(generation);
       const result = await postJson<PrototypeImageActionResult>(
         `/api/v1/prototypes/images/${encodeURIComponent(imageId)}/${action}`,
       );
@@ -1110,6 +1139,7 @@ export function PrototypeWorkspace() {
     setActionBusy("all");
     setError(null);
     try {
+      await ensureImageProvider(generation);
       applyImageResult(
         await postJson<PrototypeImageGenerationResult>(
           `/api/v1/prototypes/generations/${encodeURIComponent(generation.id)}/images/retry-failed`,
@@ -1799,7 +1829,7 @@ export function PrototypeWorkspace() {
                 <strong>IA para generar imágenes</strong>
                 <select
                   value={imageConfigurationId}
-                  disabled={isActive || Boolean(generation) || !aiOptions}
+                  disabled={isActive || !imageProviderChangeable || !aiOptions}
                   onChange={(event) => {
                     setImageConfigurationId(event.target.value);
                     window.localStorage.setItem(

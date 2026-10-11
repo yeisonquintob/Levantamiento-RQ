@@ -132,6 +132,16 @@ export class PrototypesGatewayController {
   retryFailedImages(@Req() request: RequestLike, @Param("id") id: string) {
     return this.prototypes.retryFailedImages(token(request), id);
   }
+  @Post(":id/image-provider")
+  @ApiOperation({ summary: "Cambiar la IA que genera las imágenes" })
+  @ApiParam({ name: "id", format: "uuid" })
+  changeImageProvider(
+    @Req() request: RequestLike,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.prototypes.changeImageProvider(token(request), id, body);
+  }
   @Post(":id/stop")
   @ApiOperation({ summary: "Detener generación de prototipo" })
   stop(@Req() request: RequestLike, @Param("id") id: string) {

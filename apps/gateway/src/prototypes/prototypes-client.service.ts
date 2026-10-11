@@ -88,6 +88,14 @@ export class PrototypesClientService {
       token,
     );
   }
+  changeImageProvider(token: string, id: string, body: unknown) {
+    return this.request<PrototypeGenerationDetail>(
+      `/api/v1/prototypes/generations/${encodeURIComponent(id)}/image-provider`,
+      "POST",
+      token,
+      body,
+    );
+  }
   startImages(token: string, id: string) {
     return this.request<PrototypeImageGenerationResult>(
       `/api/v1/prototypes/generations/${encodeURIComponent(id)}/images`,

@@ -137,3 +137,23 @@ test("un texto largo del botón principal no ensancha la columna izquierda y la 
   assert.doesNotMatch(source, /key=\{component\}/u);
   assert.match(source, /key=\{`\$\{index\}-\$\{component\}`\}/u);
 });
+
+test("con el texto interpretado se puede cambiar la IA de imágenes y se aplica antes de generar o reintentar", () => {
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  assert.match(source, /\/image-provider/u);
+  assert.match(source, /async function ensureImageProvider/u);
+  // Se aplica al generar, al reintentar las fallidas y al reintentar/regenerar una imagen.
+  assert.equal((source.match(/await ensureImageProvider\(/gu) ?? []).length, 3);
+  assert.match(source, /let next = await ensureImageProvider\(current\)/u);
+  assert.match(source, /if \(generation\) await ensureImageProvider\(generation\)/u);
+  // El selector de imágenes ya no se bloquea por tener una generación: solo sin plan o generando
+  // imágenes. El de la IA que interpreta el Markdown sí sigue bloqueado una vez procesado.
+  assert.match(
+    source,
+    /value=\{imageConfigurationId\}\s*disabled=\{isActive \|\| !imageProviderChangeable \|\| !aiOptions\}/u,
+  );
+  assert.match(
+    source,
+    /value=\{plannerConfigurationId\}[\s\S]{0,120}disabled=\{isActive \|\| Boolean\(generation\) \|\| !aiOptions\}/u,
+  );
+});
