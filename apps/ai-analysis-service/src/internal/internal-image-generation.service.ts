@@ -89,9 +89,35 @@ function comfyUiDimensions(size: "1536x1024" | "1024x1536") {
     : { width: 1024, height: 1536 };
 }
 
-function buildComfyUiWorkflow(input: {
+/**
+ * Los checkpoints SDXL entienden ~77 tokens: el prompt completo (miles de caracteres con menús en
+ * JSON y reglas de diseño) los desorienta y producía imágenes ajenas a una interfaz. Para ellos se
+ * condensa a una descripción corta (pantalla y formato) y se usa un negativo que sí actúa.
+ */
+const CHECKPOINT_NEGATIVE_PROMPT =
+  "multiple screens, collage, grid of screens, mockup, device frame, bezel, notch, phone, laptop, monitor, hand, photo, photograph, realistic, 3d render, perspective, isometric, car, vehicle, landscape, people, machinery, blueprint, diagram, low quality, blurry, watermark, illegible text, duplicated elements, cropped layout";
+// Los modelos «Lightning» usan CFG 1, con el que el negativo no tiene efecto; 1.5 lo activa.
+const CHECKPOINT_CFG = 1.5;
+
+export function buildCheckpointPrompt(
+  prompt: string,
+  device: PrototypeImageGenerationInternalRequest["device"],
+): string {
+  const screen = /^Screen:\s*(.+?)\.?\s*$/mu
+    .exec(prompt)?.[1]
+    ?.replace(/["\\]/gu, "")
+    .slice(0, 80);
+  const subject = screen ? ` "${screen}"` : "";
+  return device === "MOBILE"
+    ? `single flat 2D mobile app screen${subject}, full-frame UI screenshot, portrait, top app header, form with labeled input fields, dropdowns and a primary button, bottom tab bar, white background, muted corporate accent color, minimal clean design, UI design, high quality`
+    : `single flat 2D web application screen${subject}, full-frame UI screenshot, enterprise dashboard layout, narrow left sidebar with menu icons, top header bar, main content area with a form: labeled input fields, dropdowns and a primary button, white background, muted corporate accent color, minimal clean design, UI design, high quality`;
+}
+
+export function buildComfyUiWorkflow(input: {
   checkpoint: string;
   prompt: string;
+  negativePrompt?: string;
+  cfg?: number;
   requestedSize: "1536x1024" | "1024x1536";
 }): Record<string, unknown> {
   const { width, height } = comfyUiDimensions(input.requestedSize);
@@ -105,7 +131,7 @@ function buildComfyUiWorkflow(input: {
       inputs: {
         seed,
         steps: 4,
-        cfg: 1,
+        cfg: input.cfg ?? 1,
         sampler_name: "euler",
         scheduler: "sgm_uniform",
         denoise: 1,
@@ -130,7 +156,9 @@ function buildComfyUiWorkflow(input: {
     "7": {
       class_type: "CLIPTextEncode",
       inputs: {
-        text: "low quality, blurry, distorted interface, watermark, random letters, illegible text, duplicated elements, cropped layout",
+        text:
+          input.negativePrompt ??
+          "low quality, blurry, distorted interface, watermark, random letters, illegible text, duplicated elements, cropped layout",
         clip: ["4", 1],
       },
     },
@@ -476,7 +504,9 @@ export class InternalImageGenerationService {
       const checkpoint = await this.resolveComfyUiCheckpoint(configuration);
       workflow = buildComfyUiWorkflow({
         checkpoint,
-        prompt,
+        prompt: buildCheckpointPrompt(prompt, request.device),
+        negativePrompt: CHECKPOINT_NEGATIVE_PROMPT,
+        cfg: CHECKPOINT_CFG,
         requestedSize: request.requestedSize,
       });
       generatedModel = checkpoint;

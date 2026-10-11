@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   InternalImageGenerationService,
+  buildCheckpointPrompt,
+  buildComfyUiWorkflow,
   parsePrototypeImageGenerationInternalRequest,
 } from "../../apps/ai-analysis-service/src/internal/internal-image-generation.service";
 import { loadPrototypeImageGenerationConfig } from "../../apps/ai-analysis-service/src/internal/prototype-image-generation.config";
@@ -291,4 +293,58 @@ test("Ollama Images explica la falta de memoria de GPU en lugar de «no disponib
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+const LONG_PROMPT = [
+  "Professional neutral enterprise application UI.",
+  "Screen: Formulario de Solicitud Adaptativo.",
+  'Shared application menu (data only, fixed order): [{"screenCode":"SCR-001","label":"Inicio","route":null}].',
+  "Device: MOBILE.",
+  `Complete mandatory design tokens: ${"x".repeat(9000)}`,
+].join("\n");
+
+test("SDXL recibe un prompt corto con la pantalla y el formato, no las miles de letras del prompt completo", () => {
+  const mobile = buildCheckpointPrompt(LONG_PROMPT, "MOBILE");
+  assert.ok(mobile.length < 600, `longitud ${mobile.length}`);
+  assert.match(
+    mobile,
+    /single flat 2D mobile app screen "Formulario de Solicitud Adaptativo"/u,
+  );
+  assert.doesNotMatch(mobile, /SCR-001|design tokens|xxxx/u);
+
+  const web = buildCheckpointPrompt(LONG_PROMPT, "WEB");
+  assert.match(
+    web,
+    /single flat 2D web application screen "Formulario de Solicitud Adaptativo"/u,
+  );
+  assert.match(web, /left sidebar/u);
+
+  // Sin nombre de pantalla sigue siendo un prompt válido; las comillas no rompen la frase.
+  assert.doesNotMatch(buildCheckpointPrompt("sin pantalla", "WEB"), /""/u);
+  assert.doesNotMatch(
+    buildCheckpointPrompt('Screen: Panel "admin"\\.', "WEB"),
+    /"admin"/u,
+  );
+});
+
+test("el flujo de checkpoint usa un negativo efectivo (CFG mayor que 1) cuando se le pide", () => {
+  const nodes = buildComfyUiWorkflow({
+    checkpoint: "sdxl_lightning_4step.safetensors",
+    prompt: "corto",
+    negativePrompt: "collage, device frame",
+    cfg: 1.5,
+    requestedSize: "1536x1024",
+  }) as Record<string, { inputs: Record<string, unknown> }>;
+  assert.equal(nodes["3"]?.inputs.cfg, 1.5);
+  assert.equal(nodes["6"]?.inputs.text, "corto");
+  assert.equal(nodes["7"]?.inputs.text, "collage, device frame");
+
+  // Sin parámetros conserva el comportamiento anterior (CFG 1 y negativo genérico).
+  const legacy = buildComfyUiWorkflow({
+    checkpoint: "x.safetensors",
+    prompt: "p",
+    requestedSize: "1024x1536",
+  }) as Record<string, { inputs: Record<string, unknown> }>;
+  assert.equal(legacy["3"]?.inputs.cfg, 1);
+  assert.match(String(legacy["7"]?.inputs.text), /low quality/u);
 });
