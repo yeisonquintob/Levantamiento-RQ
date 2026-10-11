@@ -108,6 +108,20 @@
   padding: 10px 14px;
 }
 
+/* PROTOTYPE_GENERATE_ONE_LINE_V1: «Procesar Markdown» es un botón de una sola línea; el texto
+   secundario se recorta con puntos suspensivos en lugar de partir el título. */
+.rq-prototype-generate span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.rq-prototype-generate small {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (min-width: 1121px) and (min-height: 640px) {
   .rq-main > .rq-content:has(> .rq-prototype-workspace > .rq-prototype-layout) {
     block-size: 100%;

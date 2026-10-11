@@ -117,6 +117,8 @@ export function PrototypeWorkspace() {
   useAutoDismiss(aiOptionsError, () => setAiOptionsError(null));
   const [plannerConfigurationId, setPlannerConfigurationId] = useState("");
   const [imageConfigurationId, setImageConfigurationId] = useState("");
+  const [optionsReload, setOptionsReload] = useState(0);
+  const [testingProvider, setTestingProvider] = useState(false);
   // RQ_PROTOTYPE_PERSISTENT_TEXT_PROGRESS_V1_4
   const [resumingPlan, setResumingPlan] = useState(false);
   const [startingImages, setStartingImages] = useState(false);
@@ -317,7 +319,7 @@ export function PrototypeWorkspace() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [optionsReload]);
 
   async function loadHistory(): Promise<PrototypeGenerationDetail[] | null> {
     setHistoryLoading(true);
@@ -756,6 +758,41 @@ export function PrototypeWorkspace() {
           ? reason.message
           : "No fue posible leer el archivo Markdown.",
       );
+    }
+  }
+
+  const selectedPlannerOption = aiOptions?.planning.find(
+    (provider) => provider.id === plannerConfigurationId,
+  );
+  const selectedImageOption = aiOptions?.images.find(
+    (provider) => provider.id === imageConfigurationId,
+  );
+  const providerBlockReason =
+    !generation && aiOptions
+      ? selectedPlannerOption && !selectedPlannerOption.available
+        ? "Prueba la conexión de la IA del Markdown"
+        : selectedImageOption && !selectedImageOption.available
+          ? "Prueba la conexión de la IA de imágenes"
+          : null
+      : null;
+
+  async function testProviderConnection(providerId: string) {
+    setTestingProvider(true);
+    setError(null);
+    try {
+      const result = await postJson<{ succeeded: boolean; message: string }>(
+        `/api/v1/admin/ai-providers/${encodeURIComponent(providerId)}/test`,
+      );
+      if (!result.succeeded) setError(result.message);
+      setOptionsReload((value) => value + 1);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No fue posible probar la conexión.",
+      );
+    } finally {
+      setTestingProvider(false);
     }
   }
 
@@ -1723,6 +1760,20 @@ export function PrototypeWorkspace() {
                   Identifica las pantallas y organiza el contenido del
                   documento.
                 </small>
+                {selectedPlannerOption &&
+                !selectedPlannerOption.available &&
+                !generation ? (
+                  <button
+                    className={styles.secondaryAction}
+                    disabled={testingProvider}
+                    onClick={() =>
+                      void testProviderConnection(selectedPlannerOption.id)
+                    }
+                    type="button"
+                  >
+                    {testingProvider ? "Probando…" : "Probar conexión"}
+                  </button>
+                ) : null}
               </label>
 
               <div className={styles.stageProgress}>
@@ -1821,6 +1872,20 @@ export function PrototypeWorkspace() {
                   Se utilizará después de validar la respuesta procesada del
                   Markdown.
                 </small>
+                {selectedImageOption &&
+                !selectedImageOption.available &&
+                !generation ? (
+                  <button
+                    className={styles.secondaryAction}
+                    disabled={testingProvider}
+                    onClick={() =>
+                      void testProviderConnection(selectedImageOption.id)
+                    }
+                    type="button"
+                  >
+                    {testingProvider ? "Probando…" : "Probar conexión"}
+                  </button>
+                ) : null}
               </label>
 
               <div className={styles.stageProgress}>
@@ -1875,7 +1940,8 @@ export function PrototypeWorkspace() {
                     ? "Vuelve a interpretar el Markdown con la IA elegida y detalla cada pantalla"
                     : plan
                     ? `${plan.screens.length} pantalla${plan.screens.length === 1 ? "" : "s"} identificada${plan.screens.length === 1 ? "" : "s"}`
-                    : "Primero interpreta el Markdown; las imágenes se generan después"}
+                    : (providerBlockReason ??
+                      "Las imágenes se generan después")}
               </small>
             </button>
             {imageProgress?.failedImages ? (
