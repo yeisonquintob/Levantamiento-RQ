@@ -168,3 +168,16 @@ test("con imágenes ya intentadas se puede exportar el TXT, importar PNG y se ex
   assert.match(block, /Importar imágenes/u);
   assert.match(block, /importInputRef/u);
 });
+
+test("la galería permite descargar todas las imágenes (web y móvil) en un ZIP", () => {
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  assert.match(source, /async function downloadAllImages\(\)/u);
+  assert.match(source, /Descargar todas \(/u);
+  assert.match(source, /Preparando ZIP \$\{downloadingAll\.done\}\/\$\{downloadingAll\.total\}/u);
+  // Solo imágenes completadas, en carpetas web/movil y con el mismo nombre que usa la importación.
+  assert.match(source, /prototypeImageZipFolder\(image\)\}\/\$\{prototypeImageFileName\(image\)\}/u);
+  assert.match(source, /prototypeImagesZipName\(/u);
+  assert.match(source, /type: "application\/zip"/u);
+  // Si alguna descarga falla no se entrega un ZIP incompleto.
+  assert.match(source, /No fue posible descargar \$\{failed\} de \$\{completed\.length\} imágenes/u);
+});

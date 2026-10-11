@@ -64,3 +64,21 @@ export function prototypeImageFileName(image: PrototypeGeneratedImage): string {
       .slice(0, 80) || "pantalla";
   return `${String(image.screenOrder).padStart(2, "0")}-${safe}-${image.device.toLowerCase()}.png`;
 }
+
+/** Nombre del ZIP con todas las imágenes del prototipo (web y móvil). */
+export function prototypeImagesZipName(applicationName: string | null): string {
+  const base = (applicationName ?? "prototipo")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/gu, "")
+    .replace(/[^a-zA-Z0-9_-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .toLowerCase();
+  return `imagenes-${base || "prototipo"}.zip`;
+}
+
+/** Carpeta del ZIP según el formato de la imagen. */
+export function prototypeImageZipFolder(
+  image: PrototypeGeneratedImage,
+): string {
+  return image.device === "MOBILE" ? "movil" : "web";
+}

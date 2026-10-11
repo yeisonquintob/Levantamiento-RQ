@@ -30,6 +30,8 @@ import { authenticatedFetch } from "../../authenticated-fetch";
 import { downloadTextFile } from "../execution/azure-devops-csv";
 import { ensureApprovedPrototypeDrafts } from "./prototype-drafts";
 import { hasCompletedPrototypePlan } from "./prototype-plan-state";
+import { buildZip, type ZipEntry } from "./zip-store";
+import { runWithConcurrency } from "../concurrency";
 import {
   buildPromptExportTxt,
   importPayload,
@@ -42,6 +44,8 @@ import {
   orderPrototypeImages,
   PROTOTYPE_GENERATION_STORAGE_KEY,
   prototypeImageFileName,
+  prototypeImagesZipName,
+  prototypeImageZipFolder,
   prototypeOriginLabel,
   selectedImageForDevice,
 } from "./prototype-gallery";
@@ -130,6 +134,10 @@ export function PrototypeWorkspace() {
     total: number;
   } | null>(null);
   const [importingImages, setImportingImages] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   // RQ_PROTOTYPE_POINT3_TABS_V1_1
@@ -1202,6 +1210,63 @@ export function PrototypeWorkspace() {
       );
     } finally {
       setActionBusy(null);
+    }
+  }
+  /** Descarga en un solo ZIP todas las imágenes generadas, en las carpetas «web» y «movil». */
+  async function downloadAllImages() {
+    const completed = orderPrototypeImages(
+      images.filter((image) => image.status === "COMPLETED"),
+    );
+    if (!completed.length || downloadingAll) return;
+    setDownloadingAll({ done: 0, total: completed.length });
+    setError(null);
+    try {
+      const entries: Array<ZipEntry | undefined> = new Array(completed.length);
+      let done = 0;
+      let failed = 0;
+      await runWithConcurrency(
+        completed.map((image, index) => ({ image, index })),
+        4,
+        async ({ image, index }) => {
+          try {
+            const response = await authenticatedFetch(
+              imageUrl(image.id, image.attemptNumber),
+            );
+            if (!response.ok) throw new Error("descarga fallida");
+            entries[index] = {
+              name: `${prototypeImageZipFolder(image)}/${prototypeImageFileName(image)}`,
+              data: new Uint8Array(await response.arrayBuffer()),
+            };
+          } catch {
+            failed += 1;
+          }
+          done += 1;
+          setDownloadingAll({ done, total: completed.length });
+        },
+      );
+      if (failed)
+        throw new Error(
+          `No fue posible descargar ${failed} de ${completed.length} imágenes. Inténtalo de nuevo.`,
+        );
+      const zip = buildZip(entries.filter((entry): entry is ZipEntry => Boolean(entry)));
+      const objectUrl = URL.createObjectURL(
+        new Blob([zip as BlobPart], { type: "application/zip" }),
+      );
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = prototypeImagesZipName(
+        generation?.applicationName ?? null,
+      );
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No fue posible preparar el ZIP de imágenes.",
+      );
+    } finally {
+      setDownloadingAll(null);
     }
   }
   function applyImageResult(result: PrototypeImageGenerationResult) {
@@ -2281,6 +2346,20 @@ export function PrototypeWorkspace() {
                           ref={importInputRef}
                           type="file"
                         />
+                        <button
+                          className={styles.secondaryAction}
+                          disabled={
+                            Boolean(downloadingAll) ||
+                            !images.some((image) => image.status === "COMPLETED")
+                          }
+                          onClick={() => void downloadAllImages()}
+                          title="Descarga un ZIP con todas las imágenes generadas: carpeta web y carpeta movil"
+                          type="button"
+                        >
+                          {downloadingAll
+                            ? `Preparando ZIP ${downloadingAll.done}/${downloadingAll.total}…`
+                            : `Descargar todas (${images.filter((image) => image.status === "COMPLETED").length})`}
+                        </button>
                       </div>
                     ) : null}
                     <div className={styles.galleryCounts} aria-live="polite">
