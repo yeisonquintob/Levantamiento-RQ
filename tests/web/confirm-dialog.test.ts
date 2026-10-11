@@ -15,9 +15,10 @@ function sources(dir: string): string[] {
 }
 
 test("ninguna pantalla usa el cuadro nativo window.confirm", () => {
-  const offenders = sources("apps/web/src").filter((file) =>
-    /window\.confirm\(/u.test(readFileSync(file, "utf8")),
-  );
+  // Solo el respaldo del propio diálogo (cuando no hay proveedor) puede llamar al cuadro nativo.
+  const offenders = sources("apps/web/src")
+    .filter((file) => !file.endsWith("app/confirm-dialog.tsx"))
+    .filter((file) => /window\.confirm\(/u.test(readFileSync(file, "utf8")));
   assert.deepEqual(offenders, []);
 });
 
@@ -40,5 +41,5 @@ test("las acciones destructivas piden un botón rojo con verbo propio, no «Cont
   assert.match(documents, /confirmLabel: "Eliminar definitivamente",\s+destructive: true/u);
   // Salir del editor con cambios sin guardar espera la respuesta antes de navegar.
   const editor = readFileSync("apps/web/src/app/workspace/documents/[documentId]/requirement-document-editor.tsx", "utf8");
-  assert.match(editor, /event\.preventDefault\(\);[\s\S]{0,800}router\.push\(destination\)/u);
+  assert.match(editor, /event\.preventDefault\(\);[\s\S]{0,800}window\.location\.assign\(destination\)/u);
 });

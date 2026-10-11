@@ -58,6 +58,7 @@ async function main() {
         requestingArea: projectRow.RequestingArea,
         description: projectRow.Description,
         status: projectRow.Status,
+        activityState: "ACTIVE" as const,
         ownerUserId: projectRow.OwnerUserId,
         template: null,
         participantCount: 0,

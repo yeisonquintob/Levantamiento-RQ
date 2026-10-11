@@ -1678,7 +1678,9 @@ test("navegación, guardado, concurrencia, bloqueo y confirmaciones están imple
     /const readOnly =[\s\S]*?\(version\.status !== "DRAFT" && version\.status !== "CHANGES_REQUESTED"\)/,
   );
   assert.match(editor, /La versión fue aprobada y quedó bloqueada\./);
-  assert.match(editor, /window\.confirm/);
+  // Las confirmaciones usan el diálogo propio de la app, no el cuadro nativo del navegador.
+  assert.match(editor, /await confirm\(\{/);
+  assert.doesNotMatch(editor, /window\.confirm/);
   assert.match(editor, /Motivo de la nueva versión/);
   assert.match(editor, /Confirmar nueva versión/);
   assert.match(editor, /Comparar versiones/);

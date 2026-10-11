@@ -56,7 +56,6 @@ import {
 } from "./document-section-presenter";
 import { useAutoDismiss } from "../../../use-auto-dismiss";
 import { AiEngineChips, useAiEngineSelection } from "../../ai-engine-selection";
-import { useRouter } from "next/navigation";
 import { useConfirm } from "../../../confirm-dialog";
 import { jsonEqual } from "./json-equal";
 
@@ -817,7 +816,6 @@ export function RequirementDocumentEditor({
   returnToAllProjects = false,
 }: RequirementDocumentEditorProps) {
   const confirm = useConfirm();
-  const router = useRouter();
   const selectedInitialVersion =
     initialVersion ?? initialDocument.currentVersionDetail;
   const [documentState, setDocumentState] = useState(initialDocument);
@@ -2426,7 +2424,7 @@ export function RequirementDocumentEditor({
                     confirmLabel: "Salir sin guardar",
                     destructive: true,
                   }).then((leave) => {
-                    if (leave) router.push(destination);
+                    if (leave) window.location.assign(destination);
                   });
                 }}
               >

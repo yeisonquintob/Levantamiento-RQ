@@ -18,3 +18,9 @@ test("los encabezados se balancean y las imágenes del prototipo declaran sus di
   assert.match(prototype, /height=\{image\.height \?\? undefined\}/u);
   assert.match(prototype, /width=\{selectedImage\.width \?\? undefined\}/u);
 });
+
+test("el catálogo de modelos no se desborda con identificadores largos", () => {
+  const css = readFileSync("libs/shared/ui/src/styles.css", "utf8");
+  assert.match(css, /\.rq-ai-providers-workspace \.rq-ai-cat > \* \{\n  min-width: 0;/u);
+  assert.match(css, /\.rq-ai-cat__model strong,\n\.rq-ai-providers-workspace \.rq-ai-cat__model small \{\n  overflow-wrap: anywhere;/u);
+});

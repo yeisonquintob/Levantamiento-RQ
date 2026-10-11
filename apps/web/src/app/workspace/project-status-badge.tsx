@@ -1,4 +1,5 @@
 import type { ProjectStatus } from "@levantamiento-rq/shared-contracts";
+import React from "react";
 import type { ReactElement, ReactNode } from "react";
 
 export type ProjectStatusTone =

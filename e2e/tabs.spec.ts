@@ -49,3 +49,17 @@ test.describe("Pestañas accesibles", () => {
     await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "ai-provider-tab-PROVIDERS");
   });
 });
+
+test.describe("Catálogo de modelos de IA", () => {
+  test("la lista de modelos no se desborda sobre el panel de detalle", async ({ page }) => {
+    requireCredentials();
+    await page.goto("/workspace/settings/ai-providers");
+    test.skip(!(await page.getByRole("tab", { name: /Por proveedor/u }).isVisible({ timeout: 6_000 }).catch(() => false)), "El usuario de prueba no accede a esta configuración.");
+    await page.getByRole("tab", { name: /Por proveedor/u }).click();
+    await page.getByRole("button", { name: /^Imágenes\s*\d/u }).first().click();
+    const models = page.locator(".rq-ai-cat__models");
+    await expect(models).toBeVisible();
+    const overflow = await models.evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
+  });
+});

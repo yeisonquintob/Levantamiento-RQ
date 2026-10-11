@@ -61,6 +61,10 @@ tmp/
 logs/
 .nx/cache/
 
+# Respaldos y reportes locales: pesan cientos de MB y no forman parte del código
+.rq-backups/
+.rq-reports/
+
 # Levantamiento RQ - infraestructura local
 infrastructure/docker/.env
 !infrastructure/docker/.env.example

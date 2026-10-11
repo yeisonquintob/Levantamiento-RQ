@@ -245,6 +245,7 @@ export function buildExportFixture(
     requestingArea: "Planeación comercial",
     description: "Fixture determinista sin consumo de API.",
     status: "VALIDATION",
+    activityState: "ACTIVE",
     template: null,
     ownerUserId: "20000000-0000-4000-8000-000000000002",
     participantCount: 0,

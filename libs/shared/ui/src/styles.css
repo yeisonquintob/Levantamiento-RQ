@@ -27856,6 +27856,24 @@ li[data-state="IN_PROGRESS"] > .rq-exec-node {
   text-wrap: balance;
 }
 
+/* RQ CATALOGO DE MODELOS SIN DESBORDE V1: un identificador largo (por ejemplo `llamacpp:<hash>`)
+   ensanchaba la columna de modelos y la lista se montaba sobre el panel de Detalle. Las columnas
+   de la rejilla y el texto de cada modelo pueden encogerse y el nombre se parte. */
+.rq-ai-providers-workspace .rq-ai-cat > * {
+  min-width: 0;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model {
+  min-width: 0;
+  max-width: 100%;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model > span {
+  min-width: 0;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model strong,
+.rq-ai-providers-workspace .rq-ai-cat__model small {
+  overflow-wrap: anywhere;
+}
+
 /* HOME_KPI_ICONS_V2: iconos de los indicadores en una ficha redondeada y con color;
    en el listado, la barra llega hasta el borde derecho del «% avance». */
 .rq-home-workspace > .rq-module-commandbar .rq-kpi__icon {

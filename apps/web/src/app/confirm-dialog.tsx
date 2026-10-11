@@ -1,6 +1,6 @@
 "use client";
 
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -110,10 +110,16 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** `await confirm(...)` devuelve true si la persona confirma. Requiere el proveedor del shell. */
+/**
+ * Sin proveedor (por ejemplo al renderizar un componente aislado en una prueba) se usa el cuadro
+ * nativo del navegador, de modo que ningún componente falla por no estar dentro del shell.
+ */
+const nativeConfirm: Confirm = async (options) => {
+  const message = typeof options === "string" ? options : options.message;
+  return typeof window !== "undefined" ? window.confirm(message) : false;
+};
+
+/** `await confirm(...)` devuelve true si la persona confirma. */
 export function useConfirm(): Confirm {
-  const confirm = useContext(ConfirmContext);
-  if (!confirm)
-    throw new Error("useConfirm debe usarse dentro de ConfirmDialogProvider.");
-  return confirm;
+  return useContext(ConfirmContext) ?? nativeConfirm;
 }
