@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 
@@ -36,6 +36,20 @@ import { loadOperationsAuthConfig } from "../../apps/operations-service/src/oper
 import { loadOperationsNotificationsConfig } from "../../apps/operations-service/src/operations/operations-notifications.config.js";
 import { loadOperationsProcessingConfig } from "../../apps/operations-service/src/operations/operations-processing.config.js";
 import { loadOperationsStorageConfig } from "../../apps/operations-service/src/operations/operations-storage.config.js";
+
+const OPERATIONS_SOURCE_DIRECTORY = "apps/operations-service/src/operations";
+
+async function readExportRendererSource(): Promise<string> {
+  const files = (await readdir(OPERATIONS_SOURCE_DIRECTORY))
+    .filter((file) => /^export-document\..+\.ts$/u.test(file))
+    .sort();
+  const sources = await Promise.all(
+    files.map((file) =>
+      readFile(`${OPERATIONS_SOURCE_DIRECTORY}/${file}`, "utf8"),
+    ),
+  );
+  return sources.join("\n");
+}
 
 test("el contrato define formatos y estados de exportación", () => {
   assert.deepEqual(EXPORT_FORMATS, ["PDF", "DOCX", "MARKDOWN"]);
@@ -969,10 +983,7 @@ test("la exportación separa AS-IS, TO-BE y modelo entidad-relación en el punto
   assert.ok(pageSizes.some((page) => page.width > page.height));
   assert.ok(pageSizes.some((page) => page.height > page.width));
 
-  const renderer = await readFile(
-    "apps/operations-service/src/operations/export-document.renderer.ts",
-    "utf8",
-  );
+  const renderer = await readExportRendererSource();
   assert.match(renderer, /HeadingLevel\.HEADING_2/);
   assert.match(renderer, /NAVI_DOCUMENT_COLORS\.operation/);
   assert.match(renderer, /NAVI_DOCUMENT_COLORS\.institutional/);
@@ -998,10 +1009,7 @@ test("DOCX inserta los flujos como imagen horizontal por carriles sin cambiar su
   const [pdf, docx, renderer] = await Promise.all([
     renderPdf(input),
     renderDocx(input),
-    readFile(
-      "apps/operations-service/src/operations/export-document.renderer.ts",
-      "utf8",
-    ),
+    readExportRendererSource(),
   ]);
   assert.equal(pdf.buffer.subarray(0, 5).toString("ascii"), "%PDF-");
   assert.equal(docx.buffer.subarray(0, 2).toString("ascii"), "PK");
@@ -1138,10 +1146,7 @@ test("PDF y DOCX se derivan del mismo orden funcional y exportar no ejecuta IA",
     "apps/operations-service/src/operations/export-processing.service.ts",
     "utf8",
   );
-  const renderer = await readFile(
-    "apps/operations-service/src/operations/export-document.renderer.ts",
-    "utf8",
-  );
+  const renderer = await readExportRendererSource();
   assert.doesNotMatch(
     processing + renderer,
     /OpenAiResponsesProvider|analysis-requests|provider\.generate/,
