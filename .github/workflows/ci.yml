@@ -32,12 +32,21 @@ jobs:
       - run: pnpm audit --prod --audit-level high
       - run: pnpm check:secrets
       - run: pnpm check:architecture
-      - run: pnpm lint:all
-      - run: pnpm typecheck:all
+      # Scripts y fixtures fuera de Nx: siempre se comprueban.
+      - run: pnpm exec tsc -p tsconfig.scripts.json --noEmit
+      # En un PR solo se valida lo afectado por el cambio (con caché de Nx); en main, todo.
+      - name: Lint, typecheck y build de los proyectos afectados
+        if: github.event_name == 'pull_request'
+        env:
+          NX_BASE: ${{ github.event.pull_request.base.sha }}
+          NX_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: pnpm ci:affected
+      - name: Lint, typecheck y build completos
+        if: github.event_name != 'pull_request'
+        run: pnpm lint:all && pnpm typecheck:all && pnpm build:all
       - run: pnpm test:unit
       - run: pnpm test:web
       - run: pnpm test:events
-      - run: pnpm build:all
       - run: git diff --check
 
   openapi:
