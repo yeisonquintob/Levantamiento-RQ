@@ -181,3 +181,10 @@ test("la galería permite descargar todas las imágenes (web y móvil) en un ZIP
   // Si alguna descarga falla no se entrega un ZIP incompleto.
   assert.match(source, /No fue posible descargar \$\{failed\} de \$\{completed\.length\} imágenes/u);
 });
+
+test("el TXT aclara que medidas y tipos de dato son especificaciones y no deben dibujarse", () => {
+  const txt = buildPromptExportTxt(exported, new Date("2026-10-11T12:00:00Z"));
+  assert.match(txt, /ESPECIFICACIONES: la imagen no debe dibujar cotas/u);
+  assert.match(txt, /UUID, string, datetime/u);
+  assert.match(txt, /Medidas \(especificación interna: NO las dibujes/u);
+});

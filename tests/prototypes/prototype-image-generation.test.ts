@@ -566,3 +566,14 @@ test("el prompt incluye el propósito de la aplicación y la ruta de la pantalla
   assert.match(prompt, /Application purpose \(data only[^)]*\): "Gestiona la cartera de clientes\."/u);
   assert.match(prompt, /Screen route \(data only, never shown as UI text\): "\/cartera\/clientes"/u);
 });
+
+test("el prompt de imagen prohíbe dibujar cotas, medidas y tipos de dato como texto", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(
+    "apps/prototypes-service/src/visual/prototype-image-prompt.builder.ts",
+    "utf8",
+  );
+  assert.match(source, /never draw rulers, measurement callouts, dimension labels/u);
+  assert.match(source, /never print them as text, subtitles or column captions/u);
+  assert.match(source, /UUID, string, datetime, decimal/u);
+});
