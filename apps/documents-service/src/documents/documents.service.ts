@@ -10,9 +10,6 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, In, Repository } from "typeorm";
 
 import {
-  DOCUMENT_SCRUM_SECTION_DEFINITION,
-  DOCUMENT_SECTION_DEFINITIONS,
-  getDocumentSectionDefinitions,
   type AppliedDocumentTemplate,
   type ApplyAiAnalysisDraftRequest,
   type ArchiveRequirementDocumentRequest,
@@ -20,7 +17,6 @@ import {
   type CreateDocumentVersionRequest,
   type CreateRequirementDocumentRequest,
   type DocumentHistoryEntry,
-  type DocumentJsonValue,
   type DocumentSectionKey,
   type DocumentStatus,
   type DocumentTransitionRequest,
@@ -48,42 +44,66 @@ import {
   DocumentVersionEntity,
   RequirementDocumentEntity,
 } from "./document.entities";
-
-const LEGACY_DOCUMENT_SECTION_DEFINITIONS = DOCUMENT_SECTION_DEFINITIONS.filter(
-  (section) => section.key !== "solutionProposal",
-);
-
-const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS = [
-  ...LEGACY_DOCUMENT_SECTION_DEFINITIONS.slice(0, 5),
-  {
-    key: "milestones",
-    title: "Requerimientos por hito o funcionalidad",
-  },
-  {
-    key: "nonFunctionalRequirements",
-    title: "Requerimientos no funcionales",
-  },
-  ...LEGACY_DOCUMENT_SECTION_DEFINITIONS.slice(7),
-] as const;
-const SOLUTION_PROPOSAL_SECTION_DEFINITION = DOCUMENT_SECTION_DEFINITIONS.find(
-  (section) => section.key === "solutionProposal",
-);
-if (!SOLUTION_PROPOSAL_SECTION_DEFINITION) {
-  throw new Error(
-    "La definición de la sección solutionProposal es obligatoria.",
-  );
-}
-const HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION = [
-  ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(0, 4),
-  SOLUTION_PROPOSAL_SECTION_DEFINITION,
-  ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS.slice(4),
-] as const;
+import {
+  approvalsForTransition,
+  headerForTransition,
+} from "./documents-approvals";
+import {
+  requireActive,
+  requireCurrent,
+  requireDraft,
+  requireEditable,
+  requireEdit,
+  requireReview,
+  stale,
+} from "./documents-guards";
+import { initialContent } from "./documents-initial-content";
+import {
+  hasPrototypeContent,
+  hasSolutionPrototypeMarkdown,
+  parseJson,
+  serialize,
+} from "./documents-json";
+import {
+  toDocumentSummary,
+  toHistoryEntry,
+  toVersionDetail,
+  templateWithoutDefinition,
+  versionSummary,
+} from "./documents-mappers";
+import {
+  appliedTemplateIncludesScrum,
+  assertCanonicalTemplate,
+  assertSectionsLayout,
+  customTemplateLayout,
+} from "./documents-template-layout";
+import {
+  buildCriterionRows,
+  buildEvidenceRows,
+  buildRequirementRows,
+  cloneSectionsForNewVersion,
+  prepareAiSections,
+} from "./documents-version-content";
+import {
+  lockEditableVersion,
+  touchDocument,
+  addHistory,
+} from "./documents-writes";
+import { synchronizePlanningSections } from "./documents-backlog-sync";
 import {
   type DocumentProjectAccess,
   DocumentsProjectsAccessClient,
 } from "./projects-access.client";
 import { DocumentsSourcesAccessClient } from "./sources-access.client";
-import { validateDocumentSectionContent } from "./documents-input";
+
+export {
+  hasPrototypeContent,
+  hasSolutionPrototypeMarkdown,
+} from "./documents-json";
+export {
+  synchronizeBacklogStructureWithRequirements,
+  synchronizeRequirementStoriesWithBacklog,
+} from "./documents-backlog-sync";
 
 export interface DocumentsActorContext {
   actor: AuthenticatedUser;
@@ -91,7 +111,6 @@ export interface DocumentsActorContext {
   correlationId: string;
 }
 
-const PENDING = "[PENDIENTE POR DEFINIR]";
 const SQL_SERVER_WRITE_BATCH_SIZE = 100;
 const SQL_SERVER_IN_BATCH_SIZE = 500;
 
@@ -110,751 +129,6 @@ async function deleteAcceptanceCriteriaInBatches(
       ),
     });
   }
-}
-
-/**
- * Guarda de tipo para objetos JSON. `Array.isArray` no descarta bien las
- * uniones con arreglos de solo lectura, así que el estrechamiento se declara.
- */
-function isJsonObject(
-  value: DocumentJsonValue | undefined,
-): value is { readonly [key: string]: DocumentJsonValue } {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function toIso(value: Date): string {
-  return value.toISOString();
-}
-
-function parseJson(value: string): DocumentJsonValue {
-  try {
-    return JSON.parse(value) as DocumentJsonValue;
-  } catch {
-    // Un JSON corrupto en BD no debe filtrarse como un 500 con SyntaxError.
-    throw new ConflictException(
-      "El documento contiene datos almacenados con formato JSON inválido.",
-    );
-  }
-}
-
-const PROTOTYPE_PLACEHOLDERS = [
-  "[pendiente por definir]",
-  "pendiente de definición",
-  "pendiente de definicion",
-];
-const PROTOTYPE_NOT_REQUESTED_PREFIX = "prototipo no solicitado en esta generación";
-
-function collectText(value: DocumentJsonValue, out: string[]): void {
-  if (typeof value === "string") out.push(value);
-  else if (Array.isArray(value)) value.forEach((item) => collectText(item, out));
-  else if (isJsonObject(value))
-    Object.values(value).forEach((item) => collectText(item, out));
-}
-
-/** Un prototipo existe solo si hay texto real en visualFormat o en solutionProposal.prototypeMarkdown. */
-export function hasPrototypeContent(content: DocumentJsonValue): boolean {
-  const texts: string[] = [];
-  collectText(content, texts);
-  return texts.some((text) => {
-    const normalized = text.trim().toLowerCase();
-    return (
-      normalized.length > 0 &&
-      !PROTOTYPE_PLACEHOLDERS.includes(normalized) &&
-      !normalized.startsWith(PROTOTYPE_NOT_REQUESTED_PREFIX)
-    );
-  });
-}
-
-/** Compatibilidad con versiones históricas: el prototipo quedó en solutionProposal.prototypeMarkdown. */
-export function hasSolutionPrototypeMarkdown(
-  content: DocumentJsonValue,
-): boolean {
-  return (
-    isJsonObject(content) &&
-    typeof content["prototypeMarkdown"] === "string" &&
-    hasPrototypeContent(content["prototypeMarkdown"])
-  );
-}
-
-function serialize(value: DocumentJsonValue): string {
-  return JSON.stringify(value);
-}
-
-function appliedTemplateIncludesScrum(
-  template: AppliedDocumentTemplateEntity,
-): boolean {
-  const definition = parseJson(template.definitionJson);
-  if (
-    !definition ||
-    typeof definition !== "object" ||
-    Array.isArray(definition)
-  ) {
-    return false;
-  }
-  const scrum = (definition as Readonly<Record<string, DocumentJsonValue>>)
-    .scrum;
-  return Boolean(
-    scrum &&
-    typeof scrum === "object" &&
-    !Array.isArray(scrum) &&
-    (scrum as Readonly<Record<string, DocumentJsonValue>>).enabled === true,
-  );
-}
-
-/**
- * Devuelve la estructura de una plantilla propia (dinámica) o `null` cuando la
- * plantilla aplicada es canónica (o su definición no es interpretable), caso en
- * el que rige el layout canónico/histórico de siempre.
- */
-function customTemplateLayout(
-  template: AppliedDocumentTemplateEntity | null | undefined,
-): ResolvedTemplateLayout["sections"] | null {
-  if (!template) return null;
-  try {
-    const layout = resolveTemplateLayout(
-      parseJson(template.definitionJson),
-      appliedTemplateIncludesScrum(template),
-    );
-    return layout.custom ? layout.sections : null;
-  } catch (error) {
-    if (error instanceof ConflictException) return null;
-    throw error;
-  }
-}
-
-function templateWithoutDefinition(
-  template: AppliedDocumentTemplateEntity,
-): Omit<AppliedDocumentTemplate, "definition"> {
-  return {
-    id: template.id,
-    sourceTemplateId: template.sourceTemplateId,
-    code: template.code,
-    name: template.name,
-    version: template.version,
-    templateType: template.templateType,
-    includesScrum: appliedTemplateIncludesScrum(template),
-    appliedAt: toIso(template.appliedAt),
-  };
-}
-
-function versionSummary(
-  version: DocumentVersionEntity,
-): DocumentVersionSummary {
-  return {
-    id: version.id,
-    versionNumber: version.versionNumber,
-    version: version.version,
-    status: version.status,
-    revision: version.revision,
-    changeSummary: version.changeSummary,
-    createdByUserId: version.createdByUserId,
-    createdAt: toIso(version.createdAt),
-    updatedAt: toIso(version.updatedAt),
-    approvedByUserId: version.approvedByUserId,
-    approvedAt: version.approvedAt ? toIso(version.approvedAt) : null,
-  };
-}
-
-interface ResolvedTemplateLayout {
-  readonly sections: readonly { readonly key: string; readonly title: string }[];
-  /** `true` cuando la plantilla es propia (estructura dinámica) y no canónica. */
-  readonly custom: boolean;
-}
-
-function assertCanonicalTemplate(
-  definition: DocumentJsonValue,
-  includesScrum: boolean,
-): readonly { readonly key: string; readonly title: string }[] {
-  return resolveTemplateLayout(definition, includesScrum).sections;
-}
-
-function resolveTemplateLayout(
-  definition: DocumentJsonValue,
-  includesScrum: boolean,
-): ResolvedTemplateLayout {
-  if (
-    !definition ||
-    typeof definition !== "object" ||
-    Array.isArray(definition)
-  ) {
-    throw new ConflictException(
-      "La plantilla aplicada no contiene una definición válida.",
-    );
-  }
-
-  const record = definition as Readonly<Record<string, DocumentJsonValue>>;
-  const order = record.sectionOrder;
-  const sections = record.sections;
-  const expected = getDocumentSectionDefinitions(includesScrum);
-  const legacyBaseExpected = LEGACY_DOCUMENT_SECTION_DEFINITIONS;
-  const legacyExpected = includesScrum
-    ? [...legacyBaseExpected, DOCUMENT_SCRUM_SECTION_DEFINITION]
-    : legacyBaseExpected;
-  const historicalExpected = includesScrum
-    ? [
-        ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS,
-        DOCUMENT_SCRUM_SECTION_DEFINITION,
-      ]
-    : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS;
-  const historicalWithSolutionExpected = includesScrum
-    ? [
-        ...HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION,
-        DOCUMENT_SCRUM_SECTION_DEFINITION,
-      ]
-    : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION;
-
-  if (!Array.isArray(order) || !Array.isArray(sections)) {
-    throw new ConflictException(
-      "La plantilla aplicada no contiene un orden de secciones válido.",
-    );
-  }
-
-  const compatibleDefinitions = [
-    expected,
-    legacyExpected,
-    historicalExpected,
-    historicalWithSolutionExpected,
-  ];
-  const definitionExpected = compatibleDefinitions.find(
-    (candidate) =>
-      sections.length === candidate.length &&
-      order.length === candidate.length &&
-      candidate.every((expectedSection, index) => {
-        const rawSection = sections[index];
-        if (
-          order[index] !== expectedSection.key ||
-          !rawSection ||
-          typeof rawSection !== "object" ||
-          Array.isArray(rawSection)
-        ) {
-          return false;
-        }
-        const section = rawSection as Readonly<
-          Record<string, DocumentJsonValue>
-        >;
-        /*
-         * La clave y sectionOrder protegen la estructura. El título y el
-         * número visual de plantillas publicadas antiguas se normalizan con
-         * `expected` al crear el documento, en lugar de bloquear el proceso.
-         */
-        return section.key === expectedSection.key;
-      }),
-  );
-
-  if (!definitionExpected) {
-    if (
-      sections.length < 1 ||
-      sections.length > 50 ||
-      order.length !== sections.length
-    ) {
-      throw new ConflictException(
-        "Cantidad de secciones de plantilla inválida.",
-      );
-    }
-    const scrum = record.scrum;
-    if (!isJsonObject(scrum) || scrum.enabled !== includesScrum) {
-      throw new ConflictException(
-        "Configuración Scrum inconsistente en la plantilla.",
-      );
-    }
-    const keys = new Set<string>();
-    const customSections = sections.map((raw, index) => {
-      if (
-        !raw ||
-        typeof raw !== "object" ||
-        Array.isArray(raw) ||
-        typeof raw.key !== "string" ||
-        !/^[a-z][a-zA-Z0-9]{2,63}$/.test(raw.key) ||
-        keys.has(raw.key) ||
-        raw.order !== index + 1 ||
-        order[index] !== raw.key ||
-        typeof raw.title !== "string" ||
-        !raw.title.trim() ||
-        typeof raw.required !== "boolean" ||
-        typeof raw.guidance !== "string"
-      ) {
-        throw new ConflictException(
-          "Estructura dinámica de plantilla inválida.",
-        );
-      }
-      keys.add(raw.key);
-      return { key: raw.key, title: raw.title.trim() };
-    });
-    return { sections: customSections, custom: true };
-  }
-
-  if (includesScrum) {
-    const rawScrum = sections.at(-1);
-    if (
-      !rawScrum ||
-      typeof rawScrum !== "object" ||
-      Array.isArray(rawScrum) ||
-      order.at(-1) !== DOCUMENT_SCRUM_SECTION_DEFINITION.key
-    ) {
-      throw new ConflictException(
-        "La plantilla Scrum no conserva el punto 15 esperado.",
-      );
-    }
-    const scrum = rawScrum as Readonly<Record<string, DocumentJsonValue>>;
-    if (
-      scrum.key !== DOCUMENT_SCRUM_SECTION_DEFINITION.key ||
-      scrum.title !== DOCUMENT_SCRUM_SECTION_DEFINITION.title
-    ) {
-      throw new ConflictException(
-        "La plantilla Scrum modifica el punto 15 canónico.",
-      );
-    }
-  }
-
-  return { sections: expected, custom: false };
-}
-
-function initialContent(
-  key: string,
-  project: DocumentProjectAccess["project"],
-  actor: AuthenticatedUser,
-  version: string,
-  now: Date,
-): DocumentJsonValue {
-  switch (key) {
-    case "header":
-      return {
-        title: project.title,
-        projectCode: project.code,
-        documentVersion: version,
-        createdDate: now.toISOString().slice(0, 10),
-        requestingArea: project.requestingArea,
-        status: "BORRADOR",
-      };
-    case "objectives":
-      return {
-        general: PENDING,
-        qualitative: [PENDING],
-        quantitative: [PENDING],
-      };
-    case "problemDescription":
-      return { currentState: PENDING, operationalImpact: [PENDING] };
-    case "scope":
-      return {
-        included: [PENDING],
-        excluded: [PENDING],
-        involvedSystems: [PENDING],
-        kpis: Array.from({ length: 3 }, () => ({
-          name: PENDING,
-          relatedObjective: PENDING,
-          measurement: PENDING,
-          target: PENDING,
-        })),
-      };
-    case "solutionProposal":
-      return {
-        objective: PENDING,
-        description: PENDING,
-        involvedElements: [PENDING],
-        flowAlignment: {
-          currentState: PENDING,
-          evaluation: PENDING,
-          expectedResult: PENDING,
-        },
-      };
-    case "processFlow":
-      return {
-        notation: "PENDING",
-        content: PENDING,
-        actors: [PENDING],
-        inputs: [PENDING],
-        outputs: [PENDING],
-        systems: [PENDING],
-      };
-    case "milestones":
-      return {
-        functionalRequirements: [],
-        nonFunctionalRequirements: [],
-      };
-    case "backlogStructure":
-      return { epics: [] };
-    case "nonFunctionalRequirements":
-      return {
-        security: [PENDING],
-        traceability: [PENDING],
-        performance: [PENDING],
-        compatibility: [PENDING],
-        availability: [PENDING],
-        usability: [PENDING],
-      };
-    case "tests":
-      return { objective: PENDING, minimumScenarios: [PENDING] };
-    case "assumptionsDependenciesPending":
-      return {
-        assumptions: [PENDING],
-        dependencies: [PENDING],
-        pendingItems: [PENDING],
-      };
-    case "approvalsAndChangeControl":
-      return {
-        approvals: [
-          {
-            name: actor.displayName,
-            position: "Responsable del documento",
-            responsibility: "Elaboración",
-            approvalMoment: "Al elaborar la versión documental",
-            status: "REGISTRADO",
-          },
-          {
-            name: PENDING,
-            position: "Líder del responsable",
-            responsibility: "Revisión",
-            approvalMoment: "Durante la validación del documento",
-            status: "PENDIENTE",
-          },
-          {
-            name: PENDING,
-            position: "Solicitante o líder de la persona solicitante",
-            responsibility: "Aprobación",
-            approvalMoment: "Al finalizar la revisión",
-            status: "PENDIENTE",
-          },
-        ],
-        changeControl: [],
-      };
-    case "writingRules":
-    case "visualFormat":
-    case "automationInstruction":
-      return PENDING;
-    case "scrumPlan":
-      return {
-        cadenceDays: 15,
-        scheduleBasis: "RELATIVE_DAY",
-        note: "Propuesta inicial sujeta a validación y estimación del equipo Scrum.",
-        sprints: [],
-      };
-    default:
-      return PENDING;
-  }
-}
-
-function requireEdit(access: DocumentProjectAccess): void {
-  if (!access.canEdit) {
-    throw new ForbiddenException(
-      "No tienes autorización para editar documentos de este proyecto.",
-    );
-  }
-}
-
-function requireReview(access: DocumentProjectAccess): void {
-  if (!access.canReview) {
-    throw new ForbiddenException(
-      "No tienes autorización para revisar o aprobar este documento.",
-    );
-  }
-}
-
-function documentRecord(
-  value: DocumentJsonValue | undefined,
-): Readonly<Record<string, DocumentJsonValue>> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Readonly<Record<string, DocumentJsonValue>>;
-}
-
-function documentRecords(value: DocumentJsonValue | undefined) {
-  return Array.isArray(value)
-    ? value
-        .map((item) => documentRecord(item))
-        .filter(
-          (item): item is Readonly<Record<string, DocumentJsonValue>> =>
-            item !== null,
-        )
-    : [];
-}
-
-/*
- * POINT_6_7_INDEPENDENT_BACKEND
- *
- * Los documentos 4.1.0 se reconocen por HU-P/functionalRequirementCodes.
- * En ese modelo no existe sincronización automática entre Punto 6 y Punto 7.
- * Los documentos legacy 4.0.0 siguen usando las funciones de proyección de
- * abajo para mantener compatibilidad histórica.
- */
-function isIndependentPlanningBacklog(content: DocumentJsonValue): boolean {
-  const backlog = documentRecord(content);
-  if (!backlog) return false;
-  return documentRecords(backlog.epics).some((epic) =>
-    documentRecords(epic.features).some((feature) =>
-      documentRecords(feature.userStories).some((story) => {
-        const code = String(story.code ?? "")
-          .trim()
-          .toUpperCase();
-        return (
-          code.startsWith("HU-P-") ||
-          Array.isArray(story.functionalRequirementCodes)
-        );
-      }),
-    ),
-  );
-}
-
-/*
- * PUNTO_7_REQUIREMENTS_SYNCHRONIZATION
- *
- * Punto 7 es la fuente canónica de:
- * - Epic
- * - Feature
- * - código HU
- * - título HU
- * - descripción estructural HU
- * - Tasks
- *
- * Punto 6 conserva la propiedad del detalle funcional.
- *
- * Esta proyección mantiene las dos secciones consistentes
- * incluso para exportación, API y consumidores que no usan
- * la composición visual del frontend.
- */
-export function synchronizeBacklogStructureWithRequirements(
-  backlogContent: DocumentJsonValue,
-  requirementsContent: DocumentJsonValue,
-): DocumentJsonValue {
-  const backlog = documentRecord(backlogContent);
-
-  const requirements = documentRecord(requirementsContent);
-
-  if (!backlog || !requirements) {
-    return requirementsContent;
-  }
-
-  if (isIndependentPlanningBacklog(backlogContent)) {
-    return requirementsContent;
-  }
-
-  const existingStories = documentRecords(requirements.functionalRequirements);
-
-  const existingByCode = new Map(
-    existingStories
-      .map((story) => [String(story.code ?? "").toUpperCase(), story] as const)
-      .filter(([code]) => Boolean(code)),
-  );
-
-  const functionalRequirements = documentRecords(backlog.epics).flatMap(
-    (epic) =>
-      documentRecords(epic.features).flatMap((feature) =>
-        documentRecords(feature.userStories).map((story) => {
-          const code = String(story.code ?? "").toUpperCase();
-
-          const existing = existingByCode.get(code);
-
-          const next: Record<string, DocumentJsonValue> = {
-            /*
-             * Para nuevas HU usamos como base
-             * el backlog. Para HU existentes,
-             * preservamos primero el contenido
-             * funcional humano del Punto 6.
-             */
-            ...story,
-            ...(existing ?? {}),
-
-            /*
-             * Luego imponemos los campos cuya
-             * propiedad corresponde al Punto 7.
-             */
-            code: story.code ?? "",
-            title: story.title ?? PENDING,
-            description: story.description ?? PENDING,
-
-            requirementType: "USER_STORY",
-
-            epicCode: epic.code ?? "",
-            epicTitle: epic.title ?? PENDING,
-
-            featureCode: feature.code ?? "",
-            featureTitle: feature.title ?? PENDING,
-
-            /*
-             * HITO != FEATURE.
-             *
-             * Punto 7 conserva la estructura del proyecto,
-             * pero no puede sobrescribir la clasificación
-             * funcional por Hitos del Punto 6.
-             */
-            milestone: existing?.milestone ?? null,
-
-            functionality: existing?.functionality ?? null,
-
-            milestoneDescription: existing?.milestoneDescription ?? null,
-          };
-
-          /*
-           * category / measure / target son
-           * exclusivos de RNF.
-           */
-          delete next.category;
-          delete next.measure;
-          delete next.target;
-
-          return next;
-        }),
-      ),
-  );
-
-  return {
-    ...requirements,
-
-    functionalRequirements,
-
-    nonFunctionalRequirements: requirements.nonFunctionalRequirements ?? [],
-  };
-}
-
-/*
- * PUNTO_6_BACKLOG_SYNCHRONIZATION
- *
- * Punto 7 conserva la propiedad de la estructura:
- * Epic -> Feature -> HU -> Task.
- *
- * Punto 6 puede modificar exclusivamente el detalle de
- * negocio de una HU.
- */
-export function synchronizeRequirementStoriesWithBacklog(
-  requirementsContent: DocumentJsonValue,
-  backlogContent: DocumentJsonValue,
-): DocumentJsonValue {
-  const requirements = documentRecord(requirementsContent);
-
-  const backlog = documentRecord(backlogContent);
-
-  if (!requirements || !backlog) {
-    return backlogContent;
-  }
-
-  if (isIndependentPlanningBacklog(backlogContent)) {
-    return backlogContent;
-  }
-
-  const functionalStories = documentRecords(
-    requirements.functionalRequirements,
-  ).filter(
-    (story) =>
-      typeof story.code === "string" &&
-      typeof story.role === "string" &&
-      typeof story.want === "string" &&
-      typeof story.benefit === "string",
-  );
-
-  if (functionalStories.length === 0) {
-    return backlogContent;
-  }
-
-  const replacements = new Map(
-    functionalStories.map((story) => [String(story.code).toUpperCase(), story]),
-  );
-
-  const synchronizedCodes = new Set<string>();
-
-  /*
-   * Solo estos campos pueden sincronizarse desde Punto 6.
-   *
-   * No se copian:
-   * - Epic
-   * - Feature
-   * - código HU
-   * - tareas
-   * - dependencias
-   */
-  const editableKeys = [
-    /*
-     * Punto 6 define funcionalmente la HU.
-     * La jerarquía y el código siguen protegidos.
-     */
-    "title",
-    "description",
-    "role",
-    "want",
-    "benefit",
-    "context",
-    "premises",
-    "impactedSystems",
-    "fields",
-    "acceptanceCriteria",
-  ] as const;
-
-  const epics = documentRecords(backlog.epics).map((epic) => ({
-    ...epic,
-
-    features: documentRecords(epic.features).map((feature) => {
-      const featureCode = String(feature.code ?? "");
-
-      return {
-        ...feature,
-
-        userStories: documentRecords(feature.userStories).map((story) => {
-          const code = String(story.code ?? "").toUpperCase();
-
-          const replacement = replacements.get(code);
-
-          if (!replacement) {
-            return story;
-          }
-
-          const requestedFeatureCode = String(
-            replacement.featureCode ?? featureCode,
-          );
-
-          if (requestedFeatureCode !== featureCode) {
-            throw new ConflictException(
-              `${code} pertenece a ${featureCode}. ` +
-                "Cambia la jerarquía desde el " +
-                "punto 7 · Esquema.",
-            );
-          }
-
-          synchronizedCodes.add(code);
-
-          const next: Record<string, DocumentJsonValue> = { ...story };
-
-          for (const key of editableKeys) {
-            if (replacement[key] !== undefined) {
-              next[key] = replacement[key];
-            }
-          }
-
-          /*
-           * story.tasks permanece intacto porque
-           * partimos de ...story.
-           */
-          return next;
-        }),
-      };
-    }),
-  }));
-
-  /*
-   * Punto 6 no puede crear una HU que no exista
-   * estructuralmente en Punto 7.
-   */
-  for (const code of replacements.keys()) {
-    if (!synchronizedCodes.has(code)) {
-      throw new ConflictException(
-        `${code} no existe en el punto 7 · Esquema. ` +
-          "Crea o reorganiza la HU desde el esquema " +
-          "antes de editarla en Requerimientos.",
-      );
-    }
-  }
-
-  const synchronized = {
-    ...backlog,
-    epics,
-  } as DocumentJsonValue;
-
-  /*
-   * La sincronización pasa por la misma validación
-   * estructural del editor del Punto 7.
-   */
-  validateDocumentSectionContent("backlogStructure", synchronized);
-
-  return synchronized;
 }
 
 @Injectable()
@@ -1001,7 +275,7 @@ export class DocumentsService {
           templateControlled: false,
         })),
       );
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId,
         eventType: "DOCUMENT_CREATED",
@@ -1122,7 +396,7 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
     if (version.status !== "DRAFT") {
       throw new ConflictException(
@@ -1142,8 +416,9 @@ export class DocumentsService {
         where: { id: documentId },
         lock: { mode: "pessimistic_write" },
       });
-      if (!lockedDocument) throw new NotFoundException("El documento no existe.");
-      this.requireActive(lockedDocument);
+      if (!lockedDocument)
+        throw new NotFoundException("El documento no existe.");
+      requireActive(lockedDocument);
       const lockedVersion = await manager.findOne(DocumentVersionEntity, {
         where: { id: version.id },
         lock: { mode: "pessimistic_write" },
@@ -1194,7 +469,7 @@ export class DocumentsService {
           updatedAt: now,
         });
       }
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId: null,
         eventType: "DOCUMENT_DRAFT_DELETED",
@@ -1214,7 +489,7 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     const now = new Date();
     // Actualización e historial en una sola transacción: no queda un cambio
     // de título sin su evento de auditoría.
@@ -1235,9 +510,9 @@ export class DocumentsService {
         .andWhere("Status <> :archived", { archived: "ARCHIVED" })
         .execute();
 
-      if (result.affected !== 1) this.stale();
+      if (result.affected !== 1) stale();
 
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId: null,
         eventType: "DOCUMENT_METADATA_UPDATED",
@@ -1257,7 +532,7 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     if (request.idempotencyKey) {
       const existing = await this.versions.findOneBy({
         documentId,
@@ -1334,7 +609,7 @@ export class DocumentsService {
         .andWhere("Status <> :archived", { archived: "ARCHIVED" })
         .execute();
 
-      if (updated.affected !== 1) this.stale();
+      if (updated.affected !== 1) stale();
 
       await manager.save(
         manager.create(DocumentVersionEntity, {
@@ -1357,91 +632,16 @@ export class DocumentsService {
         }),
       );
 
-      const sectionIds = new Map<string, string>();
-      const clonedSections = sourceSections.map((section) => {
-        const id = randomUUID();
-        sectionIds.set(section.key, id);
-        const content = parseJson(section.contentJson);
-        const updatedContent =
-          section.key === "header"
-            ? this.headerForNewVersion(content, nextVersion)
-            : section.key === "approvalsAndChangeControl"
-              ? this.approvalsForNewVersion(content, context.actor)
-              : content;
-        return {
-          id,
-          documentVersionId: versionId,
-          key: section.key,
-          title: section.title,
-          orderIndex: section.orderIndex,
-          contentJson: serialize(updatedContent),
-          templateControlled: section.templateControlled,
-        };
+      const { clonedSections, sectionCount } = cloneSectionsForNewVersion({
+        sourceSections,
+        versionId,
+        nextVersion,
+        actor: context.actor,
+        project: access.project,
+        now,
+        isCustomTemplate,
+        includesScrum,
       });
-
-      if (
-        !isCustomTemplate &&
-        !sourceSections.some((section) => section.key === "solutionProposal")
-      ) {
-        const processFlowOrder =
-          sourceSections.find((section) => section.key === "processFlow")
-            ?.orderIndex ?? 5;
-        for (const section of clonedSections) {
-          if (section.orderIndex >= processFlowOrder) section.orderIndex += 1;
-        }
-        const id = randomUUID();
-        sectionIds.set("solutionProposal", id);
-        clonedSections.push({
-          id,
-          documentVersionId: versionId,
-          key: "solutionProposal",
-          title: "Solución propuesta del profesional de soluciones",
-          orderIndex: processFlowOrder,
-          contentJson: serialize(
-            initialContent(
-              "solutionProposal",
-              access.project,
-              context.actor,
-              nextVersion,
-              now,
-            ),
-          ),
-          templateControlled: false,
-        });
-        clonedSections.sort(
-          (left, right) => left.orderIndex - right.orderIndex,
-        );
-      }
-
-      if (
-        includesScrum &&
-        !isCustomTemplate &&
-        !sourceSections.some(
-          (section) => section.key === DOCUMENT_SCRUM_SECTION_DEFINITION.key,
-        )
-      ) {
-        const id = randomUUID();
-        sectionIds.set(DOCUMENT_SCRUM_SECTION_DEFINITION.key, id);
-        clonedSections.push({
-          id,
-          documentVersionId: versionId,
-          key: DOCUMENT_SCRUM_SECTION_DEFINITION.key,
-          title: DOCUMENT_SCRUM_SECTION_DEFINITION.title,
-          orderIndex:
-            Math.max(...clonedSections.map((section) => section.orderIndex)) +
-            1,
-          contentJson: serialize(
-            initialContent(
-              DOCUMENT_SCRUM_SECTION_DEFINITION.key,
-              access.project,
-              context.actor,
-              nextVersion,
-              now,
-            ),
-          ),
-          templateControlled: false,
-        });
-      }
 
       // DOCUMENT_VERSION_CLONE_SQL_CHUNK_V1_2
       // SQL Server admite como máximo 2.100 parámetros por solicitud.
@@ -1507,7 +707,7 @@ export class DocumentsService {
         })),
         { chunk: 100 },
       );
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId,
         eventType: "VERSION_CREATED",
@@ -1516,7 +716,7 @@ export class DocumentsService {
           fromVersion: sourceVersion.version,
           version: nextVersion,
           changeSummary: request.changeSummary,
-          sections: sectionIds.size,
+          sections: sectionCount,
         },
         now,
       });
@@ -1540,10 +740,10 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
-    this.requireCurrent(document, version);
-    const editableStatus = this.requireEditable(version);
+    requireCurrent(document, version);
+    const editableStatus = requireEditable(version);
     const section = await this.sections.findOneBy({
       documentVersionId: version.id,
       key: sectionKey,
@@ -1553,7 +753,7 @@ export class DocumentsService {
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
-      await this.lockEditableVersion(
+      await lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
@@ -1565,21 +765,21 @@ export class DocumentsService {
         contentJson: serialize(request.content),
       });
 
-      await this.synchronizePlanningSections(
+      await synchronizePlanningSections(
         manager,
         version.id,
         sectionKey,
         request.content,
       );
 
-      await this.touchDocument(
+      await touchDocument(
         manager,
         document,
         context.actor.id,
         now,
         editableStatus,
       );
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId: version.id,
         eventType: "SECTION_UPDATED",
@@ -1603,10 +803,10 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
-    this.requireCurrent(document, version);
-    const editableStatus = this.requireEditable(version);
+    requireCurrent(document, version);
+    const editableStatus = requireEditable(version);
 
     const sourceIds = [
       ...new Set(request.evidence.map((item) => item.sourceId)),
@@ -1624,7 +824,7 @@ export class DocumentsService {
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
-      await this.lockEditableVersion(
+      await lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
@@ -1667,61 +867,34 @@ export class DocumentsService {
         { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
 
-      const clientRequirementIds = new Map<string, string>();
-      const requirementRows = request.requirements.map((requirement) => {
-        const id = randomUUID();
-        if (requirement.clientId)
-          clientRequirementIds.set(requirement.clientId, id);
-        return {
-          id,
-          documentVersionId: version.id,
-          sectionKey: requirement.sectionKey,
-          code: requirement.code,
-          title: requirement.title,
-          description: requirement.description,
-          requirementType: requirement.requirementType,
-          status: requirement.status,
-          orderIndex: requirement.order,
-        };
-      });
+      const { requirementRows, clientRequirementIds } = buildRequirementRows(
+        request.requirements,
+        version.id,
+      );
       await manager.save(DocumentRequirementEntity, requirementRows, {
         chunk: SQL_SERVER_WRITE_BATCH_SIZE,
       });
 
-      const criterionRows = request.requirements.flatMap((requirement, index) =>
-        requirement.acceptanceCriteria.map((criterion) => ({
-          id: randomUUID(),
-          requirementId: requirementRows[index]?.id as string,
-          description: criterion.description,
-          orderIndex: criterion.order,
-        })),
+      const criterionRows = buildCriterionRows(
+        request.requirements,
+        requirementRows,
       );
       await manager.save(AcceptanceCriterionEntity, criterionRows, {
         chunk: SQL_SERVER_WRITE_BATCH_SIZE,
       });
       await manager.save(
         DocumentEvidenceEntity,
-        request.evidence.map((item) => ({
-          id: randomUUID(),
-          documentVersionId: version.id,
-          sourceId: item.sourceId,
-          sectionKey: item.sectionKey ?? null,
-          requirementId: item.requirementClientId
-            ? (clientRequirementIds.get(item.requirementClientId) as string)
-            : null,
-          excerpt: item.excerpt ?? null,
-          note: item.note ?? null,
-        })),
+        buildEvidenceRows(request.evidence, version.id, clientRequirementIds),
         { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
-      await this.touchDocument(
+      await touchDocument(
         manager,
         document,
         context.actor.id,
         now,
         editableStatus,
       );
-      await this.addHistory(manager, {
+      await addHistory(manager, {
         documentId,
         versionId: version.id,
         eventType: "STRUCTURED_CONTENT_REPLACED",
@@ -1753,18 +926,16 @@ export class DocumentsService {
     // carga de trabajo del servicio de IA (rol SERVICE, nunca un usuario): aplica
     // el borrador de una solicitud cuya autorización ya se validó al crearla, y
     // así funciona igual en todos los proyectos.
-    if (
-      !(
-        access.role === "SERVICE" &&
-        context.actor.permissions.includes("documents.ai.apply")
-      )
-    ) {
+    if (!(
+      access.role === "SERVICE" &&
+      context.actor.permissions.includes("documents.ai.apply")
+    )) {
       requireEdit(access);
     }
-    this.requireActive(document);
+    requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
-    this.requireCurrent(document, version);
-    this.requireDraft(version);
+    requireCurrent(document, version);
+    requireDraft(version);
 
     const alreadyApplied = await this.appliedAiResults.findOneBy({
       analysisResultId: request.analysisResultId,
@@ -1803,7 +974,7 @@ export class DocumentsService {
 
     const now = new Date();
     await this.dataSource.transaction(async (manager) => {
-      await this.lockEditableVersion(
+      await lockEditableVersion(
         manager,
         version,
         request.expectedRevision,
@@ -1816,62 +987,7 @@ export class DocumentsService {
         where: { documentVersionId: version.id },
         order: { orderIndex: "ASC" },
       });
-      const sectionsByKey = new Map(
-        sectionRows.map((section) => [section.key, section]),
-      );
-      const allSectionKeys = sectionRows.map((section) => section.key);
-      const legacyAiSectionKeys = sectionRows
-        .filter(
-          (section) =>
-            !["writingRules", "visualFormat", "automationInstruction"].includes(
-              section.key,
-            ),
-        )
-        .map((section) => section.key);
-      const requestedSectionKeys = request.sections.map(
-        (section) => section.key,
-      );
-      const matches = (expected: readonly string[]) =>
-        requestedSectionKeys.length === expected.length &&
-        requestedSectionKeys.every((key, index) => key === expected[index]);
-      if (
-        new Set(requestedSectionKeys).size !== requestedSectionKeys.length ||
-        (!matches(allSectionKeys) && !matches(legacyAiSectionKeys))
-      ) {
-        throw new ConflictException(
-          "El borrador debe contener las secciones del documento en su orden real.",
-        );
-      }
-      for (const reference of [...request.requirements, ...request.evidence]) {
-        if (
-          reference.sectionKey != null &&
-          !sectionsByKey.has(reference.sectionKey)
-        ) {
-          throw new ConflictException(
-            "La trazabilidad referencia una sección ajena al documento.",
-          );
-        }
-      }
-      // Se valida todo el contenido antes de escribir la primera sección.
-      const preparedSections = request.sections.map((sectionInput) => {
-        const section = sectionsByKey.get(sectionInput.key);
-        if (!section) {
-          throw new ConflictException(
-            "El borrador de IA no coincide con las secciones del documento.",
-          );
-        }
-        const content = this.contentFromAi(
-          sectionInput.key,
-          parseJson(section.contentJson),
-          sectionInput.content,
-        );
-        // Mismo esquema que exige el editor manual (updateSection).
-        validateDocumentSectionContent(
-          sectionInput.key as DocumentSectionKey,
-          content,
-        );
-        return { section, key: sectionInput.key, content };
-      });
+      const preparedSections = prepareAiSections(sectionRows, request);
       for (const prepared of preparedSections) {
         await manager.update(DocumentSectionEntity, prepared.section.id, {
           contentJson: serialize(prepared.content),
@@ -1879,7 +995,7 @@ export class DocumentsService {
       }
       // Punto 6 / Punto 7 en la misma transacción, como en updateSection.
       for (const prepared of preparedSections) {
-        await this.synchronizePlanningSections(
+        await synchronizePlanningSections(
           manager,
           version.id,
           prepared.key,
@@ -1904,51 +1020,21 @@ export class DocumentsService {
         documentVersionId: version.id,
       });
 
-      const clientRequirementIds = new Map<string, string>();
-      const requirementRows = request.requirements.map((requirement) => {
-        const id = randomUUID();
-        if (requirement.clientId)
-          clientRequirementIds.set(requirement.clientId, id);
-        return {
-          id,
-          documentVersionId: version.id,
-          sectionKey: requirement.sectionKey,
-          code: requirement.code,
-          title: requirement.title,
-          description: requirement.description,
-          requirementType: requirement.requirementType,
-          status: requirement.status,
-          orderIndex: requirement.order,
-        };
-      });
+      const { requirementRows, clientRequirementIds } = buildRequirementRows(
+        request.requirements,
+        version.id,
+      );
       await manager.save(DocumentRequirementEntity, requirementRows, {
         chunk: SQL_SERVER_WRITE_BATCH_SIZE,
       });
       await manager.save(
         AcceptanceCriterionEntity,
-        request.requirements.flatMap((requirement, index) =>
-          requirement.acceptanceCriteria.map((criterion) => ({
-            id: randomUUID(),
-            requirementId: requirementRows[index]?.id as string,
-            description: criterion.description,
-            orderIndex: criterion.order,
-          })),
-        ),
+        buildCriterionRows(request.requirements, requirementRows),
         { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
       await manager.save(
         DocumentEvidenceEntity,
-        request.evidence.map((item) => ({
-          id: randomUUID(),
-          documentVersionId: version.id,
-          sourceId: item.sourceId,
-          sectionKey: item.sectionKey ?? null,
-          requirementId: item.requirementClientId
-            ? (clientRequirementIds.get(item.requirementClientId) as string)
-            : null,
-          excerpt: item.excerpt ?? null,
-          note: item.note ?? null,
-        })),
+        buildEvidenceRows(request.evidence, version.id, clientRequirementIds),
         { chunk: SQL_SERVER_WRITE_BATCH_SIZE },
       );
       await manager.save(
@@ -1962,14 +1048,8 @@ export class DocumentsService {
           appliedAt: now,
         }),
       );
-      await this.touchDocument(
-        manager,
-        document,
-        context.actor.id,
-        now,
-        "DRAFT",
-      );
-      await this.addHistory(manager, {
+      await touchDocument(manager, document, context.actor.id, now, "DRAFT");
+      await addHistory(manager, {
         documentId,
         versionId: version.id,
         eventType: "AI_DRAFT_APPLIED",
@@ -2075,7 +1155,7 @@ export class DocumentsService {
     const document = await this.requireDocument(documentId);
     const access = await this.projectAccess(context, document.projectId);
     requireReview(access);
-    this.requireActive(document);
+    requireActive(document);
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
@@ -2096,8 +1176,8 @@ export class DocumentsService {
         })
         .andWhere("Status <> :archived", { archived: "ARCHIVED" })
         .execute();
-      if (result.affected !== 1) this.stale();
-      await this.addHistory(manager, {
+      if (result.affected !== 1) stale();
+      await addHistory(manager, {
         documentId,
         versionId: null,
         eventType: "DOCUMENT_ARCHIVED",
@@ -2121,15 +1201,7 @@ export class DocumentsService {
       order: { createdAt: "DESC" },
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      documentId: row.documentId,
-      versionId: row.versionId,
-      eventType: row.eventType,
-      actorUserId: row.actorUserId,
-      details: parseJson(row.detailsJson),
-      createdAt: toIso(row.createdAt),
-    }));
+    return rows.map(toHistoryEntry);
   }
 
   async appliedTemplate(
@@ -2164,9 +1236,9 @@ export class DocumentsService {
     const access = await this.projectAccess(context, document.projectId);
     if (reviewPermission) requireReview(access);
     else requireEdit(access);
-    this.requireActive(document);
+    requireActive(document);
     const version = await this.requireVersion(documentId, versionNumber);
-    this.requireCurrent(document, version);
+    requireCurrent(document, version);
 
     if (!from.includes(version.status)) {
       throw new ConflictException(
@@ -2205,7 +1277,7 @@ export class DocumentsService {
         })
         .andWhere("Status IN (:...from)", { from })
         .execute();
-      if (result.affected !== 1) this.stale();
+      if (result.affected !== 1) stale();
 
       /*
        * Encabezado y aprobaciones son secciones canónicas. Una plantilla propia
@@ -2218,7 +1290,7 @@ export class DocumentsService {
       if (header) {
         await manager.update(DocumentSectionEntity, header.id, {
           contentJson: serialize(
-            this.headerForTransition(parseJson(header.contentJson), to),
+            headerForTransition(parseJson(header.contentJson), to),
           ),
         });
       } else if (!customLayout) {
@@ -2231,7 +1303,7 @@ export class DocumentsService {
       if (approvals) {
         await manager.update(DocumentSectionEntity, approvals.id, {
           contentJson: serialize(
-            this.approvalsForTransition(
+            approvalsForTransition(
               parseJson(approvals.contentJson),
               to,
               context.actor,
@@ -2245,8 +1317,8 @@ export class DocumentsService {
           "El documento no contiene la sección de aprobaciones.",
         );
       }
-      await this.touchDocument(manager, document, context.actor.id, now, to);
-      await this.addHistory(manager, {
+      await touchDocument(manager, document, context.actor.id, now, to);
+      await addHistory(manager, {
         documentId,
         versionId: version.id,
         eventType,
@@ -2265,237 +1337,6 @@ export class DocumentsService {
     );
   }
 
-  private headerForNewVersion(
-    content: DocumentJsonValue,
-    version: string,
-  ): DocumentJsonValue {
-    if (!content || typeof content !== "object" || Array.isArray(content))
-      return content;
-    const normalized = { ...content } as Record<string, DocumentJsonValue>;
-    delete normalized.preparedBy;
-    delete normalized.reviewedBy;
-    delete normalized.approvedBy;
-    return {
-      ...normalized,
-      documentVersion: version,
-      status: "BORRADOR",
-    };
-  }
-
-  private headerForTransition(
-    content: DocumentJsonValue,
-    status: DocumentStatus,
-  ): DocumentJsonValue {
-    if (!content || typeof content !== "object" || Array.isArray(content))
-      return content;
-    const visibleStatus =
-      status === "IN_REVIEW"
-        ? "EN VALIDACIÓN"
-        : status === "APPROVED"
-          ? "APROBADO"
-          : status === "CHANGES_REQUESTED"
-            ? "CORRECCIONES SOLICITADAS"
-            : status === "REJECTED"
-              ? "BORRADOR"
-              : "BORRADOR";
-    const normalized = { ...content } as Record<string, DocumentJsonValue>;
-    delete normalized.preparedBy;
-    delete normalized.reviewedBy;
-    delete normalized.approvedBy;
-    return { ...normalized, status: visibleStatus };
-  }
-
-  private contentFromAi(
-    key: string,
-    current: DocumentJsonValue,
-    proposed: DocumentJsonValue,
-  ): DocumentJsonValue {
-    if (key === "header") {
-      if (!proposed || typeof proposed !== "object" || Array.isArray(proposed))
-        return proposed;
-      const normalized = { ...proposed } as Record<string, DocumentJsonValue>;
-      delete normalized.preparedBy;
-      delete normalized.reviewedBy;
-      delete normalized.approvedBy;
-      return normalized;
-    }
-    if (key !== "approvalsAndChangeControl") return proposed;
-    const proposedRecord = documentRecord(proposed);
-    const currentRecord = documentRecord(current);
-    const proposedApprovals = documentRecords(proposedRecord?.approvals);
-    const currentApprovals = documentRecords(currentRecord?.approvals);
-    const proposedByResponsibility = new Map(
-      proposedApprovals.map((approval) => [
-        String(approval.responsibility),
-        approval,
-      ]),
-    );
-    const currentByResponsibility = new Map(
-      currentApprovals.map((approval) => [
-        String(approval.responsibility),
-        approval,
-      ]),
-    );
-    const responsibilities = ["Elaboración", "Revisión", "Aprobación"];
-    return {
-      approvals: responsibilities.map((responsibility) => {
-        const currentApproval = currentByResponsibility.get(responsibility);
-        const proposedApproval = proposedByResponsibility.get(responsibility);
-        const workflowHasDecided =
-          currentApproval && currentApproval.status !== "PENDIENTE";
-        return {
-          ...(proposedApproval ?? currentApproval ?? {}),
-          ...(responsibility === "Elaboración" || workflowHasDecided
-            ? (currentApproval ?? {})
-            : {}),
-          responsibility,
-        };
-      }),
-      // Generar o regenerar contenido no constituye un cambio aprobado.
-      changeControl: [],
-    };
-  }
-
-  private approvalsForNewVersion(
-    content: DocumentJsonValue,
-    actor: AuthenticatedUser,
-  ): DocumentJsonValue {
-    const record = documentRecord(content);
-    const approvals = documentRecords(record?.approvals);
-    const byResponsibility = new Map(
-      approvals.map((approval) => [String(approval.responsibility), approval]),
-    );
-    return {
-      approvals: [
-        {
-          ...(byResponsibility.get("Elaboración") ?? {}),
-          name: actor.displayName,
-          position: "Responsable del documento",
-          responsibility: "Elaboración",
-          approvalMoment: "Al elaborar la versión documental",
-          status: "REGISTRADO",
-        },
-        {
-          ...(byResponsibility.get("Revisión") ?? {}),
-          responsibility: "Revisión",
-          approvalMoment: "Durante la validación del documento",
-          status: "PENDIENTE",
-        },
-        {
-          ...(byResponsibility.get("Aprobación") ?? {}),
-          responsibility: "Aprobación",
-          approvalMoment: "Al finalizar la revisión",
-          status: "PENDIENTE",
-        },
-      ],
-      changeControl: [],
-    };
-  }
-
-  private approvalsForTransition(
-    content: DocumentJsonValue,
-    status: DocumentStatus,
-    actor: AuthenticatedUser,
-    version: DocumentVersionEntity,
-    now: Date,
-  ): DocumentJsonValue {
-    const record = documentRecord(content);
-    const approvals = documentRecords(record?.approvals).map((item) => ({
-      ...item,
-    }));
-    const update = (
-      responsibility: "Revisión" | "Aprobación",
-      changes: Readonly<Record<string, DocumentJsonValue>>,
-    ) => {
-      const index = approvals.findIndex(
-        (approval) => approval.responsibility === responsibility,
-      );
-      if (index >= 0) {
-        approvals[index] = { ...approvals[index], ...changes };
-        return;
-      }
-      approvals.push({
-        name: PENDING,
-        position:
-          responsibility === "Revisión"
-            ? "Líder del responsable"
-            : "Solicitante o líder de la persona solicitante",
-        responsibility,
-        approvalMoment:
-          responsibility === "Revisión"
-            ? "Durante la validación del documento"
-            : "Al finalizar la revisión",
-        status: "PENDIENTE",
-        ...changes,
-      });
-    };
-
-    if (status === "IN_REVIEW") {
-      const elaborationIndex = approvals.findIndex(
-        (approval) => approval.responsibility === "Elaboración",
-      );
-      const elaboration = {
-        name: actor.displayName,
-        position: "Responsable del documento",
-        responsibility: "Elaboración",
-        approvalMoment: now.toISOString(),
-        status: "REGISTRADO",
-      };
-      if (elaborationIndex >= 0) {
-        approvals[elaborationIndex] = {
-          ...approvals[elaborationIndex],
-          ...elaboration,
-        };
-      } else {
-        approvals.push(elaboration);
-      }
-      update("Revisión", {
-        approvalMoment: "Durante la validación del documento",
-        status: "EN REVISIÓN",
-      });
-    } else if (status === "CHANGES_REQUESTED") {
-      update("Revisión", {
-        name: actor.displayName,
-        position: "Líder del responsable",
-        approvalMoment: now.toISOString(),
-        status: "CAMBIOS SOLICITADOS",
-      });
-    } else if (status === "APPROVED") {
-      update("Aprobación", {
-        name: actor.displayName,
-        position: "Solicitante o líder de la persona solicitante",
-        approvalMoment: now.toISOString(),
-        status: "APROBADO",
-      });
-    }
-
-    return {
-      approvals: ["Elaboración", "Revisión", "Aprobación"].map(
-        (responsibility) =>
-          approvals.find(
-            (approval) => approval.responsibility === responsibility,
-          ) ?? {
-            name: PENDING,
-            position: PENDING,
-            responsibility,
-            approvalMoment: PENDING,
-            status: "PENDIENTE",
-          },
-      ),
-      changeControl:
-        status === "APPROVED" && version.versionNumber > 1
-          ? [
-              {
-                version: version.version,
-                date: now.toISOString().slice(0, 10),
-                description: version.changeSummary,
-                approvedBy: actor.displayName,
-              },
-            ]
-          : (record?.changeControl ?? []),
-    };
-  }
-
   private async projectAccess(
     context: DocumentsActorContext,
     projectId: string,
@@ -2505,55 +1346,6 @@ export class DocumentsService {
       context.accessToken,
       context.actor,
       context.correlationId,
-    );
-  }
-
-  private requireActive(document: RequirementDocumentEntity): void {
-    if (document.status === "ARCHIVED") {
-      throw new ConflictException(
-        "El documento está archivado y es inmutable.",
-      );
-    }
-  }
-
-  private requireCurrent(
-    document: RequirementDocumentEntity,
-    version: DocumentVersionEntity,
-  ): void {
-    if (document.currentVersionNumber !== version.versionNumber) {
-      throw new ConflictException(
-        "Solo la versión actual puede modificarse o cambiar de estado.",
-      );
-    }
-  }
-
-  private requireDraft(version: DocumentVersionEntity): void {
-    if (version.status === "APPROVED") {
-      throw new ConflictException(
-        "La versión aprobada es inmutable; crea una nueva versión.",
-      );
-    }
-    if (version.status !== "DRAFT") {
-      throw new ConflictException(
-        "Solo una versión en borrador puede editarse.",
-      );
-    }
-  }
-
-  private requireEditable(
-    version: DocumentVersionEntity,
-  ): "DRAFT" | "CHANGES_REQUESTED" {
-    if (version.status !== "DRAFT" && version.status !== "CHANGES_REQUESTED") {
-      throw new ConflictException(
-        "Solo una versión en borrador o con correcciones solicitadas puede editarse.",
-      );
-    }
-    return version.status;
-  }
-
-  private stale(): never {
-    throw new ConflictException(
-      "La revisión enviada está desactualizada. Recarga el documento antes de guardar.",
     );
   }
 
@@ -2606,21 +1398,7 @@ export class DocumentsService {
         : hasSolutionPrototypeMarkdown(content);
     });
 
-    return {
-      id: document.id,
-      projectId: document.projectId,
-      title: document.title,
-      status: document.status,
-      revision: document.revision,
-      currentVersionNumber: document.currentVersionNumber,
-      currentVersion: version.version,
-      hasPrototype,
-      template: templateWithoutDefinition(template),
-      createdByUserId: document.createdByUserId,
-      createdAt: toIso(document.createdAt),
-      updatedAt: toIso(document.updatedAt),
-      archivedAt: document.archivedAt ? toIso(document.archivedAt) : null,
-    };
+    return toDocumentSummary(document, version, template, hasPrototype);
   }
 
   private async loadDetail(
@@ -2673,51 +1451,14 @@ export class DocumentsService {
         })
       : [];
 
-    return {
-      ...versionSummary(version),
-      sections: sections.map((section) => ({
-        id: section.id,
-        key: section.key as DocumentSectionKey,
-        title: section.title,
-        order: section.orderIndex,
-        content: parseJson(section.contentJson),
-        templateControlled: section.templateControlled,
-      })),
-      fields: fields.map((field) => ({
-        id: field.id,
-        sectionKey: field.sectionKey as DocumentSectionKey,
-        key: field.key,
-        label: field.label,
-        valueType: field.valueType,
-        value: parseJson(field.valueJson),
-        order: field.orderIndex,
-      })),
-      requirements: requirements.map((requirement) => ({
-        id: requirement.id,
-        sectionKey: requirement.sectionKey as DocumentSectionKey,
-        code: requirement.code,
-        title: requirement.title,
-        description: requirement.description,
-        requirementType: requirement.requirementType,
-        status: requirement.status,
-        order: requirement.orderIndex,
-        acceptanceCriteria: criteria
-          .filter((criterion) => criterion.requirementId === requirement.id)
-          .map((criterion) => ({
-            id: criterion.id,
-            description: criterion.description,
-            order: criterion.orderIndex,
-          })),
-      })),
-      evidence: evidence.map((item) => ({
-        id: item.id,
-        sourceId: item.sourceId,
-        sectionKey: item.sectionKey as DocumentSectionKey | null,
-        requirementId: item.requirementId,
-        excerpt: item.excerpt,
-        note: item.note,
-      })),
-    };
+    return toVersionDetail(
+      version,
+      sections,
+      fields,
+      requirements,
+      criteria,
+      evidence,
+    );
   }
 
   /**
@@ -2735,224 +1476,6 @@ export class DocumentsService {
     sections: readonly DocumentSectionEntity[],
     appliedTemplate?: AppliedDocumentTemplateEntity | null,
   ): void {
-    /*
-     * Plantillas propias: el layout válido es el de la plantilla efectiva del
-     * documento, no el canónico fijo. Los documentos canónicos conservan la
-     * validación histórica de abajo.
-     */
-    const customLayout = customTemplateLayout(appliedTemplate);
-    if (customLayout) {
-      if (sections.length !== customLayout.length) {
-        throw new ConflictException(
-          `El documento debe contener ${customLayout.length} secciones según su plantilla aplicada.`,
-        );
-      }
-      customLayout.forEach((expectedSection, index) => {
-        const actual = sections[index];
-        if (
-          !actual ||
-          actual.key !== expectedSection.key ||
-          actual.orderIndex !== index + 1
-        ) {
-          throw new ConflictException(
-            "El documento no conserva el orden de las secciones configuradas.",
-          );
-        }
-      });
-      return;
-    }
-    const includesScrum = sections.at(-1)?.key === "scrumPlan";
-    const withoutScrum = includesScrum ? sections.slice(0, -1) : sections;
-    const hasSolutionProposal = withoutScrum.some(
-      (section) => section.key === "solutionProposal",
-    );
-    const historicalLayout = withoutScrum.some(
-      (section) => section.key === "nonFunctionalRequirements",
-    );
-    const baseDefinitions = historicalLayout
-      ? hasSolutionProposal
-        ? HISTORICAL_DOCUMENT_SECTION_DEFINITIONS_WITH_SOLUTION
-        : HISTORICAL_DOCUMENT_SECTION_DEFINITIONS
-      : hasSolutionProposal
-        ? DOCUMENT_SECTION_DEFINITIONS
-        : LEGACY_DOCUMENT_SECTION_DEFINITIONS;
-    const expected = includesScrum
-      ? [...baseDefinitions, DOCUMENT_SCRUM_SECTION_DEFINITION]
-      : baseDefinitions;
-
-    if (
-      sections.length !== baseDefinitions.length &&
-      sections.length !== baseDefinitions.length + 1
-    ) {
-      throw new ConflictException(
-        `El documento debe contener ${baseDefinitions.length} secciones base${includesScrum ? " y Plan Scrum" : ""}.`,
-      );
-    }
-
-    expected.forEach((expectedSection, index) => {
-      const actual = sections[index];
-      if (
-        !actual ||
-        actual.key !== expectedSection.key ||
-        actual.orderIndex !== index + 1
-      ) {
-        throw new ConflictException(
-          "El documento no conserva el orden de las secciones configuradas.",
-        );
-      }
-    });
-  }
-
-  /*
-   * Sincroniza Punto 6 / Punto 7 en la misma transacción que escribe la
-   * sección editada. Lo comparten `updateSection` y `applyAiDraft`.
-   */
-  private async synchronizePlanningSections(
-    manager: DataSource["manager"],
-    versionId: string,
-    sectionKey: string,
-    content: DocumentJsonValue,
-  ): Promise<void> {
-    /*
-     * PUNTO_7_SYNC_IN_TRANSACTION
-     *
-     * Al editar el esquema proyectamos de inmediato
-     * Epic / Feature / HU sobre el Punto 6.
-     *
-     * La operación usa la misma transacción:
-     * nunca queda un Punto 6 actualizado y un Punto 7
-     * anterior, ni al contrario.
-     */
-    if (sectionKey === "backlogStructure") {
-      const requirementsSection = await manager.findOne(
-        DocumentSectionEntity,
-        {
-          where: {
-            documentVersionId: versionId,
-            key: "milestones",
-          },
-        },
-      );
-
-      if (requirementsSection) {
-        const currentRequirements = parseJson(
-          requirementsSection.contentJson,
-        );
-
-        const synchronizedRequirements =
-          synchronizeBacklogStructureWithRequirements(
-            content,
-            currentRequirements,
-          );
-
-        if (
-          serialize(synchronizedRequirements) !==
-          serialize(currentRequirements)
-        ) {
-          await manager.update(
-            DocumentSectionEntity,
-            requirementsSection.id,
-            {
-              contentJson: serialize(synchronizedRequirements),
-            },
-          );
-        }
-      }
-    }
-
-    /*
-     * Al editar Punto 6 sincronizamos solamente
-     * el detalle de las HU con Punto 7.
-     */
-    if (sectionKey === "milestones") {
-      const backlogSection = await manager.findOne(DocumentSectionEntity, {
-        where: {
-          documentVersionId: versionId,
-          key: "backlogStructure",
-        },
-      });
-
-      if (backlogSection) {
-        const currentBacklog = parseJson(backlogSection.contentJson);
-
-        const synchronizedBacklog = synchronizeRequirementStoriesWithBacklog(
-          content,
-          currentBacklog,
-        );
-
-        if (serialize(synchronizedBacklog) !== serialize(currentBacklog)) {
-          await manager.update(DocumentSectionEntity, backlogSection.id, {
-            contentJson: serialize(synchronizedBacklog),
-          });
-        }
-      }
-    }
-  }
-
-  private async lockEditableVersion(
-    manager: DataSource["manager"],
-    version: DocumentVersionEntity,
-    expectedRevision: number,
-    actorUserId: string,
-    now: Date,
-    status: "DRAFT" | "CHANGES_REQUESTED",
-  ): Promise<void> {
-    const result = await manager
-      .createQueryBuilder()
-      .update(DocumentVersionEntity)
-      .set({
-        revision: () => "Revision + 1",
-        updatedByUserId: actorUserId,
-        updatedAt: now,
-      })
-      .where("Id = :versionId", { versionId: version.id })
-      .andWhere("Revision = :expectedRevision", { expectedRevision })
-      .andWhere("Status = :status", { status })
-      .execute();
-    if (result.affected !== 1) this.stale();
-  }
-
-  private async touchDocument(
-    manager: DataSource["manager"],
-    document: RequirementDocumentEntity,
-    actorUserId: string,
-    now: Date,
-    status: DocumentStatus,
-  ): Promise<void> {
-    await manager
-      .createQueryBuilder()
-      .update(RequirementDocumentEntity)
-      .set({
-        revision: () => "Revision + 1",
-        status,
-        updatedByUserId: actorUserId,
-        updatedAt: now,
-      })
-      .where("Id = :documentId", { documentId: document.id })
-      .execute();
-  }
-
-  private async addHistory(
-    manager: DataSource["manager"],
-    input: {
-      documentId: string;
-      versionId: string | null;
-      eventType: string;
-      actorUserId: string;
-      details: DocumentJsonValue;
-      now: Date;
-    },
-  ): Promise<void> {
-    await manager.save(
-      manager.create(DocumentHistoryEntity, {
-        id: randomUUID(),
-        documentId: input.documentId,
-        versionId: input.versionId,
-        eventType: input.eventType,
-        actorUserId: input.actorUserId,
-        detailsJson: serialize(input.details),
-        createdAt: input.now,
-      }),
-    );
+    assertSectionsLayout(sections, appliedTemplate);
   }
 }

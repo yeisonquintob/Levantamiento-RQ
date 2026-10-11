@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const documentsDir = "apps/documents-service/src/documents/";
+
+async function readDocumentsModules(...names: string[]): Promise<string> {
+  const contents = await Promise.all(
+    names.map((name) => readFile(`${documentsDir}${name}`, "utf8")),
+  );
+  return contents.join("\n");
+}
+
 import {
   DOCUMENT_SCRUM_SECTION_DEFINITION,
   DOCUMENT_SECTION_DEFINITIONS,
@@ -176,12 +185,9 @@ test("la edición manual del esquema rechaza duplicados, huérfanos y ciclos", (
 });
 
 test("el punto 7 sincroniza su estructura con el punto 6 en la misma transacción", async () => {
-  const service = await readFile(
-    new URL(
-      "../../apps/documents-service/src/documents/documents.service.ts",
-      import.meta.url,
-    ),
-    "utf8",
+  const service = await readDocumentsModules(
+    "documents.service.ts",
+    "documents-backlog-sync.ts",
   );
 
   assert.match(service, /PUNTO_7_REQUIREMENTS_SYNCHRONIZATION/);
@@ -392,9 +398,9 @@ test("la persistencia pertenece solo a RqDocumentsDb", async () => {
 });
 
 test("aprobación, bloqueo, historial y concurrencia están protegidos", async () => {
-  const service = await readFile(
-    "apps/documents-service/src/documents/documents.service.ts",
-    "utf8",
+  const service = await readDocumentsModules(
+    "documents.service.ts",
+    "documents-guards.ts",
   );
 
   assert.match(service, /Revision = :expectedRevision/);
@@ -624,12 +630,9 @@ test("el backend 4.1 valida HU-P sin heredar criterios funcionales", async () =>
     }),
   );
 
-  const service = await readFile(
-    new URL(
-      "../../apps/documents-service/src/documents/documents.service.ts",
-      import.meta.url,
-    ),
-    "utf8",
+  const service = await readDocumentsModules(
+    "documents.service.ts",
+    "documents-backlog-sync.ts",
   );
   assert.match(service, /POINT_6_7_INDEPENDENT_BACKEND/);
   assert.match(service, /isIndependentPlanningBacklog/);
