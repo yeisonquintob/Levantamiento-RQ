@@ -119,3 +119,11 @@ test("interpretar el Markdown exige elegir la IA de imágenes, no que esté prob
   assert.match(source, /Boolean\(imageProviderBlockReason\)/u);
   assert.match(source, /Mientras tanto puedes/u);
 });
+
+test("la columna izquierda de Generar prototipo se compacta para caber en una pantalla de poca altura", () => {
+  const css = readStylesSync();
+  assert.match(css, /PROTOTYPE_LEFT_ONE_SCREEN_V1/u);
+  assert.match(css, /@media \(min-width: 1121px\) and \(max-height: 820px\)/u);
+  assert.match(css, /\.rq-device-selection button > small \{\s*display: none;/u);
+  assert.match(css, /@media \(min-width: 1121px\) and \(max-height: 700px\)/u);
+});
