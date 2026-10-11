@@ -131,3 +131,74 @@ jobs:
           name: playwright-report
           path: tmp/playwright-report
           retention-days: 7
+
+  integration-e2e:
+    name: Integración y E2E con servicios reales
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      E2E_BASE_URL: http://127.0.0.1:4200
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Caché de Nx
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .nx/cache
+          key: nx-integration-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-integration-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
+      - run: pnpm exec playwright install --with-deps chromium
+      # Credenciales efímeras: se generan en cada ejecución, se enmascaran y no se guardan en ningún sitio.
+      - name: Credenciales efímeras de la prueba
+        run: |
+          sql_password="Rq-$(openssl rand -hex 12)-aA1!"
+          e2e_password="E2e-$(openssl rand -hex 12)-aA1"
+          echo "::add-mask::$sql_password"
+          echo "::add-mask::$e2e_password"
+          {
+            echo "CI_SQL_PASSWORD=$sql_password"
+            echo "E2E_EMAIL=e2e-admin@example.test"
+            echo "E2E_PASSWORD=$e2e_password"
+            echo "DOCUMENT_EDITOR_E2E_EMAIL=e2e-admin@example.test"
+            echo "DOCUMENT_EDITOR_E2E_PASSWORD=$e2e_password"
+          } >> "$GITHUB_ENV"
+      - name: SQL Server efímero
+        run: |
+          docker run -d --name rq-ci-sql \
+            -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e "MSSQL_SA_PASSWORD=$CI_SQL_PASSWORD" \
+            -p 127.0.0.1:1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+      - name: Levantar el stack completo (infraestructura, bases, migraciones, servicios y web)
+        run: bash scripts/ci-stack-up.sh
+      - name: Integración con bases de datos, Redis y Azurite
+        run: pnpm test:integration
+      - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
+        run: pnpm test:e2e:v1
+      - name: Datos de prueba para los E2E de interfaz
+        run: pnpm documents:editor:e2e:fixture prepare ci
+      - name: E2E de interfaz con sesión real
+        run: pnpm exec playwright test --project=login --project=chromium
+      - name: Limpiar datos de prueba
+        if: always()
+        run: pnpm documents:editor:e2e:fixture cleanup || true
+      - name: Registros y informe
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: integration-e2e-diagnostico
+          path: |
+            logs
+            tmp/playwright-report
+          retention-days: 7
+      - name: Detener servicios
+        if: always()
+        run: bash scripts/local-auth-down.sh || true

@@ -1,0 +1,29 @@
+# Integración y E2E con servicios reales en CI
+
+El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo en un runner limpio y ejecuta:
+
+1. `pnpm test:integration` — verificación de bases de datos, almacenamiento (Azurite) y colas (Redis).
+2. `pnpm test:e2e:v1` — recorrido completo por el gateway: login, proyecto, documento, exportación PDF/DOCX, auditoría y notificaciones.
+3. Playwright con sesión real (`login` y `chromium`) sobre datos creados por `documents:editor:e2e:fixture`.
+
+## Cómo se levanta (`scripts/ci-stack-up.sh`)
+
+- `scripts/ci-prepare-env.mjs` genera `infrastructure/docker/.env` y `apps/*/.env` a partir de los `.env.example`. Nunca sobrescribe un `.env` existente salvo con `--force`.
+- Redis, RabbitMQ y Azurite arrancan con `scripts/infrastructure-up.sh`. SQL Server arranca en un contenedor efímero del propio job.
+- Se crean las bases y se aplican las migraciones de identity, projects, sources, documents, ai, workflow y operations. La creación de cada base se autoriza solo dentro del script (`*_CREATE_DATABASE`).
+- Se crea un administrador de prueba con `identity:bootstrap-admin` y se arranca todo con `scripts/local-auth-up.sh`.
+
+## Credenciales
+
+Contraseña de SQL Server y del usuario E2E se generan en cada ejecución (`openssl rand`), se enmascaran en los registros y no se guardan. El correo es `e2e-admin@example.test`.
+
+## Probarlo en local
+
+No uses tu entorno de desarrollo: el script escribe `.env` y crea bases. En un clon limpio, con Docker y un SQL Server accesible:
+
+```bash
+export CI_SQL_PASSWORD='…' E2E_EMAIL=e2e-admin@example.test E2E_PASSWORD='…'
+bash scripts/ci-stack-up.sh
+```
+
+Los puertos 3000–3009 y 4200 deben estar libres.
