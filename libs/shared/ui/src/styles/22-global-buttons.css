@@ -1,0 +1,183 @@
+/* =========================================================
+   RQ SISTEMA GLOBAL DE BOTONES
+   Métricas compartidas para acciones principales, tablas e iconos.
+   ========================================================= */
+
+.rq-action {
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  max-width: 100%;
+  padding: 0 12px;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+
+.rq-action.rq-action--compact {
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0 10px;
+}
+
+.rq-action:hover:not(:disabled):not(.rq-action--disabled) {
+  filter: brightness(0.94);
+  transform: none;
+}
+
+.rq-action:active:not(:disabled):not(.rq-action--disabled) {
+  filter: brightness(0.86);
+}
+
+.rq-action:focus-visible {
+  outline: 2px solid var(--rq-color-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.rq-action:disabled,
+.rq-action--disabled,
+.rq-action[aria-disabled="true"] {
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: saturate(0.65);
+  opacity: 0.55;
+}
+
+/* Acciones de tabla: 32px sin alterar anchos ni cuadrículas existentes. */
+.rq-project-card__actions .rq-action,
+.rq-projects-list .rq-project-card__actions .rq-action,
+.rq-project-table__actions .rq-action,
+.rq-template-table__actions .rq-action,
+.rq-document-actions .rq-action,
+.rq-validation-actions .rq-action,
+.rq-users-table__actions .rq-action,
+.rq-notification-table__actions .rq-action,
+.rq-discussion-index__table td:last-child .rq-action,
+.rq-document-actions .rq-document-open,
+.rq-validation-actions .rq-document-open {
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding-block: 0;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Barras principales: 36px aunque el botón use compact por composición. */
+.rq-page-hero__actions .rq-action,
+.rq-discussion-workspace .rq-page-hero__actions .rq-action,
+.rq-module-commandbar__actions > .rq-action,
+.rq-document-editor__header-actions .rq-action,
+.rq-document-workflow-actions > .rq-action,
+.rq-discussion-toolbar__actions .rq-action,
+.rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding-block: 0;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rq-document-open,
+.rq-source-view-draft {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+
+.rq-document-open:hover,
+.rq-source-view-draft:hover {
+  filter: brightness(0.94);
+}
+
+.rq-document-open:active,
+.rq-source-view-draft:active {
+  filter: brightness(0.86);
+}
+
+.rq-document-open:focus-visible,
+.rq-source-view-draft:focus-visible {
+  outline: 2px solid var(--rq-color-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* El control iconográfico de Fuentes se alinea con la barra principal. */
+.rq-source-command-more > summary {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    filter 160ms ease;
+}
+
+.rq-source-command-more > summary:hover,
+.rq-source-command-more[open] > summary {
+  filter: brightness(0.94);
+}
+
+.rq-source-command-more > summary:active {
+  filter: brightness(0.86);
+}
+
+.rq-source-command-more > summary:focus-visible {
+  outline: 2px solid var(--rq-color-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+@media (max-width: 700px) {
+  .rq-module-commandbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .rq-module-commandbar__actions .rq-action {
+    width: auto;
+    min-width: 0;
+  }
+
+  .rq-project-card__actions .rq-action,
+  .rq-project-table__actions .rq-action,
+  .rq-template-table__actions .rq-action,
+  .rq-document-actions .rq-action,
+  .rq-validation-actions .rq-action,
+  .rq-users-table__actions .rq-action,
+  .rq-notification-table__actions .rq-action {
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
+  }
+}
+
+/* RQ SISTEMA GLOBAL DE BOTONES FIN */
+

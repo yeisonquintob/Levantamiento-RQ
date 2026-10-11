@@ -1,14 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const uiStylesUrl = new URL(
-  "../../libs/shared/ui/src/styles.css",
-  import.meta.url,
-);
+import { readStyles } from "../support/read-styles";
 
 test("las alertas del workspace flotan sin desplazar el contenido", async () => {
-  const styles = await readFile(uiStylesUrl, "utf8");
+  const styles = await readStyles();
   const cleanInterface = styles.slice(
     styles.indexOf("RQ INTERFAZ LIMPIA Y ALERTAS FLOTANTES V1"),
   );
@@ -20,7 +15,7 @@ test("las alertas del workspace flotan sin desplazar el contenido", async () => 
 });
 
 test("la interfaz conserva un solo marco para datos y controles", async () => {
-  const styles = await readFile(uiStylesUrl, "utf8");
+  const styles = await readStyles();
   const cleanInterface = styles.slice(
     styles.indexOf("RQ INTERFAZ LIMPIA Y ALERTAS FLOTANTES V1"),
   );

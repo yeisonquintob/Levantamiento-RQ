@@ -1,0 +1,1384 @@
+/* =========================================================
+   RQ DISCUSSION CARGA HORIZONTAL ESTANDAR V1
+   Referencia visual:
+   [ cuadro largo de carga/progreso ] [ Detener procesamiento ]
+   ========================================================= */
+
+/*
+ * Control superior:
+ * - primera fila: motores IA + acciones existentes;
+ * - segunda fila: carga/progreso + detener.
+ */
+.rq-discussion-workspace .rq-discussion-toolbar__control-area {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 8px;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__control-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/*
+ * El contenedor general deja de ser una tarjeta grande.
+ * Solo organiza los dos elementos que el usuario marcó:
+ * cuadro de carga largo + botón independiente.
+ */
+.rq-discussion-workspace .rq-discussion-processing {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Cuadro largo de carga/progreso. */
+.rq-discussion-workspace .rq-discussion-processing__content {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  box-shadow: none;
+}
+
+/*
+ * Una sola lectura horizontal:
+ * Reprocesamiento con IA | mensaje | porcentaje
+ * y la barra fina debajo.
+ */
+.rq-discussion-workspace .rq-discussion-processing__content header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.rq-discussion-workspace .rq-discussion-processing__content header strong {
+  color: var(--rq-color-text);
+  font-size: calc(10px * var(--rq-font-scale));
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.rq-discussion-workspace .rq-discussion-processing__content header p {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-workspace .rq-discussion-processing__content header span {
+  min-width: 38px;
+  color: var(--rq-action-operation);
+  font-size: calc(10px * var(--rq-font-scale));
+  font-weight: 850;
+  line-height: 1;
+  text-align: right;
+}
+
+/* Barra de progreso más limpia y compacta. */
+.rq-discussion-workspace .rq-discussion-processing progress {
+  width: 100%;
+  height: 5px;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--rq-radius-pill);
+  accent-color: var(--rq-action-operation);
+}
+
+/*
+ * Estados conservan semántica sin convertir el cuadro completo
+ * en una alerta pesada.
+ */
+.rq-discussion-workspace
+  .rq-discussion-processing[data-status="completed"]
+  .rq-discussion-processing__content {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 48%,
+    var(--rq-color-border)
+  );
+}
+
+.rq-discussion-workspace
+  .rq-discussion-processing[data-status="cancelled"]
+  .rq-discussion-processing__content,
+.rq-discussion-workspace
+  .rq-discussion-processing[data-status="failed"]
+  .rq-discussion-processing__content {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-warning) 48%,
+    var(--rq-color-border)
+  );
+}
+
+/*
+ * DETENER:
+ * elimina el ancho especial antiguo de 156px.
+ * Altura/tipografía/radio/color vienen del estándar global .rq-action:
+ * 36px en barras principales.
+ */
+.rq-discussion-workspace .rq-discussion-processing > .rq-action {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  align-self: center;
+  padding: 0 12px;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* En pantallas angostas no se crea un botón gigante. */
+@media (max-width: 760px) {
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    flex-wrap: wrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing > .rq-action {
+    width: auto;
+    min-width: 0;
+    justify-self: end;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content header strong {
+    grid-column: 1;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content header p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content header span {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+/* RQ DISCUSSION CARGA HORIZONTAL ESTANDAR V1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION CARGA HORIZONTAL CORRECCION V2
+   Corrige ancho real del área de control y usa únicamente
+   variables existentes del sistema visual.
+   ========================================================= */
+
+/*
+ * En escritorio ancho:
+ * 4 indicadores + un área completa para motores, acciones y progreso.
+ * Antes el área de control quedaba atrapada en una de las 6 columnas
+ * antiguas, por eso el cuadro de carga aparecía demasiado corto.
+ */
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns:
+      minmax(105px, 0.72fr)
+      minmax(135px, 0.92fr)
+      minmax(135px, 0.88fr)
+      minmax(135px, 0.88fr)
+      minmax(620px, 2.45fr);
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    width: 100%;
+    min-width: 0;
+    padding-left: 10px;
+    border-left: 1px solid var(--rq-color-border);
+  }
+}
+
+/*
+ * Escritorio/intermedio:
+ * si no hay espacio suficiente para tener todo a la derecha,
+ * el bloque completo baja a una segunda línea sin deformarse.
+ */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    padding: 7px 0 0;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 0;
+  }
+}
+
+/* El área completa usa siempre el ancho disponible. */
+.rq-discussion-workspace .rq-discussion-toolbar__control-area,
+.rq-discussion-workspace .rq-discussion-toolbar__control-row,
+.rq-discussion-workspace .rq-discussion-processing {
+  width: 100%;
+  min-width: 0;
+}
+
+/*
+ * La fila superior conserva exactamente los controles actuales.
+ * No se altera su lógica ni el orden.
+ */
+.rq-discussion-workspace .rq-discussion-toolbar__control-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/*
+ * Segunda fila:
+ * [ cuadro largo de carga/progreso ] [ Detener procesamiento ]
+ */
+.rq-discussion-workspace .rq-discussion-processing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Cuadro largo visible con el borde estándar REAL del sistema. */
+.rq-discussion-workspace .rq-discussion-processing__content {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  box-shadow: none;
+}
+
+/*
+ * El botón ya es RqActionButton tone="danger".
+ * Solo anulamos el ancho especial antiguo de Discusión y devolvemos
+ * la medida mínima estándar del sistema.
+ */
+.rq-discussion-workspace .rq-discussion-processing > .rq-action {
+  width: auto;
+  min-width: 96px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Responsive: nunca obliga a crecer el ancho de la pantalla. */
+@media (max-width: 760px) {
+  .rq-discussion-workspace .rq-discussion-processing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing > .rq-action {
+    width: auto;
+    justify-self: end;
+  }
+}
+
+/* RQ DISCUSSION CARGA HORIZONTAL CORRECCION V2 FIN */
+
+/* =========================================================
+   RQ DISCUSSION CAMPOS SUPERIORES COMPACTOS V3
+   Corrige únicamente la geometría de la barra superior.
+   ========================================================= */
+
+/*
+ * Escritorio ancho:
+ *
+ * [Respuestas][Conversación][IA local][IA nube][ controles + progreso ]
+ *
+ * Los cuatro indicadores NO deben expandirse con fr.
+ * El espacio sobrante pertenece al área de controles/progreso.
+ */
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    width: 100%;
+    grid-template-columns:
+      minmax(145px, 160px)
+      minmax(175px, 190px)
+      minmax(160px, 175px)
+      minmax(160px, 175px)
+      minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 54px;
+    padding: 7px 10px;
+  }
+
+  /*
+   * Mantiene etiqueta y valor dentro de un espacio razonable.
+   * Evita el hueco gigante que aparece en la captura.
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span,
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > strong,
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    min-width: 0;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /*
+   * El área derecha ocupa TODO lo que queda.
+   * Allí permanecen los chips IA, botones y la carga.
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding-left: 10px;
+    border-left: 1px solid var(--rq-color-border);
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/*
+ * Escritorio medio:
+ * evita que los indicadores vuelvan a estirarse.
+ * El bloque derecho baja completo a la segunda fila.
+ */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* RQ DISCUSSION CAMPOS SUPERIORES COMPACTOS V3 FIN */
+
+/* =========================================================
+   RQ DISCUSSION PROPORCIONES REFERENCIA V4
+   Reproduce la distribución mostrada por el usuario:
+   4 indicadores amplios + bloque derecho de controles/progreso.
+   ========================================================= */
+
+@media (min-width: 1350px) {
+  /*
+   * La V3 dejó los indicadores demasiado estrechos.
+   * Aquí recuperamos una distribución proporcional:
+   *
+   * [Respuesta][Conversación][IA local][IA nube][CONTROLES]
+   *
+   * Los cuatro primeros crecen de forma equilibrada.
+   * El quinto bloque conserva suficiente espacio para:
+   * chips IA + botones arriba
+   * progreso + detener abajo.
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    width: 100%;
+    grid-template-columns:
+      repeat(4, minmax(160px, 1fr))
+      minmax(620px, 2.7fr);
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 84px;
+    align-content: center;
+    padding: 8px 12px;
+  }
+
+  /*
+   * Mantiene cada indicador con etiqueta a la izquierda,
+   * valor a la derecha y detalle debajo.
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 10px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding-left: 10px;
+    border-left: 1px solid var(--rq-color-border);
+  }
+
+  /*
+   * Primera fila del bloque derecho:
+   * IA local | IA nube | acciones
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /*
+   * Segunda fila:
+   * [       cuadro de carga / progreso       ] [ Detener ]
+   */
+  .rq-discussion-workspace .rq-discussion-processing {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-processing__content {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/*
+ * En escritorio medio conservamos el patrón seguro:
+ * indicadores arriba y bloque de controles/progreso debajo.
+ */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 0;
+  }
+}
+
+/* RQ DISCUSSION PROPORCIONES REFERENCIA V4 FIN */
+
+/* =========================================================
+   RQ DISCUSSION ANCHOS REFERENCIA V5
+   Ajuste fino solicitado:
+   [Respuestas][Conversación][IA local][IA nube][Controles]
+       160px       210px       210px      210px     resto
+   ========================================================= */
+
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns:
+      160px
+      210px
+      210px
+      210px
+      minmax(0, 1fr);
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row,
+  .rq-discussion-workspace .rq-discussion-processing,
+  .rq-discussion-workspace .rq-discussion-processing__content {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* RQ DISCUSSION ANCHOS REFERENCIA V5 FIN */
+
+/* =========================================================
+   RQ DISCUSSION CONTEXTO Y PROCESO ALINEADOS V6
+   - Progreso + Detener al nivel del título/pestañas.
+   - Indicadores superiores más anchos y con grosor uniforme.
+   ========================================================= */
+
+/*
+ * Barra superior:
+ * los cuatro indicadores ganan ancho horizontal,
+ * pero mantienen grosor/altura contenida.
+ */
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns:
+      minmax(180px, 1fr)
+      minmax(210px, 1.12fr)
+      minmax(200px, 1.08fr)
+      minmax(200px, 1.08fr)
+      minmax(520px, 1.7fr);
+    min-height: 58px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    min-height: 58px;
+    padding: 7px 12px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    min-height: 58px;
+    align-content: center;
+    padding-left: 10px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    min-height: 58px;
+    align-items: center;
+  }
+}
+
+/*
+ * Nuevo nivel contextual:
+ *
+ * [ Título del proyecto                    ] [ progreso ][ Detener ]
+ * [ Mi levantamiento | Procesado con IA    ]
+ *
+ * El bloque de progreso queda visualmente al mismo nivel
+ * del título y de las pestañas, no en la barra de indicadores.
+ */
+.rq-discussion-workspace .rq-discussion-context-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(520px, 0.95fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.rq-discussion-workspace .rq-discussion-context-main {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 0;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-project-title {
+  min-height: 32px;
+  padding: 4px 2px 1px;
+}
+
+.rq-discussion-workspace .rq-discussion-context-row .rq-discussion-tabs {
+  min-height: 32px;
+  padding: 0 2px;
+}
+
+/*
+ * Progreso dentro del nivel contextual:
+ * mismo grosor visual y sin tarjeta pesada.
+ */
+.rq-discussion-workspace .rq-discussion-context-row .rq-discussion-processing {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing__content {
+  min-height: 40px;
+  padding: 5px 10px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  box-shadow: none;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing
+  > .rq-action {
+  width: auto;
+  min-width: 132px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--rq-radius-sm);
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+/* Responsive: el progreso baja sin romper ni ensanchar la vista. */
+@media (max-width: 1180px) {
+  .rq-discussion-workspace .rq-discussion-context-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-context-row
+    .rq-discussion-processing {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .rq-discussion-workspace
+    .rq-discussion-context-row
+    .rq-discussion-processing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-context-row
+    .rq-discussion-processing
+    > .rq-action {
+    justify-self: end;
+  }
+}
+
+/* RQ DISCUSSION CONTEXTO Y PROCESO ALINEADOS V6 FIN */
+
+/* =========================================================
+   RQ DISCUSSION AJUSTE FINO SIN SOLAPAMIENTO V6.2
+   Mantiene la distribución V6. Solo corrige respiración,
+   tamaños internos y protección contra textos sobrepuestos.
+   ========================================================= */
+
+/* Indicadores superiores: misma altura, mejor respiración horizontal. */
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns:
+      minmax(185px, 1fr)
+      minmax(215px, 1.12fr)
+      minmax(205px, 1.08fr)
+      minmax(205px, 1.08fr)
+      minmax(540px, 1.7fr);
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    overflow: hidden;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: 12px;
+    padding-inline: 12px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > strong {
+    min-width: max-content;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /*
+   * El bloque derecho conserva su ubicación,
+   * pero evita que chips y acciones se pisen.
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    min-width: 0;
+    gap: 7px;
+    overflow: visible;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-toolbar__control-row
+    .rq-ai-engine-chips {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding-inline: 6px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 6px;
+    padding-left: 8px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    padding-inline: 10px;
+    font-size: calc(10px * var(--rq-font-scale));
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Nivel del título/pestañas:
+ * mantiene V6, solo da un poco más de separación
+ * entre el bloque izquierdo y el procesamiento.
+ */
+.rq-discussion-workspace .rq-discussion-context-row {
+  column-gap: 20px;
+}
+
+/*
+ * Cuadro de reprocesamiento:
+ * tres zonas bien definidas para que
+ * título, mensaje y porcentaje nunca se superpongan.
+ */
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing__content
+  header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: max-content minmax(0, 1fr) 44px;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing__content
+  header
+  strong {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing__content
+  header
+  p {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing__content
+  header
+  span {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* El botón Detener conserva exactamente el estándar principal. */
+.rq-discussion-workspace
+  .rq-discussion-context-row
+  .rq-discussion-processing
+  > .rq-action {
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding-inline: 12px;
+  font-size: calc(11px * var(--rq-font-scale));
+  line-height: 1;
+}
+
+/* Escritorio medio: evita presión horizontal sin cambiar la estructura. */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    overflow: hidden;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span,
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* RQ DISCUSSION AJUSTE FINO SIN SOLAPAMIENTO V6.2 FIN */
+
+/* =========================================================
+   RQ DISCUSSION SOLO BARRA SUPERIOR V7.1
+   ÚNICO alcance:
+   [Respuestas][Conversación][IA local][IA nube][IA local][IA nube][acciones]
+   No altera el resto de la pantalla.
+   ========================================================= */
+
+@media (min-width: 1350px) {
+  /*
+   * 4 métricas + 1 bloque final.
+   * El bloque final contiene:
+   * [IA local][IA nube][acciones]
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns:
+      minmax(150px, 0.78fr)
+      minmax(180px, 0.95fr)
+      minmax(180px, 0.95fr)
+      minmax(180px, 0.95fr)
+      minmax(620px, 2.65fr);
+    align-items: stretch;
+    gap: 0;
+    overflow: visible;
+  }
+
+  /* Las 4 métricas conservan el mismo grosor y no se montan. */
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    padding-inline: 10px;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: 10px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span,
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > strong {
+    min-width: max-content;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  /* El quinto bloque ocupa todo el espacio restante. */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+  }
+
+  /*
+   * Una sola fila:
+   * IA local | IA nube | Volver | Fuentes | Procesar
+   */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 4px 0 4px 10px;
+    overflow: visible;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-toolbar__control-row
+    .rq-ai-engine-chips {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-toolbar__control-row
+    .rq-ai-engine-chip {
+    width: auto;
+    min-width: 94px;
+    max-width: 112px;
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding: 3px 8px;
+    box-shadow: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    flex: 0 0 auto;
+    padding: 0 10px;
+    border-radius: var(--rq-radius-sm);
+    box-shadow: none;
+    font-size: calc(10px * var(--rq-font-scale));
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Escritorio medio:
+ * mantiene las 4 métricas arriba y el bloque IA/acciones debajo
+ * únicamente cuando el ancho ya no permite una sola fila segura.
+ */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 0;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+}
+
+/* RQ DISCUSSION SOLO BARRA SUPERIOR V7.1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION BARRA COMO FUENTES V7.2
+   ÚNICO alcance: compactar la barra superior de Discusión
+   con el mismo ritmo visual de Fuentes.
+   ========================================================= */
+
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    grid-template-columns:
+      repeat(4, minmax(170px, 1fr))
+      minmax(610px, auto);
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Métricas compactas como en Fuentes. */
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    max-height: 46px;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 1px 10px;
+    padding: 5px 12px;
+    overflow: hidden;
+    border: 0;
+    border-right: 1px solid var(--rq-color-border);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > span {
+    min-width: 0;
+    overflow: hidden;
+    align-self: end;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > strong {
+    min-width: max-content;
+    align-self: center;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+    min-width: 0;
+    overflow: hidden;
+    align-self: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Bloque derecho compacto y alineado como en Fuentes. */
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 5;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    max-height: 46px;
+    align-items: center;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-row {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    max-height: 46px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 4px 0 4px 10px;
+    overflow: visible;
+  }
+
+  /* Motores IA con el mismo grosor visual de Fuentes. */
+  .rq-discussion-workspace
+    .rq-discussion-toolbar__control-row
+    .rq-ai-engine-chips {
+    display: flex;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 0 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-toolbar__control-row
+    .rq-ai-engine-chip {
+    width: auto;
+    min-width: 96px;
+    max-width: 116px;
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding: 4px 8px;
+    box-shadow: none;
+  }
+
+  /* Acciones principales: misma altura estándar. */
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 0 10px;
+    border-radius: var(--rq-radius-sm);
+    box-shadow: none;
+    font-size: calc(10px * var(--rq-font-scale));
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+/* Escritorio medio: evita solapamientos sin modificar nada inferior. */
+@media (min-width: 1181px) and (max-width: 1349px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    min-height: 46px;
+    max-height: 46px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 1 / -1;
+    min-height: 46px;
+    padding: 4px 0;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 0;
+  }
+}
+
+/* RQ DISCUSSION BARRA COMO FUENTES V7.2 FIN */
+
+/* La viabilidad y su clasificación forman parte de los indicadores superiores. */
+.rq-discussion-toolbar__viability-value {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 9px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--rq-radius-pill);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-toolbar__viability-value[data-viable="false"] {
+  border-color: color-mix(in srgb, var(--rq-action-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--rq-action-danger) 8%, transparent);
+  color: var(--rq-action-danger);
+}
+
+.rq-discussion-toolbar__viability-value[data-viable="true"] {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 50%,
+    transparent
+  );
+  background: color-mix(in srgb, var(--rq-action-affirmative) 8%, transparent);
+  color: var(--rq-action-affirmative);
+}
+
+.rq-ai-engine-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.rq-ai-engine-menu > summary {
+  display: grid;
+  box-sizing: border-box;
+  min-width: 104px;
+  min-height: 36px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  cursor: pointer;
+  font-size: calc(10px * var(--rq-font-scale));
+  font-weight: 800;
+  list-style: none;
+}
+
+.rq-ai-engine-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rq-ai-engine-menu > summary small {
+  grid-column: 2;
+  color: var(--rq-color-muted);
+  font-size: calc(8px * var(--rq-font-scale));
+}
+
+.rq-ai-engine-menu > summary[data-rq-active="true"] {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 55%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 10%,
+    var(--rq-color-surface)
+  );
+}
+
+.rq-ai-engine-menu > summary[data-rq-active="true"] .rq-ai-engine-chip__dot {
+  background: var(--rq-action-affirmative);
+}
+
+.rq-ai-engine-menu__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  width: 238px;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  box-shadow: var(--rq-shadow-sm);
+}
+
+.rq-discussion-workspace
+  .rq-discussion-toolbar
+  .rq-ai-engine-menu__panel
+  .rq-ai-engine-chip {
+  width: 100%;
+  max-width: none;
+}
+
+@media (min-width: 1350px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    grid-template-columns:
+      repeat(3, minmax(150px, 1fr))
+      minmax(600px, auto);
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__control-area {
+    grid-column: 4;
+    min-height: 46px;
+    padding: 0;
+    border-top: 0;
+  }
+}
+
+@media (min-width: 1181px) {
+  .rq-discussion-workspace .rq-discussion-context-row {
+    grid-template-columns: minmax(0, 1fr) 350px;
+  }
+
+  .rq-discussion-workspace
+    .rq-discussion-context-row
+    .rq-discussion-processing {
+    width: 350px;
+    justify-self: end;
+  }
+}
+

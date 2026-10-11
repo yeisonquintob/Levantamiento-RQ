@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "../support/read-styles";
 
 const DIALOG_FILES = [
   "apps/web/src/app/appearance-controls.tsx",
@@ -57,7 +58,7 @@ test("todas las tablas declaran el alcance de sus encabezados", async () => {
 });
 
 test("el sistema visual conserva foco visible y salto al contenido", async () => {
-  const styles = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const styles = await readStyles();
   const shell = await readFile("apps/web/src/app/app-shell.tsx", "utf8");
 
   assert.match(styles, /:focus-visible/);

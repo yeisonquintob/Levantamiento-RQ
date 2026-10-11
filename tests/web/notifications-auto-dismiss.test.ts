@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { readStyles } from "../support/read-styles";
 
 const APP_ROOT = join(process.cwd(), "apps/web/src/app");
-const STYLES = join(process.cwd(), "libs/shared/ui/src/styles.css");
 
 // Páginas de servidor: no tienen estado de cliente que limpiar; el respaldo CSS
 // oculta su aviso a los 5 s.
@@ -55,7 +55,7 @@ test("el hook limpia el aviso con un tiempo de 5 segundos y reinicia con cada av
 });
 
 test("el respaldo de estilos desvanece cualquier aviso a los 5 segundos", async () => {
-  const css = await readFile(STYLES, "utf8");
+  const css = await readStyles();
   assert.match(css, /@keyframes rq-toast-exit/u);
   assert.match(css, /rq-toast-exit 250ms ease-in 5s forwards/u);
 });

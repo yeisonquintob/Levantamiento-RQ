@@ -1,0 +1,737 @@
+/* RQ PROYECTOS FILTRO AUTOMATICO Y ORDEN V1.2 */
+/* Solo aplica a /workspace/projects. */
+@media (min-width: 1101px) {
+  .rq-projects-filter-bar {
+    grid-template-columns:
+      minmax(320px, 1fr)
+      minmax(160px, 220px)
+      minmax(190px, 240px)
+      auto;
+  }
+
+  .rq-projects-filter-bar .rq-filter-bar__actions {
+    grid-column: auto;
+  }
+}
+/* RQ PROYECTOS FILTRO AUTOMATICO Y ORDEN V1.2 FIN */
+
+/* RQ DISCUSION FILTRO AUTOMATICO Y ORDEN V1.1 */
+/* Solo aplica a /workspace/discussion. */
+.rq-discussion-filter-bar {
+  padding: 2px 0 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (min-width: 1101px) {
+  .rq-discussion-filter-bar {
+    grid-template-columns:
+      minmax(320px, 1fr)
+      minmax(160px, 220px)
+      minmax(190px, 240px)
+      auto;
+  }
+
+  .rq-discussion-filter-bar .rq-filter-bar__actions {
+    grid-column: auto;
+  }
+}
+/* RQ DISCUSION FILTRO AUTOMATICO Y ORDEN V1.1 FIN */
+
+/* =========================================================
+   RQ INTERFAZ LIMPIA Y ALERTAS FLOTANTES V1
+   Reduce marcos repetidos en todos los modulos sin eliminar
+   los limites necesarios de tablas, formularios y dialogos.
+   ========================================================= */
+
+/* La barra de indicadores se lee como una sola franja, no como una tarjeta. */
+.rq-module-commandbar .rq-kpi-grid,
+.rq-kpi-grid {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Las acciones superiores no necesitan un segundo contenedor enmarcado. */
+.rq-module-commandbar__actions {
+  padding-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Los filtros se separan por espacio; cada campo conserva su propio limite. */
+.rq-filter-bar {
+  padding: 4px 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Los encabezados destacados dejan de ser una tarjeta dentro de la pagina. */
+.rq-page-hero {
+  padding: 8px 2px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--rq-color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Una tabla conserva un unico marco exterior y divisores horizontales. */
+.rq-table-shell {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-table-shell__header {
+  padding-inline: 0;
+  border-bottom: 0;
+}
+
+.rq-table-shell__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 10px;
+  background: var(--rq-color-surface);
+}
+
+.rq-table th,
+.rq-table td {
+  border-right: 0;
+  border-bottom: 1px solid var(--rq-color-border);
+}
+
+.rq-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Tarjetas de seleccion: fondo suave y un solo acento al seleccionarlas. */
+.rq-project-card,
+.rq-validation-project-card,
+.rq-settings-card,
+.rq-settings-hub-card {
+  border-color: transparent;
+  background: color-mix(
+    in srgb,
+    var(--rq-color-surface-soft) 58%,
+    var(--rq-color-surface)
+  );
+  box-shadow: none;
+}
+
+.rq-project-card:hover,
+.rq-validation-project-card:hover,
+.rq-settings-card:hover,
+.rq-settings-hub-card:hover {
+  border-color: color-mix(in srgb, var(--rq-action-operation) 28%, transparent);
+  box-shadow: none;
+}
+
+.rq-project-card[data-selected="true"],
+.rq-validation-project-card[data-selected="true"] {
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--rq-action-operation);
+}
+
+/* Paneles informativos: evita marcos dentro de otros marcos. */
+.rq-clean-card {
+  border-color: transparent;
+  background: color-mix(
+    in srgb,
+    var(--rq-color-surface-soft) 52%,
+    var(--rq-color-surface)
+  );
+  box-shadow: none;
+}
+
+/*
+ * Mensajes transitorios compartidos. Se sacan del flujo para que nunca
+ * empujen indicadores, filtros ni tablas cuando aparecen o desaparecen.
+ */
+:is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert) {
+  --rq-toast-accent: var(--rq-action-information);
+  position: fixed;
+  z-index: 1200;
+  inset-block-start: 70px;
+  inset-inline-end: 20px;
+  display: grid;
+  width: min(430px, calc(100vw - 32px));
+  min-height: 52px;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-inline-start: 3px solid var(--rq-toast-accent);
+  border-radius: 12px;
+  background: color-mix(
+    in srgb,
+    var(--rq-color-surface) 96%,
+    var(--rq-toast-accent)
+  );
+  box-shadow: 0 16px 42px rgb(20 28 32 / 18%);
+  color: var(--rq-color-text);
+  animation: rq-toast-enter 180ms ease-out both;
+}
+
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)::before {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--rq-toast-accent);
+  border-radius: 50%;
+  content: "";
+}
+
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-tone="success"],
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-rq-tone="success"] {
+  --rq-toast-accent: var(--rq-action-affirmative);
+}
+
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-tone="warning"],
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-rq-tone="warning"] {
+  --rq-toast-accent: var(--rq-action-warning);
+}
+
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-tone="danger"],
+:is(
+  .rq-alert,
+  .rq-inline-alert,
+  .rq-project-alert,
+  .rq-document-alert
+)[data-rq-tone="danger"] {
+  --rq-toast-accent: var(--rq-action-danger);
+}
+
+:is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert) > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+:is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert)
+  > button {
+  display: grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--rq-color-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+:is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert)
+  > button:hover {
+  background: var(--rq-color-surface-soft);
+  color: var(--rq-color-text);
+}
+
+/* Dos mensajes simultaneos permanecen visibles y no se superponen. */
+.rq-project-alert + .rq-project-alert,
+.rq-document-alert + .rq-document-alert,
+.rq-alert + .rq-alert,
+.rq-inline-alert + .rq-inline-alert {
+  inset-block-start: 132px;
+}
+
+@keyframes rq-toast-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, -6px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (max-width: 700px) {
+  :is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert) {
+    inset-block-start: 62px;
+    inset-inline: 12px;
+    width: auto;
+  }
+
+  .rq-project-alert + .rq-project-alert,
+  .rq-document-alert + .rq-document-alert,
+  .rq-alert + .rq-alert,
+  .rq-inline-alert + .rq-inline-alert {
+    inset-block-start: 124px;
+  }
+}
+
+
+/* Transición direccional breve del contenido central al navegar. */
+@keyframes rq-content-enter-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 96px, 0);
+  }
+}
+
+@keyframes rq-content-enter-down {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -96px, 0);
+  }
+}
+
+@keyframes rq-content-enter-right {
+  from {
+    opacity: 0;
+    transform: translate3d(-14%, 0, 0);
+  }
+}
+
+@keyframes rq-content-enter-left {
+  from {
+    opacity: 0;
+    transform: translate3d(14%, 0, 0);
+  }
+}
+
+.rq-content[data-rq-navigation-direction] {
+  animation-fill-mode: backwards;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html[data-rq-motion="fast"] .rq-content[data-rq-navigation-direction] {
+  animation-duration: 260ms;
+}
+
+html[data-rq-motion="normal"] .rq-content[data-rq-navigation-direction] {
+  animation-duration: 420ms;
+}
+
+html[data-rq-motion="slow"] .rq-content[data-rq-navigation-direction] {
+  animation-duration: 760ms;
+}
+
+html[data-rq-motion="reduced"] .rq-content[data-rq-navigation-direction] {
+  animation: none;
+}
+
+.rq-content[data-rq-navigation-direction="up"] {
+  animation-name: rq-content-enter-up;
+}
+
+.rq-content[data-rq-navigation-direction="down"] {
+  animation-name: rq-content-enter-down;
+}
+
+.rq-content[data-rq-navigation-direction="right"] {
+  animation-name: rq-content-enter-right;
+}
+
+.rq-content[data-rq-navigation-direction="left"] {
+  animation-name: rq-content-enter-left;
+}
+
+/* RQ SHELL CONTRAER Y VOLVER V1 */
+.rq-topbar__collapse,
+.rq-sidebar__back {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .rq-topbar__identity {
+    gap: 8px;
+  }
+
+  .rq-topbar__collapse {
+    display: inline-grid;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--rq-color-text);
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .rq-topbar__collapse:hover {
+    background: transparent;
+    color: var(--rq-action-danger);
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__collapse {
+    display: inline-grid;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong {
+    display: none;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong::after {
+    content: none;
+  }
+
+  .rq-sidebar__toggle-row {
+    justify-content: flex-end;
+  }
+
+  .rq-sidebar__back {
+    display: inline-grid;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 0;
+    border-radius: var(--rq-radius-pill);
+    background: transparent;
+    color: var(--rq-color-muted);
+    cursor: pointer;
+  }
+
+  .rq-sidebar__back svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+
+  .rq-sidebar__back:hover:not(:disabled) {
+    background: color-mix(
+      in srgb,
+      var(--rq-action-danger) 9%,
+      var(--rq-color-surface)
+    );
+    color: var(--rq-action-danger);
+  }
+
+  .rq-sidebar__back:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.rq-alert, .rq-inline-alert, .rq-project-alert, .rq-document-alert) {
+    animation: none;
+  }
+}
+
+/* RQ INTERFAZ LIMPIA Y ALERTAS FLOTANTES V1 FIN */
+
+/* RQ DOCUMENTOS COMPACTOS Y ESTADOS REALES V1 */
+.rq-documents-index {
+  gap: 4px;
+}
+
+.rq-documents-index .rq-documents-filter-bar {
+  gap: 7px;
+  padding-block: 0 3px;
+}
+
+.rq-documents-index .rq-documents-list-heading {
+  gap: 8px;
+  padding-block: 2px 4px;
+}
+
+.rq-documents-index .rq-documents-list-heading__copy p {
+  margin-top: 1px;
+}
+
+.rq-documents-index .rq-documents-list-heading--count-only {
+  display: flex;
+  justify-content: flex-end;
+  padding-block: 0 4px;
+}
+
+.rq-documents-index .rq-document-table th {
+  padding-block: 7px;
+  text-align: left;
+}
+
+.rq-documents-index .rq-document-table td {
+  padding-block: 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.rq-documents-index .rq-document-table tbody td:first-child > small {
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.rq-documents-index .rq-document-table th:last-child,
+.rq-documents-index .rq-document-table td:last-child {
+  width: 150px;
+  min-width: 150px;
+  text-align: left;
+}
+
+.rq-documents-index .rq-document-actions {
+  justify-content: start;
+}
+
+.rq-documents-index .rq-document-open[data-document-action="closed"] {
+  --rq-document-action-color: var(--rq-action-affirmative);
+}
+
+.rq-documents-index .rq-document-open[data-document-action="edit"] {
+  --rq-document-action-color: var(--rq-action-primary);
+}
+
+.rq-documents-index .rq-document-actions .rq-action[data-rq-tone="danger"] {
+  --rq-document-action-color: var(--rq-action-danger);
+}
+
+.rq-documents-index .rq-document-open,
+.rq-documents-index .rq-document-actions .rq-action {
+  justify-content: center;
+  border-color: var(--rq-document-action-color, var(--rq-action-consult));
+  background: var(--rq-document-action-color, var(--rq-action-consult));
+  color: #fff;
+  opacity: 1;
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+}
+
+.rq-documents-index .rq-document-open:hover,
+.rq-documents-index .rq-document-actions .rq-action:not(:disabled):hover {
+  border-color: var(--rq-document-action-color, var(--rq-action-consult));
+  background: var(--rq-document-action-color, var(--rq-action-consult));
+  color: #fff;
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+}
+
+@media (min-width: 1101px) {
+  .rq-documents-index .rq-documents-filter-bar {
+    grid-template-columns: minmax(280px, 1fr) repeat(3, 145px);
+  }
+
+  .rq-documents-index .rq-documents-filter-bar .rq-filter-bar__actions {
+    grid-column: auto;
+    width: 145px;
+  }
+}
+
+.rq-documents-index .rq-documents-filter-bar select,
+.rq-documents-index .rq-documents-filter-bar .rq-filter-bar__actions,
+.rq-documents-index
+  .rq-documents-filter-bar
+  .rq-filter-bar__actions
+  .rq-action {
+  width: 100%;
+  min-width: 0;
+}
+
+/* RQ DOCUMENTOS COMPACTOS Y ESTADOS REALES V1 FIN */
+
+/* RQ DISCUSION Y FUENTES CON PATRON DOCUMENTOS V1 */
+:is(.rq-discussion-index, .rq-sources-index) {
+  gap: 4px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-commandbar {
+  margin: 0;
+  gap: 6px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-commandbar
+  .rq-kpi {
+  min-height: 44px;
+  padding: 4px 8px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-commandbar
+  .rq-module-commandbar__actions
+  .rq-action {
+  min-height: 36px;
+  padding-block: 6px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-filter-bar {
+  gap: 7px;
+  padding-block: 0 3px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-table-shell {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table-shell
+  .rq-table-shell__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 10px;
+  background: var(--rq-color-surface);
+  box-shadow: none;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-table {
+  --rq-compact-table-divider: color-mix(
+    in srgb,
+    var(--rq-color-border) 72%,
+    var(--rq-color-text)
+  );
+  width: 100%;
+  margin: 0;
+  border: 0;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-table th {
+  padding-block: 7px;
+  border-right: 1px solid
+    color-mix(in srgb, var(--rq-color-on-institutional) 34%, transparent);
+  border-bottom: 1px solid var(--rq-compact-table-divider);
+  text-align: left;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-table td {
+  padding-block: 6px;
+  border-right: 1px solid var(--rq-compact-table-divider);
+  border-bottom: 1px solid var(--rq-compact-table-divider);
+  vertical-align: middle;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  tbody
+  tr:last-child
+  td {
+  border-bottom: 0;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  :is(th, td):last-child {
+  border-right: 0;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  th:last-child,
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  td:last-child {
+  width: 150px;
+  min-width: 150px;
+  text-align: left;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-open {
+  display: inline-flex;
+  min-width: 110px;
+  justify-content: center;
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-consult) 88%,
+    var(--rq-color-text)
+  );
+  background: color-mix(
+    in srgb,
+    var(--rq-action-consult) 84%,
+    var(--rq-color-surface)
+  );
+  color: #fff;
+  opacity: 0.92;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-open:hover {
+  border-color: var(--rq-action-consult);
+  background: var(--rq-action-consult);
+  color: #fff;
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+@media (min-width: 1101px) {
+  :is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-filter-bar {
+    grid-template-columns: minmax(280px, 1fr) repeat(3, 145px);
+  }
+
+  :is(.rq-discussion-index, .rq-sources-index)
+    .rq-compact-index-filter-bar
+    .rq-filter-bar__actions {
+    grid-column: auto;
+    width: 145px;
+  }
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-filter-bar
+  select,
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-filter-bar
+  .rq-filter-bar__actions,
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-filter-bar
+  .rq-filter-bar__actions
+  .rq-action {
+  width: 100%;
+  min-width: 0;
+}
+
+/* RQ DISCUSION Y FUENTES CON PATRON DOCUMENTOS V1 FIN */
+

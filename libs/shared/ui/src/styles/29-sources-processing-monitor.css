@@ -1,0 +1,699 @@
+/* Columnas de las bandejas: cada celda conserva su contenido dentro del ancho. */
+:is(.rq-discussion-index, .rq-sources-index) .rq-compact-index-table {
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  :is(th, td) {
+  box-sizing: border-box;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  .rq-status {
+  box-sizing: border-box;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  td:first-child
+  strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is(.rq-discussion-index, .rq-sources-index)
+  .rq-compact-index-table
+  .rq-compact-index-open {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.rq-discussion-index .rq-compact-index-table .rq-discussion-index__dates span {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.rq-discussion-index
+  .rq-compact-index-table
+  td:nth-child(6)
+  > span:not(.rq-status) {
+  display: block;
+  margin-top: 4px;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(1) {
+  width: 23%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(2) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(3) {
+  width: 13%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(4) {
+  width: 7%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(5) {
+  width: 12%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(6) {
+  width: 12%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(7) {
+  width: 13%;
+  min-width: 0;
+}
+
+.rq-discussion-index .rq-compact-index-table :is(th, td):nth-child(8) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(1) {
+  width: 24%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(2) {
+  width: 13%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(3) {
+  width: 7%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(4) {
+  width: 7%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(5) {
+  width: 9%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(6) {
+  width: 12%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(7) {
+  width: 15%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(8) {
+  width: 13%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1240px;
+}
+.rq-documents-index .rq-document-project-summary :is(th, td),
+.rq-documents-index .rq-document-project-summary .rq-status,
+.rq-documents-index .rq-document-project-summary .rq-document-open {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.rq-documents-index .rq-document-project-summary td:first-child strong {
+  display: block;
+  font-weight: 700;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(1) {
+  width: 20%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(2) {
+  width: 8%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(3) {
+  width: 8%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(4) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(5) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(6) {
+  width: 9%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(7) {
+  width: 8%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(8) {
+  width: 9%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(9) {
+  width: 8%;
+  min-width: 0;
+}
+
+.rq-documents-index .rq-document-project-summary :is(th, td):nth-child(10) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-documents-index
+  .rq-document-project-summary
+  .rq-status:is([data-rq-status="success"], [data-rq-status="process"]) {
+  background: var(--rq-color-surface);
+}
+.rq-documents-index
+  .rq-document-project-summary
+  .rq-status[data-rq-status="success"] {
+  border: 1px solid var(--rq-action-affirmative);
+  color: var(--rq-action-affirmative);
+}
+.rq-documents-index
+  .rq-document-project-summary
+  .rq-status[data-rq-status="process"] {
+  border: 1px solid var(--rq-action-operation);
+  color: var(--rq-action-operation);
+}
+
+/* Fuentes: estado de la última generación, independiente del historial completado. */
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(1) {
+  width: 23%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(2) {
+  width: 12%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(3) {
+  width: 6%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(4) {
+  width: 6%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(5) {
+  width: 8%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(6) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(7) {
+  width: 10%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(8) {
+  width: 14%;
+  min-width: 0;
+}
+
+.rq-sources-index .rq-compact-index-table :is(th, td):nth-child(9) {
+  width: 11%;
+  min-width: 0;
+}
+
+/* =========================================================
+   PASO_4_INTERFAZ_PROGRESO_BLOQUES_V1
+   PASO_9_VISTA_COMPACTA_TRES_MODOS_V2
+   Progreso local por bloques, compacto y dinámico.
+   ========================================================= */
+
+.rq-sources-workspace .rq-local-draft-block-progress {
+  display: grid;
+  gap: 4px;
+  padding: 5px 0 0;
+  border-top: 1px solid var(--rq-color-border);
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__header,
+.rq-sources-workspace .rq-local-draft-block-progress__summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__header > strong {
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__header > span,
+.rq-sources-workspace .rq-local-draft-block-progress__summary > small {
+  flex: 0 0 auto;
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__current {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--rq-color-text);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__list > li {
+  display: inline-grid;
+  grid-template-columns: 12px auto;
+  min-width: 31px;
+  min-height: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--rq-color-border) 70%, transparent);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__list > li > strong {
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__marker {
+  width: 12px;
+  text-align: center;
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 900;
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="PROCESSING"] {
+  border-color: color-mix(in srgb, var(--rq-action-operation) 55%, transparent);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="PROCESSING"]
+  .rq-local-draft-block-progress__marker,
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="PROCESSING"]
+  > strong {
+  color: var(--rq-color-info-text);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="COMPLETED"] {
+  border-color: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 45%,
+    transparent
+  );
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="COMPLETED"]
+  .rq-local-draft-block-progress__marker,
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="COMPLETED"]
+  > strong {
+  color: var(--rq-color-success-text);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="FAILED"] {
+  border-color: color-mix(in srgb, var(--rq-action-danger) 55%, transparent);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="FAILED"]
+  .rq-local-draft-block-progress__marker,
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="FAILED"]
+  > strong {
+  color: var(--rq-color-danger-text);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="CANCELLED"] {
+  border-color: color-mix(in srgb, var(--rq-color-muted) 45%, transparent);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="CANCELLED"]
+  .rq-local-draft-block-progress__marker,
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="CANCELLED"]
+  > strong {
+  color: var(--rq-color-muted);
+}
+
+.rq-sources-workspace .rq-source-token-meter {
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+@media (max-width: 700px) {
+  .rq-sources-workspace .rq-local-draft-block-progress__summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rq-sources-workspace .rq-local-draft-block-progress__current {
+    width: 100%;
+    white-space: normal;
+  }
+}
+
+/* =========================================================
+   PASO_12_MONITOR_PROCESAMIENTO_COMPACTO_V2
+   SOLO monitor izquierdo de Fuentes.
+   El panel derecho (resumen + motivo de falla) NO se modifica.
+   ========================================================= */
+
+/* PASO_12_MONITOR_PROCESAMIENTO_COMPACTO_V2 FIN */
+
+/* =========================================================
+   MONITOR_IA_FUENTES_LEGIBILIDAD_V2
+   Jerarquía legible con una huella vertical menor. El reloj ocupa el lugar
+   del indicador redundante "Procesando" y el resumen respeta la columna
+   disponible sin forzar ancho ni altura fuera de sus márgenes.
+   ========================================================= */
+
+/* Punto activo claramente destacado, no solo por color. */
+
+/* Etapas con más aire y sin recortar el nombre con puntos suspensivos: la
+   actividad concreta ("Análisis local", "Borrador por puntos"...) debe
+   leerse completa. */
+
+.rq-sources-workspace .rq-source-token-meter__header > span,
+.rq-sources-workspace .rq-local-draft-block-progress__header > span,
+.rq-sources-workspace .rq-local-draft-block-progress__summary > small {
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+/* Panel "Estimación" / "Resumen de ejecución": compacto y contenido en su
+   columna. No debe forzar los 400px que antes lo llevaban hasta el margen. */
+
+.rq-sources-workspace .rq-source-token-meter__header {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.rq-sources-workspace .rq-source-token-meter__header > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rq-sources-workspace .rq-source-token-meter__header > strong {
+  font-size: calc(13px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-source-token-meter > small {
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+/* Indicador indeterminado: sin proveedor de eventos parciales de la nube,
+   se anima un patrón visual en vez de un número fabricado. */
+.rq-source-cloud-indeterminate {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--rq-radius-pill);
+  background: color-mix(in srgb, var(--rq-color-border) 60%, transparent);
+}
+
+.rq-source-cloud-indeterminate::after {
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 100%;
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-action-operation);
+  content: "";
+  animation: rq-cloud-indeterminate-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes rq-cloud-indeterminate-sweep {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Estancamiento del checkpoint: aviso visible, no un error. */
+.rq-sources-workspace .rq-local-draft-block-progress__stall-notice {
+  display: block;
+  margin-top: 2px;
+  color: var(--rq-action-attention, var(--rq-color-muted));
+  font-weight: 650;
+}
+
+/* Lista de puntos: nombre completo + estado, no solo un círculo numerado.
+   Se deja crecer verticalmente durante IA local en vez de recortar
+   información con overflow. */
+.rq-sources-workspace .rq-local-draft-block-progress {
+  max-height: none;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  flex-wrap: unset;
+  gap: 0.25rem;
+  max-block-size: 9rem;
+  overflow-y: auto;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__list > li {
+  display: grid;
+  grid-template-columns: 1rem 1.25rem minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: start;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--rq-radius-sm);
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__item-number {
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__item-body {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+  line-height: 1.2;
+}
+
+/* El ✓ y el aria-label ya indican «Completado»: se omite el texto repetido. */
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="COMPLETED"]
+  .rq-local-draft-block-progress__item-body
+  > small {
+  display: none;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__item-body > strong {
+  overflow-wrap: anywhere;
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__item-body > small {
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="PROCESSING"] {
+  background: color-mix(in srgb, var(--rq-action-operation) 8%, transparent);
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="FAILED"] {
+  background: color-mix(in srgb, var(--rq-action-danger) 8%, transparent);
+}
+
+/* Apila monitor y resumen antes de que se aprieten; ambos a 100%. */
+@media (max-width: 700px) {
+  .rq-sources-workspace .rq-local-draft-block-progress__list > li {
+    grid-template-columns: 16px 20px minmax(0, 1fr);
+  }
+
+  .rq-sources-workspace .rq-local-draft-block-progress__item-body > strong,
+  .rq-sources-workspace .rq-local-draft-block-progress__item-body > small {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+/* MONITOR_IA_FUENTES_LEGIBILIDAD_V1 FIN */
+
+/* PASO_4_INTERFAZ_PROGRESO_BLOQUES_V1 FIN */
+
+/* The project picker can be folded on phones without affecting desktop. */
+.rq-home-project-list__collapse {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .rq-topbar__actions {
+    grid-column: 3;
+    grid-row: 1;
+    padding: 0;
+    justify-content: flex-end;
+  }
+
+  .rq-topbar__actions .rq-appearance {
+    width: auto;
+  }
+
+  .rq-topbar__page {
+    overflow: hidden;
+  }
+
+  .rq-topbar__page > h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-home-project-state {
+    grid-row: 1;
+  }
+
+  .rq-home-project-list__header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .rq-home-project-list__header h2 {
+    flex: 1;
+  }
+
+  .rq-home-project-list__collapse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid var(--rq-color-border);
+    border-radius: var(--rq-radius-pill);
+    background: var(--rq-color-surface);
+    color: var(--rq-color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .rq-home-project-list__controls {
+    flex-basis: 100%;
+  }
+
+  .rq-home-project-state[data-expanded="false"] .rq-home-project-list__controls,
+  .rq-home-project-state[data-expanded="false"] .rq-home-project-list__content {
+    display: none;
+  }
+
+  .rq-home-project-state[data-expanded="false"] .rq-home-project-list__header {
+    border-bottom: 0;
+  }
+
+  .rq-home-project-state__list {
+    max-height: 45dvh;
+    overflow-y: auto;
+  }
+}
+

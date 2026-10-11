@@ -15,6 +15,7 @@ import {
   sourceProcessingDisplay,
   sourceProcessingPercentage,
 } from "../../apps/web/src/app/workspace/sources/sources-workspace.js";
+import { readStyles } from "../support/read-styles.js";
 
 // Pantalla de Fuentes: el espacio de trabajo y sus componentes de presentación.
 async function readSourcesScreen(): Promise<string> {
@@ -576,7 +577,7 @@ test("el monitor conserva accesibilidad, retry, reloj local y estados específic
   const [source, styles] = await Promise.all([
     readSourcesScreen(),
     import("node:fs/promises").then(({ readFile }) =>
-      readFile("libs/shared/ui/src/styles.css", "utf8"),
+      readStyles(),
     ),
   ]);
 
@@ -628,7 +629,7 @@ test("el indicador indeterminado de nube aparece solo durante CLOUD_AI_GENERATIO
   const [source, styles] = await Promise.all([
     readSourcesScreen(),
     import("node:fs/promises").then(({ readFile }) =>
-      readFile("libs/shared/ui/src/styles.css", "utf8"),
+      readStyles(),
     ),
   ]);
 

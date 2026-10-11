@@ -1,0 +1,508 @@
+/* =========================================================
+   RQ EJECUCION SEGUIMIENTO V1
+   Pestañas «Resumen de cumplimiento» / «Actividades y tareas», franja de KPI con anillo
+   (también en la sección «Indicadores» del documento) y listado con casillas.
+   ========================================================= */
+
+.rq-exec-tabs {
+  display: flex;
+  gap: 4px;
+  margin-block: 4px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rq-color-text) 12%, transparent);
+}
+
+.rq-exec-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--rq-color-muted);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rq-exec-tabs button:hover {
+  color: var(--rq-color-text);
+}
+
+.rq-exec-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--rq-action-primary);
+  color: var(--rq-color-text);
+}
+
+.rq-exec-tabs button small {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rq-color-text) 8%, transparent);
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+/* Franja de KPI */
+.rq-exec-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--rq-space-3);
+}
+
+.rq-exec-kpis article {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--rq-color-text) 3.5%, var(--rq-color-surface));
+}
+
+.rq-exec-kpi__gauge,
+.rq-document-kpi-gauge {
+  position: relative;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+}
+
+.rq-exec-kpi__gauge > strong,
+.rq-document-kpi-gauge > strong {
+  position: absolute;
+  font-size: calc(15px * var(--rq-font-scale));
+  font-weight: 850;
+}
+
+.rq-exec-kpi__ring {
+  width: 100%;
+  height: 100%;
+}
+
+.rq-exec-kpi__ring circle {
+  fill: none;
+  stroke-width: 7;
+}
+
+.rq-exec-kpi__ring-track {
+  stroke: color-mix(in srgb, var(--rq-color-text) 10%, transparent);
+}
+
+.rq-exec-kpi__ring-value {
+  stroke: var(--rq-action-primary);
+  stroke-linecap: round;
+  transition: stroke-dasharray 320ms ease;
+}
+
+article[data-complete="true"] .rq-exec-kpi__ring-value {
+  stroke: var(--rq-action-affirmative);
+}
+
+.rq-exec-kpi__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.rq-exec-kpi__copy > span {
+  font-size: calc(13px * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-exec-kpi__copy > small,
+.rq-exec-kpi__copy > em {
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-style: normal;
+}
+
+.rq-exec-kpi__bar {
+  position: relative;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rq-color-text) 10%, transparent);
+}
+
+.rq-exec-kpi__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rq-action-primary);
+  transition: width 320ms ease;
+}
+
+.rq-exec-kpis article[data-complete="true"] .rq-exec-kpi__bar i {
+  background: var(--rq-action-affirmative);
+}
+
+.rq-exec-kpi__bar b {
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--rq-color-text);
+  opacity: 0.4;
+}
+
+/* Aviso al abrir un proyecto sin aprobar: solo permite regresar. */
+.rq-execution-gate {
+  width: min(480px, 100%);
+}
+
+.rq-execution-gate > p {
+  margin: 0;
+  padding: var(--rq-space-4) var(--rq-space-5);
+  line-height: 1.6;
+}
+
+.rq-execution-gate .rq-project-modal__actions {
+  padding: var(--rq-space-3) var(--rq-space-5) var(--rq-space-4);
+}
+
+/* En el resumen la franja ocupa la columna izquierda: los tres KPI se apilan. */
+.rq-execution-overview {
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+}
+
+.rq-execution-overview .rq-exec-kpis {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--rq-space-2);
+}
+
+.rq-execution-overview .rq-exec-kpis article {
+  grid-template-columns: 64px minmax(0, 1fr);
+  padding: 12px 14px;
+}
+
+.rq-execution-overview .rq-exec-kpi__gauge {
+  width: 64px;
+  height: 64px;
+}
+
+@media (max-width: 1100px) {
+  .rq-execution-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Sección «Indicadores del proyecto» del documento con el mismo lenguaje */
+.rq-document-kpi-dashboard__grid > article {
+  justify-items: center;
+  text-align: center;
+}
+
+.rq-document-kpi-dashboard__grid .rq-exec-kpi__ring-value {
+  stroke: var(--rq-action-primary);
+}
+
+.rq-document-kpi-dashboard__grid > article[data-complete="true"] .rq-exec-kpi__ring-value {
+  stroke: var(--rq-action-affirmative);
+}
+
+.rq-document-kpi-gauge {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 4px;
+}
+
+.rq-document-kpi-gauge > strong {
+  font-size: calc(19px * var(--rq-font-scale));
+}
+
+/* Listado de actividades y tareas */
+.rq-exec-tracking {
+  display: grid;
+  gap: var(--rq-space-3);
+}
+
+.rq-exec-tracking[data-busy="true"] {
+  cursor: progress;
+}
+
+.rq-exec-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rq-exec-filters input[type="search"],
+.rq-exec-filters select {
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rq-color-text) 5%, transparent);
+  color: var(--rq-color-text);
+  font: inherit;
+}
+
+.rq-exec-filters input[type="search"] {
+  min-width: 240px;
+  flex: 1;
+}
+
+.rq-exec-filters__states {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rq-color-text) 5%, transparent);
+}
+
+.rq-exec-filters__states button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rq-color-muted);
+  font: inherit;
+  font-size: calc(12px * var(--rq-font-scale));
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rq-exec-filters__states button[aria-pressed="true"] {
+  background: var(--rq-color-surface);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--rq-color-text) 14%, transparent);
+  color: var(--rq-color-text);
+}
+
+.rq-exec-tree,
+.rq-exec-tree ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 4px;
+  list-style: none;
+}
+
+.rq-exec-tree > li {
+  padding: 6px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--rq-color-text) 3.5%, var(--rq-color-surface));
+}
+
+.rq-exec-tree > li ul {
+  margin: 4px 0 4px 18px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--rq-color-text) 10%, transparent);
+}
+
+.rq-exec-tree > li[data-complete="true"] {
+  background: color-mix(in srgb, var(--rq-action-affirmative) 9%, var(--rq-color-surface));
+}
+
+.rq-exec-node {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.rq-exec-node--epic {
+  grid-template-columns: 22px minmax(0, 1fr) 190px;
+}
+
+.rq-exec-node--story {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.rq-exec-node--task {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.rq-exec-node--task:hover {
+  background: color-mix(in srgb, var(--rq-color-text) 5%, transparent);
+}
+
+.rq-exec-node__title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rq-exec-node__title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-exec-node--epic .rq-exec-node__title strong {
+  font-size: calc(15px * var(--rq-font-scale));
+}
+
+.rq-exec-node__title b {
+  color: var(--rq-color-muted);
+  font-size: 12px;
+}
+
+.rq-exec-code {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rq-action-primary) 12%, transparent);
+  color: var(--rq-action-primary);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-style: normal;
+  font-weight: 800;
+}
+
+.rq-exec-node__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rq-exec-node__progress > div {
+  height: 6px;
+  flex: 1;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rq-color-text) 10%, transparent);
+}
+
+.rq-exec-node__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rq-action-primary);
+  transition: width 240ms ease;
+}
+
+.rq-exec-tree li[data-complete="true"] > .rq-exec-node .rq-exec-node__progress i {
+  background: var(--rq-action-affirmative);
+}
+
+.rq-exec-node output {
+  color: var(--rq-color-muted);
+  font-size: calc(12px * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-exec-check {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--rq-action-affirmative);
+  cursor: pointer;
+}
+
+.rq-exec-check:disabled {
+  cursor: progress;
+}
+
+.rq-exec-task {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.rq-exec-task > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.rq-exec-task strong {
+  font-size: calc(13px * var(--rq-font-scale));
+  font-weight: 650;
+}
+
+.rq-exec-task small {
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+.rq-exec-task p {
+  margin: 2px 0 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rq-action-warning) 12%, transparent);
+  font-size: calc(12px * var(--rq-font-scale));
+}
+
+.rq-exec-note {
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rq-color-text) 7%, transparent);
+  color: var(--rq-color-text);
+  font: inherit;
+}
+
+li[data-state="DONE"] > .rq-exec-node .rq-exec-task strong {
+  color: var(--rq-color-muted);
+  text-decoration: line-through;
+}
+
+li[data-state="IN_PROGRESS"] > .rq-exec-node {
+  background: color-mix(in srgb, var(--rq-action-warning) 10%, transparent);
+}
+
+.rq-exec-task__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rq-exec-task__actions button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rq-color-text) 7%, transparent);
+  color: var(--rq-color-muted);
+  font: inherit;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rq-exec-task__actions button[aria-pressed="true"] {
+  background: var(--rq-action-warning);
+  color: var(--rq-action-on-solid);
+}
+
+.rq-exec-task__actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 900px) {
+  .rq-exec-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-exec-node--epic {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .rq-exec-node--epic .rq-exec-node__progress {
+    grid-column: 2;
+  }
+
+  .rq-exec-node--task {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .rq-exec-task__actions {
+    grid-column: 2;
+  }
+}
+
+/* RQ EJECUCION SEGUIMIENTO V1 FIN */
+

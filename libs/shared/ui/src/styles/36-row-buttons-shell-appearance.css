@@ -1,0 +1,330 @@
+/* DRAFT_BLOCK_TIME_V1: tiempo por punto del borrador. */
+.rq-sources-workspace .rq-local-draft-block-progress__list > li {
+  grid-template-columns: 1rem 1.25rem minmax(0, 1fr) auto;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__item-time {
+  align-self: center;
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.rq-sources-workspace
+  .rq-local-draft-block-progress__list
+  > li[data-rq-block-status="PROCESSING"]
+  .rq-local-draft-block-progress__item-time {
+  color: var(--rq-action-operation);
+}
+
+/* ROW_OPEN_BUTTON_V1: botón «Abrir» de las filas de tabla; blanco y morado al pasar el cursor, mismo tamaño en todas las vistas. */
+.rq-action.rq-row-open,
+.rq-action.rq-row-open[data-rq-tone],
+.rq-documents-index .rq-action.rq-row-open[data-document-action] {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  min-width: 92px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--rq-color-text);
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 1;
+  transform: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.rq-action.rq-row-open:is(:hover, :focus-visible):not(:disabled),
+.rq-action.rq-row-open[data-rq-tone]:is(:hover, :focus-visible):not(:disabled),
+.rq-documents-index
+  .rq-action.rq-row-open[data-document-action]:is(:hover, :focus-visible) {
+  border-color: var(--rq-action-operation);
+  background: var(--rq-action-operation);
+  color: #fff;
+  transform: none;
+}
+
+.rq-action.rq-row-open:disabled {
+  opacity: 0.5;
+}
+
+/* ROW_DELETE_SIZE_V1: «Eliminar» de las filas mide lo mismo que «Abrir». */
+.rq-action.rq-row-delete {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   RQ MENU LATERAL DESLIZANTE V1
+   Contraer/expandir con deslizamiento: el ancho se anima, los textos se
+   desvanecen y los íconos permanecen exactamente en la misma posición.
+   ========================================================= */
+
+@property --rq-sidebar-width {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 220px;
+}
+
+:root {
+  --rq-sidebar-slide: 340ms;
+  --rq-sidebar-ease: cubic-bezier(0.77, 0, 0.18, 1);
+}
+
+html[data-rq-motion="fast"] {
+  --rq-sidebar-slide: 200ms;
+}
+
+html[data-rq-motion="slow"] {
+  --rq-sidebar-slide: 560ms;
+}
+
+html[data-rq-motion="reduced"] {
+  --rq-sidebar-slide: 0ms;
+}
+
+@media (min-width: 900px) {
+  /* Una sola variable anima menú, cabecera y contenido en sincronía. */
+  .rq-shell {
+    transition: --rq-sidebar-width var(--rq-sidebar-slide) var(--rq-sidebar-ease);
+  }
+
+  .rq-sidebar {
+    overflow-x: hidden;
+  }
+
+  /* Los textos se desvanecen y se deslizan hacia la izquierda sin salir del flujo,
+     así los íconos no cambian de posición. */
+  .rq-nav a > span:last-child,
+  .rq-nav__label {
+    overflow: hidden;
+    white-space: nowrap;
+    transition:
+      opacity calc(var(--rq-sidebar-slide) * 0.6) ease,
+      transform var(--rq-sidebar-slide) var(--rq-sidebar-ease);
+  }
+
+  .rq-sidebar[data-collapsed="true"] .rq-nav a > span:last-child,
+  .rq-sidebar[data-collapsed="true"] .rq-nav__label {
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-14px);
+  }
+
+  .rq-sidebar[data-collapsed="true"] .rq-nav a {
+    grid-template-columns: 27px minmax(0, 1fr);
+    padding-inline: 7px;
+  }
+
+  .rq-sidebar[data-collapsed="true"] .rq-nav__icon {
+    margin-inline: 0;
+  }
+
+  /* La flecha de volver acompaña el borde del menú. */
+  .rq-sidebar__toggle-row,
+  .rq-sidebar[data-collapsed="true"] .rq-sidebar__toggle-row {
+    justify-content: flex-end;
+    padding-inline: 12px;
+  }
+
+  /* Cabecera: el botón de contraer no se mueve; el título se recoge. */
+  .rq-topbar__identity,
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity,
+  .rq-shell:not([data-sidebar-collapsed="true"]) .rq-topbar__identity {
+    overflow: hidden;
+    justify-content: flex-start;
+    padding-inline: 12px 10px;
+  }
+
+  .rq-topbar__identity strong {
+    max-width: 190px;
+    opacity: 1;
+    transition:
+      max-width var(--rq-sidebar-slide) var(--rq-sidebar-ease),
+      opacity calc(var(--rq-sidebar-slide) * 0.6) ease;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong {
+    display: block;
+    max-width: 0;
+    font-size: 19px;
+    opacity: 0;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong::after {
+    content: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rq-sidebar-slide: 0ms;
+  }
+}
+
+/* RQ MENU LATERAL DESLIZANTE V1 FIN */
+
+
+/* =========================================================
+   RQ BARRA SUPERIOR SIN BORDES V1
+   Notificaciones, Apariencia y usuario sin recuadro ni aro de enfoque;
+   el estado se comunica con un fondo suave.
+   ========================================================= */
+
+.rq-topbar .rq-notifications-indicator,
+.rq-topbar .rq-appearance__trigger,
+.rq-topbar .rq-user-menu__trigger {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.rq-topbar .rq-notifications-indicator:hover,
+.rq-topbar .rq-appearance__trigger:hover,
+.rq-topbar .rq-user-menu__trigger:hover,
+.rq-topbar .rq-appearance__trigger[aria-expanded="true"],
+.rq-topbar .rq-user-menu__trigger[aria-expanded="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--rq-color-text) 7%, transparent);
+  color: var(--rq-color-text);
+}
+
+/* Sin aro al hacer clic; con teclado queda un fondo más marcado. */
+.rq-topbar .rq-notifications-indicator:focus,
+.rq-topbar .rq-appearance__trigger:focus,
+.rq-topbar .rq-user-menu__trigger:focus {
+  outline: 0;
+}
+
+.rq-topbar .rq-notifications-indicator:focus-visible,
+.rq-topbar .rq-appearance__trigger:focus-visible,
+.rq-topbar .rq-user-menu__trigger:focus-visible {
+  outline: 0;
+  background: color-mix(in srgb, var(--rq-color-text) 12%, transparent);
+}
+
+.rq-notifications-indicator__bell {
+  width: 20px;
+  height: 20px;
+}
+
+.rq-topbar .rq-notifications-indicator strong {
+  top: 1px;
+  right: 0;
+  box-shadow: 0 0 0 2px var(--rq-color-surface);
+}
+
+/* El menú del usuario flota sin marco y las tarjetas internas se funden con el panel. */
+.rq-user-menu__panel {
+  border: 0;
+  box-shadow:
+    0 20px 50px color-mix(in srgb, var(--rq-color-text) 18%, transparent),
+    0 2px 8px color-mix(in srgb, var(--rq-color-text) 8%, transparent);
+}
+
+.rq-user-menu__header {
+  border-bottom: 0;
+  padding-bottom: 8px;
+}
+
+.rq-user-menu__profile {
+  border: 0;
+  background: color-mix(in srgb, var(--rq-color-text) 5%, transparent);
+}
+
+/* RQ BARRA SUPERIOR SIN BORDES V1 FIN */
+
+
+/* =========================================================
+   RQ PANEL APARIENCIA SIN BORDES V1
+   Mismo lenguaje que la barra superior: sin recuadros ni aro de enfoque;
+   la opción activa se distingue por un tinte de color y el texto en negrita.
+   ========================================================= */
+
+.rq-appearance__panel {
+  border: 0;
+  outline: 0;
+  box-shadow:
+    0 20px 50px color-mix(in srgb, var(--rq-color-text) 18%, transparent),
+    0 2px 8px color-mix(in srgb, var(--rq-color-text) 8%, transparent);
+}
+
+.rq-appearance__panel > header {
+  border-bottom: 0;
+}
+
+.rq-appearance__panel > header button,
+.rq-appearance__options button {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.rq-appearance__panel > header button {
+  background: color-mix(in srgb, var(--rq-color-text) 7%, transparent);
+}
+
+.rq-appearance__options button {
+  background: color-mix(in srgb, var(--rq-color-text) 5%, transparent);
+}
+
+.rq-appearance__panel > header button:hover,
+.rq-appearance__options button:hover {
+  background: color-mix(in srgb, var(--rq-color-text) 10%, transparent);
+}
+
+.rq-appearance__panel > header button:focus,
+.rq-appearance__options button:focus {
+  outline: 0;
+}
+
+.rq-appearance__panel > header button:focus-visible,
+.rq-appearance__options button:focus-visible {
+  outline: 0;
+  background: color-mix(in srgb, var(--rq-color-text) 15%, transparent);
+}
+
+.rq-appearance__options button[data-active="true"] {
+  border: 0;
+  background: color-mix(
+    in srgb,
+    var(--rq-action-operation) 20%,
+    var(--rq-color-surface)
+  );
+  box-shadow: none;
+}
+
+.rq-appearance__options button[data-active="true"] > small {
+  font-weight: 800;
+}
+
+/* RQ PANEL APARIENCIA SIN BORDES V1 FIN */
+
+

@@ -1,0 +1,749 @@
+/* =========================================================
+   RQ DISCUSSION INDEX METRICAS Y SIN SOMBRAS V1
+   Solo aplica a /workspace/discussion.
+   ========================================================= */
+
+/* El bloque grande superior desaparece; queda únicamente la acción. */
+.rq-discussion-index__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Se conservan los marcos, pero sin sombras. */
+.rq-discussion-index .rq-table-shell,
+.rq-discussion-index .rq-project-alert,
+.rq-discussion-index .rq-action {
+  box-shadow: none;
+}
+
+/* Las dos nuevas columnas conservan lectura compacta. */
+.rq-discussion-index__table {
+  min-width: 1120px;
+}
+
+.rq-discussion-index__table th:nth-child(4),
+.rq-discussion-index__table td:nth-child(4) {
+  width: 110px;
+  text-align: center;
+}
+
+.rq-discussion-index__table th:nth-child(5),
+.rq-discussion-index__table td:nth-child(5) {
+  width: 190px;
+}
+
+.rq-discussion-index__answers strong {
+  font-size: calc(12px * var(--rq-font-scale));
+}
+
+.rq-discussion-index__generated {
+  min-width: 0;
+}
+
+.rq-discussion-index__generated strong,
+.rq-discussion-index__generated span {
+  display: block;
+}
+
+.rq-discussion-index__generated strong {
+  color: var(--rq-color-text);
+  font-size: calc(10px * var(--rq-font-scale));
+}
+
+.rq-discussion-index__generated span {
+  margin-top: 2px;
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+/* RQ DISCUSSION INDEX METRICAS Y SIN SOMBRAS V1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION TABLA COMPACTA AZUL V1
+   Solo aplica a /workspace/discussion.
+   ========================================================= */
+
+/* El marco queda plano: sin sombras. */
+.rq-discussion-index .rq-table-shell,
+.rq-discussion-index .rq-action,
+.rq-discussion-index .rq-project-alert {
+  box-shadow: none;
+}
+
+/* Tabla más compacta y con anchos controlados. */
+.rq-discussion-index__table {
+  width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+/*
+ * Distribución:
+ * Proyecto              30%
+ * Área solicitante      14%
+ * Estado                14%
+ * Respuestas            14%
+ * Respuestas generadas  14%
+ * Acción                14%
+ */
+.rq-discussion-index__table th:nth-child(1),
+.rq-discussion-index__table td:nth-child(1) {
+  width: 30%;
+}
+
+.rq-discussion-index__table th:nth-child(2),
+.rq-discussion-index__table td:nth-child(2),
+.rq-discussion-index__table th:nth-child(3),
+.rq-discussion-index__table td:nth-child(3),
+.rq-discussion-index__table th:nth-child(4),
+.rq-discussion-index__table td:nth-child(4),
+.rq-discussion-index__table th:nth-child(5),
+.rq-discussion-index__table td:nth-child(5),
+.rq-discussion-index__table th:nth-child(6),
+.rq-discussion-index__table td:nth-child(6) {
+  width: 14%;
+}
+
+/* Los cuatro campos solicitados quedan exactamente con el mismo ancho. */
+.rq-discussion-index__table th:nth-child(2),
+.rq-discussion-index__table td:nth-child(2),
+.rq-discussion-index__table th:nth-child(3),
+.rq-discussion-index__table td:nth-child(3),
+.rq-discussion-index__table th:nth-child(4),
+.rq-discussion-index__table td:nth-child(4),
+.rq-discussion-index__table th:nth-child(5),
+.rq-discussion-index__table td:nth-child(5) {
+  width: 14%;
+}
+
+/* Todos los encabezados alineados a la izquierda, incluida Acción. */
+.rq-discussion-index__table th,
+.rq-discussion-index__table th:last-child {
+  text-align: left;
+}
+
+/* Cabecera azul primaria del sistema. */
+.rq-discussion-index__table th {
+  padding: 8px 10px;
+  background: var(--rq-action-primary);
+  color: var(--rq-action-on-solid);
+  font-size: calc(10px * var(--rq-font-scale));
+}
+
+/* Filas más compactas. */
+.rq-discussion-index__table td {
+  padding: 7px 10px;
+  vertical-align: middle;
+}
+
+.rq-discussion-index__table td:first-child strong {
+  overflow: hidden;
+  color: var(--rq-color-text);
+  font-size: calc(11px * var(--rq-font-scale));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-index__table td:first-child span {
+  margin-top: 2px;
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+.rq-discussion-index__answers strong {
+  font-size: calc(11px * var(--rq-font-scale));
+}
+
+.rq-discussion-index__generated strong {
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+.rq-discussion-index__generated span {
+  margin-top: 1px;
+  font-size: calc(8px * var(--rq-font-scale));
+}
+
+/* Botón de acción más compacto sin cambiar su función. */
+.rq-discussion-index__table td:last-child {
+  text-align: center;
+}
+
+.rq-discussion-index__table td:last-child .rq-action {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: calc(10px * var(--rq-font-scale));
+}
+
+/* RQ DISCUSSION TABLA COMPACTA AZUL V1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION CABECERA NEGRA V1
+   Corrige únicamente el color de la cabecera de la tabla.
+   ========================================================= */
+
+.rq-discussion-index__table th {
+  background: var(--rq-color-institutional);
+  color: var(--rq-color-on-institutional);
+}
+
+/* RQ DISCUSSION CABECERA NEGRA V1 FIN */
+
+/* =========================================================
+   RQ FUENTES INDICE DE PROYECTOS V1
+   Tabla general de fuentes por proyecto.
+   ========================================================= */
+
+.rq-sources-index .rq-table-shell,
+.rq-sources-index .rq-action,
+.rq-sources-index .rq-project-alert {
+  box-shadow: none;
+}
+
+.rq-sources-index__table {
+  min-width: 1160px;
+}
+
+.rq-sources-index__table th:nth-child(1),
+.rq-sources-index__table td:nth-child(1) {
+  width: 25%;
+}
+
+.rq-sources-index__table th:nth-child(2),
+.rq-sources-index__table td:nth-child(2) {
+  width: 12%;
+}
+
+.rq-sources-index__table th:nth-child(3),
+.rq-sources-index__table td:nth-child(3),
+.rq-sources-index__table th:nth-child(4),
+.rq-sources-index__table td:nth-child(4),
+.rq-sources-index__table th:nth-child(5),
+.rq-sources-index__table td:nth-child(5),
+.rq-sources-index__table th:nth-child(6),
+.rq-sources-index__table td:nth-child(6) {
+  width: 9%;
+  text-align: center;
+}
+
+.rq-sources-index__table th:nth-child(7),
+.rq-sources-index__table td:nth-child(7) {
+  width: 16%;
+}
+
+.rq-sources-index__table th:nth-child(8),
+.rq-sources-index__table td:nth-child(8) {
+  width: 11%;
+}
+
+.rq-sources-index__number {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rq-sources-index__empty {
+  padding: 28px 16px !important;
+  color: var(--rq-color-muted);
+  text-align: center !important;
+}
+
+/* RQ FUENTES INDICE DE PROYECTOS V1 FIN */
+
+/* La discusión muestra por separado las fechas reales de IA local y nube. */
+.rq-discussion-index__dates span {
+  display: block;
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+  white-space: nowrap;
+}
+
+.rq-discussion-index__dates strong {
+  color: var(--rq-color-text);
+}
+
+.rq-discussion-index__table th:nth-child(1),
+.rq-discussion-index__table td:nth-child(1) {
+  width: 26%;
+}
+
+.rq-discussion-index__table th:nth-child(2),
+.rq-discussion-index__table td:nth-child(2) {
+  width: 12%;
+}
+
+.rq-discussion-index__table th:nth-child(3),
+.rq-discussion-index__table td:nth-child(3) {
+  width: 11%;
+}
+
+.rq-discussion-index__table th:nth-child(4),
+.rq-discussion-index__table td:nth-child(4) {
+  width: 9%;
+}
+
+.rq-discussion-index__table th:nth-child(5),
+.rq-discussion-index__table td:nth-child(5),
+.rq-discussion-index__table th:nth-child(6),
+.rq-discussion-index__table td:nth-child(6) {
+  width: 16%;
+}
+
+.rq-discussion-index__table th:nth-child(7),
+.rq-discussion-index__table td:nth-child(7) {
+  width: 10%;
+}
+
+/* =========================================================
+   RQ DISCUSSION BARRA UNICA V1
+   Indicadores + IA + acciones en una sola barra sin marco.
+   ========================================================= */
+
+.rq-discussion-toolbar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  scrollbar-width: thin;
+}
+
+.rq-discussion-toolbar > * {
+  flex: 0 0 auto;
+}
+
+.rq-discussion-toolbar > * + * {
+  border-left: 1px solid var(--rq-color-border);
+}
+
+.rq-discussion-toolbar__metric {
+  display: grid;
+  min-width: 105px;
+  align-content: center;
+  grid-template-columns: 1fr auto;
+  gap: 1px 8px;
+  padding: 6px 10px;
+}
+
+.rq-discussion-toolbar__metric span,
+.rq-discussion-toolbar__metric small {
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+.rq-discussion-toolbar__metric strong {
+  overflow: hidden;
+  font-size: calc(13px * var(--rq-font-scale));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-toolbar__metric small {
+  grid-column: 1 / -1;
+}
+
+.rq-discussion-toolbar .rq-ai-engine-chips {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  padding: 4px 10px;
+  background: transparent;
+}
+
+.rq-discussion-toolbar__actions {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 0 4px 10px;
+}
+
+.rq-discussion-toolbar__actions .rq-action {
+  min-height: 34px;
+  padding: 5px 10px;
+  box-shadow: none;
+  font-size: calc(10px * var(--rq-font-scale));
+  white-space: nowrap;
+}
+
+.rq-discussion-project-title {
+  min-width: 0;
+  padding: 4px 2px 2px;
+}
+
+.rq-discussion-project-title strong {
+  display: block;
+  overflow: hidden;
+  color: var(--rq-color-text);
+  font-size: calc(18px * var(--rq-font-scale));
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-discussion-workspace .rq-discussion-tabs {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button {
+  min-height: 32px;
+  padding: 5px 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button[aria-selected="true"] {
+  border-color: var(--rq-color-border);
+  background: var(--rq-color-surface-soft);
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .rq-discussion-toolbar__actions {
+    flex: 0 0 auto;
+  }
+
+  .rq-discussion-project-title strong {
+    font-size: calc(16px * var(--rq-font-scale));
+  }
+}
+
+/* RQ DISCUSSION BARRA UNICA V1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION PULIDO VISUAL V1
+   Solo presentación. No altera lógica ni comportamiento.
+   ========================================================= */
+
+/* Barra superior: mismo ritmo visual del Inicio, sin caja exterior. */
+.rq-discussion-workspace .rq-discussion-toolbar {
+  min-height: 52px;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Indicadores compactos y equilibrados. */
+.rq-discussion-workspace .rq-discussion-toolbar__metric {
+  min-width: 108px;
+  min-height: 52px;
+  align-content: center;
+  padding: 5px 12px;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric:first-child {
+  padding-left: 6px;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric span,
+.rq-discussion-workspace .rq-discussion-toolbar__metric small {
+  line-height: 1.15;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric strong {
+  font-size: calc(14px * var(--rq-font-scale));
+  line-height: 1.1;
+}
+
+/* Mantiene únicamente los separadores verticales internos. */
+.rq-discussion-workspace .rq-discussion-toolbar > * + * {
+  border-left: 1px solid var(--rq-color-border);
+}
+
+/* Motores IA: misma altura visual que el resto de la barra. */
+.rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chips {
+  min-height: 52px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chip {
+  min-width: 94px;
+  min-height: 34px;
+  padding: 4px 8px;
+  box-shadow: none;
+}
+
+/* Acciones: alineadas a la derecha y con altura uniforme. */
+.rq-discussion-workspace .rq-discussion-toolbar__actions {
+  min-height: 52px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0 5px 12px;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+  min-height: 34px;
+  padding: 5px 10px;
+  box-shadow: none;
+}
+
+/* Nombre del proyecto con mejor jerarquía y sin marco. */
+.rq-discussion-workspace .rq-discussion-project-title {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 7px 2px 3px;
+}
+
+.rq-discussion-workspace .rq-discussion-project-title strong {
+  font-size: calc(19px * var(--rq-font-scale));
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * Pestañas limpias:
+ * ya no parecen botones encerrados; la activa se reconoce
+ * por texto + línea inferior delgada.
+ */
+.rq-discussion-workspace .rq-discussion-tabs {
+  display: flex;
+  align-items: end;
+  gap: 18px;
+  min-height: 34px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button,
+.rq-discussion-workspace .rq-discussion-tabs button[aria-selected="true"] {
+  position: relative;
+  min-height: 34px;
+  padding: 4px 2px 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button {
+  color: var(--rq-color-muted);
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button:hover {
+  color: var(--rq-action-operation);
+}
+
+.rq-discussion-workspace .rq-discussion-tabs button[aria-selected="true"] {
+  color: var(--rq-action-operation);
+}
+
+.rq-discussion-workspace
+  .rq-discussion-tabs
+  button[aria-selected="true"]::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-action-operation);
+  content: "";
+}
+
+/* El contador sigue visible, pero más discreto. */
+.rq-discussion-workspace .rq-discussion-tabs button span {
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 5px;
+  font-size: 9px;
+}
+
+/* Paneles planos: conserva bordes, elimina solamente sombras. */
+.rq-discussion-workspace .rq-discussion-questionnaire,
+.rq-discussion-workspace .rq-discussion-conversation,
+.rq-discussion-workspace .rq-discussion-processed {
+  box-shadow: none;
+}
+
+/* En anchos intermedios, la barra puede desplazarse sin deformar controles. */
+@media (max-width: 1180px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    flex: 0 0 auto;
+  }
+}
+
+/* RQ DISCUSSION PULIDO VISUAL V1 FIN */
+
+/* =========================================================
+   RQ DISCUSSION BARRA ORGANIZADA COMO INICIO V2
+   Misma lectura horizontal del resumen de Inicio:
+   indicadores -> motores IA -> acciones.
+   ========================================================= */
+
+@media (min-width: 1181px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    width: 100%;
+    min-height: 54px;
+    grid-template-columns:
+      minmax(105px, 0.7fr)
+      minmax(145px, 0.95fr)
+      minmax(145px, 0.9fr)
+      minmax(145px, 0.9fr)
+      minmax(215px, 1.15fr)
+      auto;
+    align-items: stretch;
+    gap: 0;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Las métricas ocupan el espacio disponible en lugar de dejar huecos. */
+  .rq-discussion-workspace .rq-discussion-toolbar__metric {
+    width: auto;
+    min-width: 0;
+    min-height: 54px;
+    align-content: center;
+    padding: 6px 12px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__metric:first-child {
+    padding-left: 6px;
+  }
+
+  /* Cada grupo queda separado por la misma línea fina usada en Inicio. */
+  .rq-discussion-workspace .rq-discussion-toolbar > * + * {
+    border-left: 1px solid var(--rq-color-border);
+  }
+
+  /* Los dos motores forman un bloque compacto, sin ocupar espacio sobrante. */
+  .rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chips {
+    display: grid;
+    min-width: 0;
+    min-height: 54px;
+    grid-template-columns: repeat(2, minmax(96px, 1fr));
+    align-items: center;
+    justify-content: stretch;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chip {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px 8px;
+    box-shadow: none;
+  }
+
+  /* Acciones inmediatamente después de IA, alineadas a la derecha. */
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    display: flex;
+    width: auto;
+    min-width: max-content;
+    min-height: 54px;
+    flex: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    padding: 6px 0 6px 12px;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions .rq-action {
+    min-height: 36px;
+    padding: 6px 10px;
+    box-shadow: none;
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Tablet:
+ * indicadores arriba y acciones debajo, sin deformar los controles.
+ */
+@media (min-width: 760px) and (max-width: 1180px) {
+  .rq-discussion-workspace .rq-discussion-toolbar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    overflow: visible;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chips {
+    grid-column: 1 / 3;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 0;
+  }
+
+  .rq-discussion-workspace .rq-discussion-toolbar__actions {
+    grid-column: 3 / 5;
+    min-width: 0;
+    justify-content: flex-end;
+    border-top: 1px solid var(--rq-color-border);
+    border-left: 1px solid var(--rq-color-border);
+  }
+}
+
+/* RQ DISCUSSION BARRA ORGANIZADA COMO INICIO V2 FIN */
+
+/* =========================================================
+   RQ DISCUSSION TIPOGRAFIA BARRA V1
+   Ajusta únicamente jerarquía de texto de la barra superior.
+   ========================================================= */
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric > span {
+  color: var(--rq-color-text);
+  font-size: calc(10px * var(--rq-font-scale));
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric > strong {
+  color: var(--rq-color-text);
+  font-size: calc(15px * var(--rq-font-scale));
+  font-weight: 850;
+  line-height: 1.05;
+}
+
+.rq-discussion-workspace .rq-discussion-toolbar__metric > small {
+  color: var(--rq-color-muted);
+  font-size: calc(8px * var(--rq-font-scale));
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+/* Etiquetas principales de los switches IA un poco más firmes. */
+.rq-discussion-workspace
+  .rq-discussion-toolbar
+  .rq-ai-engine-chip
+  > span:not(.rq-ai-engine-chip__dot) {
+  font-weight: 800;
+}
+
+/* Estado Encendida/Apagada sigue siendo secundario. */
+.rq-discussion-workspace .rq-discussion-toolbar .rq-ai-engine-chip small {
+  font-weight: 600;
+}
+
+/* RQ DISCUSSION TIPOGRAFIA BARRA V1 FIN */
+

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "../support/read-styles";
 
 test("Inicio reemplaza proyectos recientes por un diagrama secuencial compacto", async () => {
   const [workspace, styles] = await Promise.all([
     readFile("apps/web/src/app/workspace/home-workspace.tsx", "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
 
   for (const stage of [
@@ -38,7 +39,7 @@ test("Inicio reemplaza proyectos recientes por un diagrama secuencial compacto",
 });
 
 test("Inicio: secciones sin marco exterior y listado de proyectos sin scroll interno", async () => {
-  const styles = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const styles = await readStyles();
   const marker = "RQ INICIO - SECCIONES SIN MARCO EXTERIOR Y LISTADO CONTINUO V1 INICIO";
   const block = styles.slice(styles.lastIndexOf(marker));
 

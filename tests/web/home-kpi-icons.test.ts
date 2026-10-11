@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
+import { readStylesSync } from "../support/read-styles";
 
-const css = readFileSync("libs/shared/ui/src/styles.css", "utf8");
+const css = readStylesSync();
 const start = css.indexOf("/* HOME_KPI_ICONS_V2");
 const end = css.indexOf("@media (prefers-reduced-motion", start);
 const block = css.slice(start, end);

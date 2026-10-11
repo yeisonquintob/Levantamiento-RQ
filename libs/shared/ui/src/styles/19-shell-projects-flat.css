@@ -1,0 +1,606 @@
+/* RQ INICIO - SUPERFICIES SIN SOMBRA V1 */
+/*
+ * Vista plana de Inicio:
+ * - conserva marcos y divisiones;
+ * - elimina únicamente sombras de superficie;
+ * - mantiene el indicador lateral del proyecto seleccionado.
+ */
+.rq-home-workspace .rq-home-flow,
+.rq-home-workspace .rq-home-stage-chart,
+.rq-home-workspace .rq-home-project-state,
+.rq-home-workspace > .rq-module-commandbar .rq-kpi-grid,
+.rq-home-workspace > .rq-module-commandbar .rq-module-commandbar__actions {
+  box-shadow: none;
+}
+/* RQ INICIO - SUPERFICIES SIN SOMBRA V1 FIN */
+
+/* =========================================================
+   RQ MENU LATERAL ICONOS Y ALINEACION V1
+   ========================================================= */
+
+.rq-nav__icon {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rq-color-muted);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.rq-nav__svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.rq-nav a {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.rq-nav a:hover .rq-nav__icon,
+.rq-nav a[aria-current="page"] .rq-nav__icon {
+  background: color-mix(in srgb, var(--rq-action-danger) 10%, transparent);
+  color: var(--rq-action-danger);
+}
+
+.rq-nav a:hover .rq-nav__icon {
+  transform: translateX(1px);
+}
+
+.rq-nav a[aria-current="page"] {
+  color: var(--rq-action-danger);
+}
+
+@media (min-width: 900px) {
+  .rq-shell {
+    --rq-sidebar-width: clamp(220px, 16vw, 260px);
+    grid-template-columns: var(--rq-sidebar-width) minmax(0, 1fr);
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] {
+    --rq-sidebar-width: 68px;
+    grid-template-columns: var(--rq-sidebar-width) minmax(0, 1fr);
+  }
+
+  .rq-topbar {
+    grid-template-columns: var(--rq-sidebar-width) minmax(0, 1fr) auto;
+    gap: 0;
+    padding: 0;
+  }
+
+  .rq-topbar__identity {
+    display: grid;
+    min-width: 0;
+    align-self: stretch;
+    align-content: center;
+    padding: 9px 16px;
+    border-right: 3px solid var(--rq-color-institutional);
+  }
+
+  .rq-topbar__page {
+    align-self: stretch;
+    align-content: center;
+    padding: 9px 16px;
+    border-left: 0;
+  }
+
+  .rq-topbar__actions {
+    padding: 9px 16px 9px 12px;
+  }
+
+  .rq-sidebar {
+    border-right: 3px solid var(--rq-color-institutional);
+  }
+
+  .rq-sidebar__toggle-row {
+    min-height: 44px;
+    align-items: center;
+    padding: 6px 10px 2px;
+    border-bottom: 0;
+  }
+
+  .rq-sidebar__toggle,
+  .rq-sidebar[data-collapsed="true"] .rq-sidebar__toggle {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rq-radius-pill);
+    background: transparent;
+    color: var(--rq-color-muted);
+  }
+
+  .rq-sidebar__toggle:hover {
+    border-color: transparent;
+    background: color-mix(
+      in srgb,
+      var(--rq-action-danger) 9%,
+      var(--rq-color-surface)
+    );
+    color: var(--rq-action-danger);
+  }
+
+  .rq-sidebar__toggle-icon {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    transition: transform 180ms ease;
+  }
+
+  .rq-sidebar__toggle-icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
+  .rq-sidebar[data-collapsed="false"] .rq-sidebar__toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .rq-sidebar[data-collapsed="true"] .rq-sidebar__toggle-row {
+    padding-inline: 7px;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity {
+    justify-items: center;
+    padding-inline: 0;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong {
+    font-size: 0;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong::after {
+    content: "RQ";
+    font-size: 18px;
+    font-weight: 850;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity span {
+    display: none;
+  }
+}
+
+.rq-sidebar .rq-nav {
+  gap: 3px;
+  padding: 8px 10px 16px;
+}
+
+.rq-nav__label {
+  margin: 14px 10px 5px;
+}
+
+.rq-nav a,
+.rq-nav__disabled {
+  min-height: 40px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 9px;
+}
+
+/* RQ MENU LATERAL ICONOS Y ALINEACION V1 FIN */
+
+/* =========================================================
+   RQ MENU/CABECERA AJUSTE FINO V1.1
+   ========================================================= */
+
+@media (min-width: 900px) {
+  /*
+   * Línea del menú:
+   * vuelve al grosor fino de los demás separadores.
+   */
+  .rq-sidebar {
+    border-right: 1px solid var(--rq-color-border);
+  }
+
+  /*
+   * La división superior sigue exactamente alineada con el menú,
+   * pero ya no ocupa toda la altura del encabezado.
+   */
+  .rq-topbar__identity {
+    position: relative;
+    border-right: 0;
+  }
+
+  .rq-topbar__identity::after {
+    position: absolute;
+    top: 50%;
+    right: -1px;
+    width: 1px;
+    height: 42px;
+    background: var(--rq-color-border);
+    content: "";
+    transform: translateY(-50%);
+  }
+
+  /*
+   * Mantiene "Levantamiento RQ" en una sola línea,
+   * más compacto y visualmente menos pesado.
+   */
+  .rq-topbar__identity strong {
+    overflow: hidden;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rq-topbar__identity span {
+    font-size: calc(10px * var(--rq-font-scale));
+  }
+
+  /*
+   * En modo contraído se conserva la sigla RQ sin alterar
+   * el funcionamiento del menú.
+   */
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong {
+    font-size: 0;
+  }
+
+  .rq-shell[data-sidebar-collapsed="true"] .rq-topbar__identity strong::after {
+    font-size: 17px;
+    font-weight: 700;
+  }
+}
+
+/* RQ MENU/CABECERA AJUSTE FINO V1.1 FIN */
+
+/* =========================================================
+   RQ LISTADO PROYECTOS FILTRO ORDEN AVANCE V1
+   ========================================================= */
+
+.rq-home-project-list__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px var(--rq-space-4);
+  border-bottom: 1px solid var(--rq-color-border);
+}
+
+.rq-home-project-list__header h2 {
+  min-width: 0;
+  margin: 0;
+  font-size: calc(18px * var(--rq-font-scale));
+  line-height: 1.15;
+}
+
+.rq-home-project-list__controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.rq-home-project-list__search-toggle {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-muted);
+  cursor: pointer;
+}
+
+.rq-home-project-list__search-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+
+.rq-home-project-list__search-toggle:hover,
+.rq-home-project-list__search-toggle[aria-pressed="true"] {
+  border-color: var(--rq-action-consult);
+  color: var(--rq-action-consult);
+}
+
+.rq-home-project-list__sort {
+  width: min(168px, 42vw);
+  height: 34px;
+  min-width: 0;
+  padding: 0 28px 0 9px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  font-size: calc(9px * var(--rq-font-scale));
+  cursor: pointer;
+}
+
+.rq-home-project-list__search {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 8px var(--rq-space-4);
+  border-bottom: 1px solid var(--rq-color-border);
+  background: var(--rq-color-surface-soft);
+  color: var(--rq-color-muted);
+}
+
+.rq-home-project-list__search > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rq-home-project-list__search input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--rq-color-text);
+  font: inherit;
+  font-size: calc(10px * var(--rq-font-scale));
+}
+
+.rq-home-project-list__search input::placeholder {
+  color: var(--rq-color-muted);
+}
+
+.rq-home-project-state__stage {
+  min-width: 145px;
+}
+
+.rq-home-project-state__progress {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(58px, 1fr) auto auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.rq-home-project-state__progress-track {
+  display: block;
+  overflow: hidden;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-color-border);
+}
+
+.rq-home-project-state__progress-track > span {
+  display: block;
+  width: var(--rq-project-list-progress);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rq-action-primary);
+  transition: width 220ms ease;
+}
+
+.rq-home-project-state__progress[data-complete="true"]
+  .rq-home-project-state__progress-track
+  > span {
+  background: var(--rq-action-affirmative);
+}
+
+.rq-home-project-state__progress output {
+  min-width: 29px;
+  color: var(--rq-color-text);
+  font-size: calc(9px * var(--rq-font-scale));
+  font-weight: 800;
+  text-align: right;
+}
+
+.rq-home-project-state__progress > small {
+  color: var(--rq-color-muted);
+  font-size: calc(8px * var(--rq-font-scale));
+  font-weight: 700;
+}
+
+.rq-home-project-state__progress[data-complete="true"] > small {
+  color: var(--rq-action-affirmative);
+}
+
+@media (max-width: 640px) {
+  .rq-home-project-list__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rq-home-project-list__controls {
+    justify-content: stretch;
+  }
+
+  .rq-home-project-list__sort {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .rq-home-project-state__stage {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* RQ LISTADO PROYECTOS FILTRO ORDEN AVANCE V1 FIN */
+
+/* =========================================================
+   RQ PROYECTOS SIN MARCOS Y COMPACTO V1
+   Solo aplica a /workspace/projects.
+   ========================================================= */
+
+/* Resumen superior: sin envolvente; conserva divisiones internas de KPI. */
+.rq-projects-commandbar .rq-kpi-grid {
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.rq-projects-commandbar .rq-module-commandbar__actions {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Filtros: sin tarjeta exterior. */
+.rq-projects-filter-bar {
+  padding: 6px 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Listado: sin marco/sombra exterior; las tarjetas individuales se conservan. */
+.rq-projects-list > .rq-table-shell {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-projects-list .rq-table-shell__header {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rq-color-border);
+}
+
+.rq-projects-list .rq-project-card-grid {
+  gap: 8px;
+  padding: 8px 0 0;
+}
+
+/* Tarjetas más compactas, manteniendo su marco propio. */
+.rq-projects-list .rq-project-card {
+  padding: 12px;
+  box-shadow: none;
+}
+
+.rq-projects-list .rq-project-card:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.rq-projects-list .rq-project-card__header {
+  gap: 8px;
+}
+
+.rq-projects-list .rq-project-card__description {
+  min-height: 32px;
+  margin-top: 6px;
+  font-size: calc(10px * var(--rq-font-scale));
+  line-height: 1.35;
+}
+
+.rq-projects-list .rq-project-card__tags {
+  margin-top: 6px;
+}
+
+.rq-projects-list .rq-project-card__tags > span {
+  padding: 2px 7px;
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+.rq-projects-list .rq-project-card__footer {
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.rq-projects-list .rq-project-card__metadata {
+  font-size: calc(9px * var(--rq-font-scale));
+}
+
+.rq-projects-list .rq-project-card__actions {
+  gap: 5px;
+}
+
+@media (min-width: 761px) {
+  .rq-projects-commandbar {
+    gap: 8px;
+  }
+
+  .rq-projects-commandbar .rq-kpi {
+    min-height: 44px;
+    padding: 4px 8px;
+  }
+
+  .rq-projects-commandbar .rq-module-commandbar__actions .rq-action {
+    min-height: 36px;
+    padding-block: 6px;
+  }
+
+  .rq-projects-filter-bar {
+    gap: 8px;
+  }
+
+  .rq-projects-filter-bar .rq-field {
+    gap: 3px;
+  }
+
+  .rq-projects-filter-bar .rq-field input,
+  .rq-projects-filter-bar .rq-field select {
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+
+  .rq-projects-filter-bar .rq-filter-bar__actions {
+    gap: 7px;
+  }
+
+  .rq-projects-filter-bar .rq-filter-bar__actions .rq-action {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+
+  .rq-projects-list .rq-project-card__actions .rq-action {
+    min-height: 30px;
+    padding: 4px 7px;
+  }
+}
+
+/* RQ PROYECTOS SIN MARCOS Y COMPACTO V1 FIN */
+
+/* =========================================================
+   RQ PROYECTOS ESPACIADO COMO INICIO V1
+   Replica únicamente el ritmo vertical de .rq-home-workspace.
+   ========================================================= */
+
+.rq-projects-workspace {
+  display: grid;
+  gap: var(--rq-space-4);
+}
+
+/* RQ PROYECTOS ESPACIADO COMO INICIO V1 FIN */
+
+/* =========================================================
+   RQ PROYECTOS SIN SOMBRA Y SIN LINEA TITULO V1
+   Solo aplica a /workspace/projects.
+   ========================================================= */
+
+/* Quita cualquier sombra residual únicamente en la vista Proyectos. */
+.rq-projects-workspace .rq-kpi-grid,
+.rq-projects-workspace .rq-module-commandbar__actions,
+.rq-projects-workspace .rq-projects-filter-bar,
+.rq-projects-workspace .rq-table-shell,
+.rq-projects-workspace .rq-project-card,
+.rq-projects-workspace .rq-project-card:hover {
+  box-shadow: none;
+}
+
+/* Quita solo la línea horizontal que está debajo del título "Proyectos". */
+.rq-projects-list .rq-table-shell__header {
+  border-bottom: 0;
+}
+
+/* RQ PROYECTOS SIN SOMBRA Y SIN LINEA TITULO V1 FIN */
+

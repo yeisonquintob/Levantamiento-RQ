@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { readStylesSync } from "../support/read-styles";
 
 const read = (path: string): string => readFileSync(path, "utf8");
 
 const controls = read("apps/web/src/app/appearance-controls.tsx");
 const layout = read("apps/web/src/app/layout.tsx");
 const settings = read("apps/web/src/app/workspace/settings/general/page.tsx");
-const css = read("libs/shared/ui/src/styles.css");
+const css = readStylesSync();
 
 test("la preferencia de movimiento ofrece las cuatro opciones declaradas", () => {
   for (const [value, label] of [

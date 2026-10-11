@@ -7,8 +7,9 @@ import {
   projectStatusLabel,
   projectStatusTone,
 } from "../../apps/web/src/app/workspace/project-status-badge";
+import { readStylesSync } from "../support/read-styles";
 
-const css = readFileSync("libs/shared/ui/src/styles.css", "utf8");
+const css = readStylesSync();
 const read = (path: string) =>
   readFileSync(`apps/web/src/app/workspace/${path}`, "utf8");
 

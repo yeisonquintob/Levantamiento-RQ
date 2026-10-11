@@ -1,0 +1,1249 @@
+/* =========================================================
+   RQ FUENTES LIMPIEZA VISUAL SOBRIA V1
+   Solo aplica a /workspace/sources.
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   1. RESUMEN SUPERIOR
+   Sin tarjeta exterior. Solo separadores internos.
+   --------------------------------------------------------- */
+
+.rq-sources-workspace > .rq-module-commandbar {
+  gap: 0;
+  align-items: stretch;
+}
+
+.rq-sources-workspace > .rq-module-commandbar .rq-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-sources-workspace > .rq-module-commandbar .rq-kpi {
+  min-height: 46px;
+  gap: 4px;
+  padding: 5px 6px;
+}
+
+.rq-sources-workspace > .rq-module-commandbar .rq-kpi__icon {
+  width: 22px;
+  height: 22px;
+}
+
+.rq-sources-workspace > .rq-module-commandbar .rq-kpi__value {
+  font-size: calc(15px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-source-version-kpi {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.rq-sources-workspace .rq-source-version-kpi select {
+  min-width: 4.75rem;
+  min-height: 1.75rem;
+  padding: 0.125rem 1.5rem 0.125rem 0.375rem;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background-color: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  font: inherit;
+  font-size: calc(0.75rem * var(--rq-font-scale));
+  font-weight: 750;
+}
+
+.rq-sources-workspace > .rq-module-commandbar > .rq-ai-processing-options {
+  padding: 4px 10px;
+  border: 0;
+  border-left: 1px solid var(--rq-color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-sources-workspace > .rq-module-commandbar > .rq-module-commandbar__actions {
+  padding: 4px 0 4px 10px;
+  border: 0;
+  border-left: 1px solid var(--rq-color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------
+   2. EJECUCIÓN DE LA GENERACIÓN (RQ FUENTES V6 COMPACTO)
+   Todo en una pantalla: barra, ejecución y filtros ocupan lo mínimo y la
+   tabla toma el alto restante con scroll interno. Sin alturas fijas: el
+   contenido puede crecer con textos grandes. Rem + tokens semánticos.
+   --------------------------------------------------------- */
+
+.rq-main > .rq-content:has(> .rq-sources-workspace) {
+  block-size: 100%;
+  container-type: inline-size;
+  container-name: rq-sources-content;
+}
+
+.rq-sources-workspace {
+  display: flex;
+  min-block-size: 0;
+  block-size: 100%;
+  flex-direction: column;
+  gap: var(--rq-space-2);
+}
+
+.rq-sources-workspace > * {
+  flex: 0 0 auto;
+}
+
+.rq-sources-workspace .rq-gen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  /* La tarjeta lateral llega hasta la fila de «Mostrar». */
+  align-items: stretch;
+  gap: var(--rq-space-2);
+}
+
+/* El bloque de estado ya no es una tarjeta: sin borde, fondo ni relleno. */
+.rq-sources-workspace .rq-gen__main {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--rq-space-2);
+}
+
+/* El cuadro de tokens sí se conserva como tarjeta. */
+.rq-sources-workspace .rq-gen__side {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--rq-space-2);
+  padding: var(--rq-space-2) var(--rq-space-3);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  background: var(--rq-color-surface);
+}
+
+.rq-gen__outcome {
+  --rq-gen-accent: var(--rq-color-border);
+  --rq-gen-bar: var(--rq-color-info-text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "eyebrow eyebrow eyebrow"
+    "title state controls"
+    "text text text"
+    "hint hint hint";
+  align-items: center;
+  gap: 0.125rem var(--rq-space-2);
+  padding-inline-start: var(--rq-space-2);
+  border-inline-start: 0.25rem solid var(--rq-gen-accent);
+}
+
+.rq-gen__outcome > .rq-gen__eyebrow {
+  grid-area: eyebrow;
+}
+
+.rq-gen__outcome[data-rq-state="active"],
+.rq-gen__outcome[data-rq-state="queued"] {
+  --rq-gen-accent: var(--rq-color-info-text);
+}
+
+.rq-gen__outcome[data-rq-state="completed"] {
+  --rq-gen-accent: var(--rq-color-success-text);
+}
+
+.rq-gen__outcome[data-rq-state="failed"] {
+  --rq-gen-accent: var(--rq-color-danger-text);
+}
+
+.rq-gen__outcome[data-rq-state="cancelled"] {
+  --rq-gen-accent: var(--rq-color-muted);
+}
+
+.rq-gen__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+  margin: 0;
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+.rq-gen__eyebrow > span + span::before {
+  content: "· ";
+}
+
+/* La región viva agrupa estado, título y texto; sus hijos se ubican en la cuadrícula. */
+.rq-gen__live {
+  display: contents;
+}
+
+/* El grupo es transparente salvo en completada, donde apila título y modo. */
+.rq-gen__headline {
+  display: contents;
+}
+
+.rq-gen__outcome[data-rq-state="completed"] .rq-gen__headline {
+  grid-area: title;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.rq-gen__outcome[data-rq-state="completed"] .rq-gen__headline .rq-gen__title {
+  grid-area: auto;
+}
+
+.rq-gen__outcome[data-rq-state="completed"] .rq-gen__headline .rq-gen__text {
+  grid-area: auto;
+}
+
+.rq-gen__title {
+  grid-area: title;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(1rem * var(--rq-font-scale));
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.rq-gen__state {
+  grid-area: state;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--rq-space-2);
+}
+
+.rq-gen__state .rq-status {
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid transparent;
+  font-size: calc(0.75rem * var(--rq-font-scale));
+}
+
+.rq-gen__state .rq-status[data-rq-status="neutral"] {
+  border-color: var(--rq-color-border);
+}
+
+.rq-gen__state-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.rq-gen__state-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.rq-gen__outcome[data-rq-state="completed"] .rq-gen__state-duration {
+  color: var(--rq-color-text);
+  font-size: calc(0.75rem * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-gen__state-icon {
+  margin-inline-end: 0.375rem;
+}
+
+.rq-gen__elapsed {
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rq-gen__elapsed strong {
+  color: var(--rq-color-text);
+}
+
+.rq-gen__outcome:is([data-rq-state="active"], [data-rq-state="queued"])
+  .rq-gen__state
+  .rq-status {
+  border-color: var(--rq-gen-bar);
+  background: var(--rq-gen-bar);
+  color: var(--rq-color-surface);
+}
+
+.rq-gen__outcome[data-rq-state="failed"] .rq-gen__title {
+  color: var(--rq-color-danger-text);
+}
+
+.rq-gen__text {
+  grid-area: text;
+  margin: 0;
+  font-size: calc(0.75rem * var(--rq-font-scale));
+  overflow-wrap: break-word;
+}
+
+.rq-gen__consequence {
+  font-weight: 700;
+}
+
+.rq-gen__controls {
+  grid-area: controls;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem var(--rq-space-2);
+}
+
+.rq-gen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--rq-space-2);
+}
+
+/* Mismo tamaño que el botón «Mostrar» de «Borrador por puntos». */
+.rq-gen .rq-action,
+.rq-gen__link,
+.rq-gen__toggle {
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  padding: 0.125rem 0.5rem;
+  border-radius: 6px;
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-weight: 750;
+  white-space: normal;
+}
+
+.rq-gen__link {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--rq-color-info-text);
+  border-radius: var(--rq-radius-sm);
+  color: var(--rq-color-info-text);
+  text-decoration: none;
+}
+
+.rq-gen__link:hover {
+  background: var(--rq-color-surface-soft);
+}
+
+/* Etapas: tarjetas compactas de columnas iguales, con borde. */
+.rq-gen__pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rq-gen__pipeline[data-rq-step-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rq-gen__pipeline[data-rq-step-count="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rq-gen__pipeline[data-rq-step-count="5"] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.rq-gen__pipeline li {
+  display: flex;
+  min-width: 0;
+  block-size: 2rem;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: start;
+  gap: 0.25rem;
+  padding: 0 var(--rq-space-2);
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  background: var(--rq-color-surface-soft);
+  color: var(--rq-color-muted);
+}
+
+.rq-gen__pipeline li > strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-gen__step-number {
+  display: grid;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 50%;
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-gen__pipeline li[data-rq-state="completed"] {
+  color: var(--rq-color-success-text);
+}
+
+.rq-gen__pipeline li[data-rq-state="active"] {
+  color: var(--rq-color-info-text);
+}
+
+.rq-gen__pipeline li[data-rq-state="failed"] {
+  color: var(--rq-color-danger-text);
+}
+
+.rq-gen__pipeline li[data-rq-state="completed"] .rq-gen__step-number {
+  border-color: var(--rq-color-success-text);
+  background: var(--rq-color-success-text);
+  color: var(--rq-color-surface);
+}
+
+.rq-gen__pipeline li[data-rq-state="active"] .rq-gen__step-number {
+  border-color: var(--rq-color-info-text);
+  background: var(--rq-color-info-text);
+  color: var(--rq-color-surface);
+}
+
+.rq-gen__pipeline li[data-rq-state="failed"] .rq-gen__step-number {
+  border-color: var(--rq-color-danger-text);
+  background: var(--rq-color-danger-text);
+  color: var(--rq-color-surface);
+}
+
+/* El estado no depende solo del color: marca textual al final de la etapa. */
+.rq-gen__pipeline li[data-rq-state="completed"]::after {
+  content: "✓";
+  color: var(--rq-color-success-text);
+}
+
+.rq-gen__pipeline li[data-rq-state="failed"]::after {
+  content: "✕";
+  color: var(--rq-color-danger-text);
+}
+
+.rq-gen__pipeline li[data-rq-state="active"]::after {
+  content: "…";
+  color: var(--rq-color-info-text);
+}
+
+.rq-gen__progress {
+  --rq-gen-bar: var(--rq-color-info-text);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--rq-space-2);
+  margin-block-start: 0.375rem;
+}
+
+.rq-gen__progress[data-rq-state="completed"] {
+  --rq-gen-bar: var(--rq-color-success-text);
+}
+
+.rq-gen__progress[data-rq-state="failed"] {
+  --rq-gen-bar: var(--rq-color-danger-text);
+}
+
+.rq-gen__progress[data-rq-state="cancelled"] {
+  --rq-gen-bar: var(--rq-color-muted);
+}
+
+/* Barra en curso: franjas en movimiento (se detienen con prefers-reduced-motion). */
+.rq-gen__progress[data-rq-state="active"] progress::-webkit-progress-value,
+.rq-gen__progress[data-rq-state="queued"] progress::-webkit-progress-value {
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgb(255 255 255 / 0.28) 0 7px,
+      transparent 7px 14px
+    ),
+    linear-gradient(90deg, var(--rq-gen-bar), var(--rq-gen-bar));
+  background-size:
+    28px 100%,
+    100% 100%;
+  animation: rq-progress-stripes 0.9s linear infinite;
+}
+
+.rq-gen__progress[data-rq-state="active"] progress::-moz-progress-bar,
+.rq-gen__progress[data-rq-state="queued"] progress::-moz-progress-bar {
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgb(255 255 255 / 0.28) 0 7px,
+      transparent 7px 14px
+    ),
+    linear-gradient(90deg, var(--rq-gen-bar), var(--rq-gen-bar));
+  background-size:
+    28px 100%,
+    100% 100%;
+  animation: rq-progress-stripes 0.9s linear infinite;
+}
+
+.rq-gen__pipeline li[data-rq-state="active"] .rq-gen__step-number {
+  animation: rq-ai-status-pulse 1.6s ease-out infinite;
+}
+
+.rq-gen__progress > strong {
+  font-size: calc(0.75rem * var(--rq-font-scale));
+  font-variant-numeric: tabular-nums;
+}
+
+.rq-gen progress,
+.rq-source-prep progress,
+.rq-source-token-meter progress {
+  inline-size: 100%;
+  block-size: 0.5rem;
+  appearance: none;
+  border: 0;
+  border-radius: var(--rq-radius-pill);
+  background: color-mix(
+    in srgb,
+    var(--rq-color-text) 18%,
+    var(--rq-color-surface)
+  );
+  overflow: hidden;
+}
+
+.rq-gen progress::-webkit-progress-bar,
+.rq-source-prep progress::-webkit-progress-bar,
+.rq-source-token-meter progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+.rq-gen progress::-webkit-progress-value,
+.rq-source-prep progress::-webkit-progress-value,
+.rq-source-token-meter progress::-webkit-progress-value {
+  background: var(--rq-gen-bar, var(--rq-color-info-text));
+  transition: inline-size 0.4s ease-out;
+}
+
+.rq-gen progress::-moz-progress-bar,
+.rq-source-prep progress::-moz-progress-bar,
+.rq-source-token-meter progress::-moz-progress-bar {
+  background: var(--rq-gen-bar, var(--rq-color-info-text));
+}
+
+.rq-gen__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--rq-space-2);
+  font-size: calc(0.75rem * var(--rq-font-scale));
+}
+
+.rq-gen__detail > span {
+  color: var(--rq-color-muted);
+}
+
+.rq-gen__detail > strong {
+  overflow-wrap: break-word;
+}
+
+.rq-gen__toggle {
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  cursor: pointer;
+}
+
+.rq-gen__toggle:hover {
+  background: var(--rq-color-surface-soft);
+}
+
+/* Detalles técnicos: panel acotado al viewport con scroll propio. */
+.rq-gen__technical-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--rq-space-1) var(--rq-space-4);
+  max-block-size: 30dvh;
+  margin: 0;
+  overflow: auto;
+}
+
+.rq-gen__technical-list[hidden] {
+  display: none;
+}
+
+.rq-gen__technical-list div {
+  min-width: 0;
+}
+
+.rq-gen__technical-list dt {
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+.rq-gen__technical-list dd {
+  margin: 0;
+  font-size: calc(0.75rem * var(--rq-font-scale));
+  /* Identificadores y rutas largas: único lugar donde se permite partir. */
+  overflow-wrap: anywhere;
+}
+
+/* Consumo: bloque plegado dentro de los detalles (ya no hay tarjeta lateral). */
+.rq-gen__disclosure {
+  display: grid;
+  gap: var(--rq-space-2);
+  padding-top: var(--rq-space-2);
+  border-top: 1px solid var(--rq-color-border);
+}
+
+.rq-gen__disclosure[hidden] {
+  display: none;
+}
+
+.rq-gen__side .rq-source-token-meter {
+  display: grid;
+  gap: var(--rq-space-1);
+}
+
+.rq-gen__side .rq-source-token-meter__header h3 {
+  margin: 0;
+  font-size: calc(0.8125rem * var(--rq-font-scale));
+}
+
+.rq-gen__side .rq-source-token-meter__mode {
+  min-width: 0;
+  color: var(--rq-color-info-text);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  font-weight: 700;
+  letter-spacing: normal;
+  overflow-wrap: break-word;
+  text-align: end;
+  text-transform: none;
+}
+
+.rq-source-token-details > summary {
+  min-height: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 64rem) {
+  .rq-sources-workspace .rq-gen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-gen__outcome {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "eyebrow"
+      "state"
+      "title"
+      "text"
+      "controls"
+      "hint";
+  }
+
+  .rq-gen__controls,
+  .rq-gen__actions {
+    justify-items: start;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rq-gen *,
+  .rq-gen *::before,
+  .rq-gen *::after,
+  .rq-source-prep progress,
+  .rq-source-cloud-indeterminate,
+  .rq-source-cloud-indeterminate::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Barra superior: una sola fila (métricas | IA | acciones). */
+.rq-sources-workspace > .rq-module-commandbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, auto);
+  align-items: center;
+  gap: var(--rq-space-2) var(--rq-space-4);
+  padding-block: 0;
+}
+
+.rq-sources-workspace .rq-kpi__icon {
+  background: color-mix(
+    in srgb,
+    var(--rq-color-info-text) 14%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-color-info-text);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-kpi__title {
+  font-size: calc(0.75rem * var(--rq-font-scale));
+}
+
+/* La aclaración de cada métrica sigue disponible: lectores de pantalla,
+   foco y puntero (cuadro flotante), sin ocupar altura. */
+.rq-sources-workspace .rq-kpi__description {
+  overflow: visible;
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.rq-sources-workspace .rq-status,
+.rq-gen .rq-status {
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-status[data-rq-status="danger"],
+.rq-gen .rq-status[data-rq-status="danger"] {
+  border-color: var(--rq-color-danger-text);
+  color: var(--rq-color-danger-text);
+}
+
+/* «Más métricas» se abre sobre la pantalla: no empuja el resto. */
+
+.rq-sources-workspace .rq-ai-processing-options {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rq-sources-workspace .rq-module-commandbar__actions.rq-source-command-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--rq-space-2);
+  padding: 0;
+}
+
+.rq-sources-workspace .rq-source-command-actions > .rq-source-command-action,
+.rq-sources-workspace .rq-source-command-actions > .rq-source-view-draft {
+  min-height: 2rem;
+  height: auto;
+  max-height: none;
+  padding: 0.125rem 0.75rem;
+  white-space: normal;
+}
+
+@media (max-width: 64rem) {
+  .rq-sources-workspace > .rq-module-commandbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-sources-workspace
+    .rq-module-commandbar__actions.rq-source-command-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Controles y filtros compactos (misma altura de control en toda la pantalla). */
+.rq-sources-workspace {
+  --rq-control-height: 2.125rem;
+}
+
+.rq-sources-workspace .rq-source-filter-bar.rq-source-filter-bar--unified {
+  gap: 0.25rem var(--rq-space-2);
+  padding: 0;
+}
+
+.rq-sources-workspace .rq-source-filter-bar .rq-field {
+  gap: 0.125rem;
+}
+
+.rq-sources-workspace .rq-source-filter-bar .rq-field > label,
+.rq-sources-workspace .rq-source-filter-bar .rq-project-picker > label {
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+/* Tabla: toma el alto restante, desplaza por dentro y conserva el encabezado. */
+.rq-sources-workspace > .rq-table-shell {
+  display: flex;
+  min-block-size: 8rem;
+  flex: 0 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rq-sources-workspace > .rq-table-shell > .rq-table-shell__header {
+  padding: 0.125rem 0;
+}
+
+.rq-sources-workspace > .rq-table-shell > .rq-table-shell__header h2 {
+  font-size: calc(0.875rem * var(--rq-font-scale));
+}
+
+.rq-sources-workspace > .rq-table-shell .rq-table-shell__scroll {
+  min-block-size: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.rq-sources-workspace .rq-source-table {
+  min-width: 60rem;
+  table-layout: auto;
+}
+
+.rq-sources-workspace .rq-source-table thead th {
+  position: sticky;
+  z-index: 1;
+  inset-block-start: 0;
+}
+
+.rq-sources-workspace .rq-source-table :is(th, td) {
+  padding: 0.25rem 0.5rem;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(1),
+.rq-sources-workspace .rq-source-table td:nth-child(1) {
+  inline-size: 2.5rem;
+  text-align: center;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(2) {
+  min-inline-size: 16rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(3) {
+  min-inline-size: 9rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(4) {
+  min-inline-size: 11rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(5),
+.rq-sources-workspace .rq-source-table th:nth-child(6) {
+  min-inline-size: 9rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(7) {
+  min-inline-size: 6rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(8) {
+  min-inline-size: 9rem;
+}
+
+.rq-sources-workspace .rq-source-table th:nth-child(9) {
+  min-inline-size: 11rem;
+}
+
+.rq-sources-workspace .rq-source-table__title > span {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--rq-color-muted);
+}
+
+.rq-sources-workspace .rq-source-table__title > strong {
+  overflow-wrap: break-word;
+}
+
+.rq-sources-workspace .rq-source-table__file > span {
+  display: -webkit-box;
+  max-inline-size: 22rem;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rq-sources-workspace .rq-source-table__type {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.rq-sources-workspace .rq-source-table__type small {
+  color: var(--rq-color-muted);
+  font-size: calc(0.6875rem * var(--rq-font-scale));
+}
+
+.rq-sources-workspace .rq-source-prep {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rq-sources-workspace .rq-source-prep[data-state="FAILED"] {
+  color: var(--rq-color-danger-text);
+  font-weight: 700;
+}
+
+.rq-sources-workspace .rq-source-prep[data-state="READY"] {
+  color: var(--rq-color-success-text);
+}
+
+.rq-sources-workspace .rq-source-generation-cell[data-included="false"] {
+  color: var(--rq-color-muted);
+}
+
+.rq-sources-workspace .rq-source-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.rq-sources-workspace .rq-source-table__actions .rq-action {
+  min-height: 1.75rem;
+  height: auto;
+  max-height: none;
+  padding: 0.125rem 0.5rem;
+  white-space: normal;
+}
+
+/* ---------------------------------------------------------
+   3. FILTROS
+   Sin tarjeta blanca exterior; controles conservan sus bordes.
+   --------------------------------------------------------- */
+
+.rq-sources-workspace .rq-source-filter-bar--unified {
+  gap: 8px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------
+   4. FUENTES
+   Solo título + tabla. Sin contenedor blanco exterior.
+   --------------------------------------------------------- */
+
+.rq-sources-workspace > .rq-table-shell {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-sources-workspace > .rq-table-shell > .rq-table-shell__header {
+  display: none;
+}
+
+.rq-sources-workspace > .rq-table-shell > .rq-table-shell__header h2 {
+  font-size: calc(18px * var(--rq-font-scale));
+}
+
+.rq-sources-workspace > .rq-table-shell .rq-table-shell__scroll {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Vista completa sin sombras residuales en los bloques solicitados. */
+.rq-sources-workspace .rq-module-commandbar,
+.rq-sources-workspace .rq-source-token-meter,
+.rq-sources-workspace .rq-source-filter-bar,
+.rq-sources-workspace .rq-table-shell {
+  box-shadow: none;
+}
+
+/* RQ FUENTES LIMPIEZA VISUAL SOBRIA V1 FIN */
+
+/* =========================================================
+   RQ FUENTES FILTROS AUTOMATICOS Y TABLA V2
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   FILTROS: Proyecto | Buscar | Tipo | Estado | Limpiar
+   --------------------------------------------------------- */
+
+.rq-sources-workspace .rq-source-filter-bar.rq-source-filter-bar--unified {
+  grid-template-columns:
+    minmax(300px, 1.35fr)
+    minmax(240px, 1fr)
+    minmax(120px, 0.5fr)
+    minmax(125px, 0.5fr)
+    auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.rq-sources-workspace .rq-source-filter-bar .rq-filter-bar__actions {
+  width: auto;
+  grid-column: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rq-sources-workspace .rq-source-filter-bar .rq-filter-bar__actions .rq-action {
+  min-width: 96px;
+}
+
+/* ---------------------------------------------------------
+   MENSAJE COMPLETADO: debajo del medidor y más visible.
+   --------------------------------------------------------- */
+
+/* ---------------------------------------------------------
+   TABLA: misma lectura limpia del resto del sistema.
+   --------------------------------------------------------- */
+
+.rq-sources-workspace .rq-source-table {
+  width: 100%;
+  min-width: 1080px;
+  table-layout: fixed;
+}
+
+.rq-sources-workspace .rq-source-table th,
+.rq-sources-workspace .rq-source-table td {
+  padding: 8px 9px;
+  vertical-align: middle;
+}
+
+.rq-sources-workspace .rq-source-table th {
+  text-align: left;
+}
+
+.rq-sources-workspace .rq-source-table tbody tr {
+  box-shadow: none;
+}
+
+/* Sin sombra en acciones de tabla. */
+.rq-sources-workspace .rq-source-table .rq-action {
+  box-shadow: none;
+}
+
+@media (max-width: 1080px) {
+  .rq-sources-workspace .rq-source-filter-bar.rq-source-filter-bar--unified {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rq-sources-workspace .rq-source-filter-bar .rq-filter-bar__actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .rq-sources-workspace .rq-source-filter-bar.rq-source-filter-bar--unified {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rq-sources-workspace .rq-source-filter-bar .rq-filter-bar__actions {
+    grid-column: auto;
+  }
+}
+
+/* RQ FUENTES FILTROS AUTOMATICOS Y TABLA V2 FIN */
+
+/* =========================================================
+   RQ FUENTES TABLA BORDES Y ACCIONES V3
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   TABLA: ancho real del contenedor, sin desbordar la pantalla.
+   --------------------------------------------------------- */
+
+.rq-sources-workspace > .rq-table-shell {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rq-sources-workspace > .rq-table-shell .rq-table-shell__scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.rq-sources-workspace .rq-source-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 1px solid var(--rq-color-border);
+}
+
+/* Bordes completos, horizontales y verticales. */
+.rq-sources-workspace .rq-source-table th,
+.rq-sources-workspace .rq-source-table td {
+  border: 1px solid var(--rq-color-border);
+  padding: 7px 8px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+/*
+ * Distribución exacta = 100%.
+ * Se reduce Procesamiento y se da espacio suficiente a Acciones.
+ */
+
+/* Textos largos permanecen dentro de la celda. */
+.rq-sources-workspace .rq-source-table td {
+  overflow-wrap: anywhere;
+}
+
+.rq-sources-workspace .rq-source-table__title strong,
+.rq-sources-workspace .rq-source-table__title span {
+  max-width: 100%;
+}
+
+/* ---------------------------------------------------------
+   PROCESAMIENTO:
+   título arriba -> barra -> porcentaje abajo.
+   --------------------------------------------------------- */
+
+/* ---------------------------------------------------------
+   ACCIONES:
+   Editar | Eliminar
+   Descargar debajo cuando exista.
+   Todos conservan exactamente el mismo tamaño.
+   --------------------------------------------------------- */
+
+/* Si una acción no existe, las demás no cambian de tamaño. */
+
+/* RQ FUENTES TABLA BORDES Y ACCIONES V3 FIN */
+
+/* =========================================================
+   RQ FUENTES TABLA REDONDA PIPELINE MENU V4
+   ========================================================= */
+
+.rq-sources-workspace > .rq-table-shell .rq-table-shell__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 12px;
+  background: var(--rq-color-surface);
+}
+
+.rq-sources-workspace .rq-source-table {
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 0;
+}
+
+.rq-sources-workspace .rq-source-table th,
+.rq-sources-workspace .rq-source-table td {
+  border: 0;
+  border-right: 1px solid var(--rq-color-border);
+  border-bottom: 1px solid var(--rq-color-border);
+}
+
+.rq-sources-workspace .rq-source-table th {
+  text-align: left;
+}
+
+.rq-sources-workspace .rq-module-commandbar__actions.rq-source-command-actions {
+  position: relative;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 0 4px 10px;
+}
+
+.rq-source-command-more {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.rq-source-command-more > summary {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--rq-color-border-strong);
+  border-radius: var(--rq-radius-sm);
+  background: var(--rq-color-surface);
+  color: var(--rq-color-text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rq-source-command-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rq-source-command-more > summary:hover,
+.rq-source-command-more[open] > summary {
+  border-color: var(--rq-action-consult);
+  color: var(--rq-action-consult);
+}
+
+.rq-source-command-more__icon {
+  display: grid;
+  width: 16px;
+  gap: 3px;
+}
+
+.rq-source-command-more__icon i {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.rq-source-command-more__menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  width: 230px;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: var(--rq-radius-md);
+  background: var(--rq-color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.rq-source-command-more__item {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: var(--rq-radius-sm);
+  background: transparent;
+  color: var(--rq-color-text);
+  font: inherit;
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rq-source-command-more__item:hover {
+  background: var(--rq-color-surface-soft);
+}
+
+@media (max-width: 980px) {
+  .rq-sources-workspace
+    .rq-module-commandbar__actions.rq-source-command-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* RQ FUENTES TABLA REDONDA PIPELINE MENU V4 FIN */
+

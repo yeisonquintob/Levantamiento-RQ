@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { SIDEBAR_MENU_DEFINITIONS } from "../../apps/web/src/app/sidebar-navigation";
+import { readStyles } from "../support/read-styles";
 
 test("Proyectos presenta tarjetas compactas y acciones sobre el proyecto seleccionado", async () => {
   const [workspace, styles] = await Promise.all([
     readFile("apps/web/src/app/workspace/projects-workspace.tsx", "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   // Cada tarjeta ofrece «Ver / editar» y se puede seleccionar; Discusión,
   // Fuentes y Eliminar están en el menú ☰ y actúan sobre el proyecto
@@ -50,7 +51,7 @@ test("Discusión compara evidencia, IA local e IA nube antes de crear la fuente"
       "utf8",
     ),
     readFile("apps/web/src/app/workspace/ai-engine-selection.tsx", "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   for (const text of [
     "Mi levantamiento",
@@ -124,7 +125,7 @@ test("Discusión compara evidencia, IA local e IA nube antes de crear la fuente"
 test("el menú lateral incluye Discusión y puede contraerse en escritorio", async () => {
   const [shell, styles, indexPage, projectList] = await Promise.all([
     readFile("apps/web/src/app/app-shell.tsx", "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
     readFile("apps/web/src/app/workspace/discussion/page.tsx", "utf8"),
     readFile(
       "apps/web/src/app/workspace/discussion/discussion-project-list.tsx",

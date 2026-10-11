@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { resolveWorkspaceBackTarget as back } from "../../apps/web/src/app/workspace-navigation-transition";
+import { readStylesSync } from "../support/read-styles";
 
 const read = (path: string): string => readFileSync(path, "utf8");
 const at = (pathname: string, search = ""): string | null =>
@@ -53,7 +54,7 @@ test("discusión, configuración y documentos vuelven a su padre semántico", ()
 
 test("el shell contrae con el icono de panel lateral junto a la marca y la flecha lateral no rota", () => {
   const shell = read("apps/web/src/app/app-shell.tsx");
-  const css = read("libs/shared/ui/src/styles.css");
+  const css = readStylesSync();
   const identity = shell.slice(
     shell.indexOf('className="rq-topbar__identity"'),
     shell.indexOf('className="rq-topbar__page"'),

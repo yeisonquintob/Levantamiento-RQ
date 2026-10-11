@@ -12,6 +12,8 @@ import {
 } from "../../apps/web/src/app/workspace/sources/live-clock";
 import { runWithConcurrency } from "../../apps/web/src/app/workspace/concurrency";
 import { jsonEqual } from "../../apps/web/src/app/workspace/documents/[documentId]/json-equal";
+import { readDocumentSectionPresenterSource } from "../support/document-section-presenter-source";
+import { readStylesSync } from "../support/read-styles";
 
 test("jsonEqual: misma referencia al instante y diferencias profundas detectadas", () => {
   const value = { a: [1, { b: "x" }], c: null };
@@ -79,10 +81,10 @@ test("los relojes de Fuentes viven en componentes propios y formatean igual que 
   assert.match(renderToStaticMarkup(createElement(StallNotice, { active: true, updatedAt: "2020-01-01T00:00:00Z" })), /no se ha recibido un nuevo punto de control/u);
   const workspace = readFileSync("apps/web/src/app/workspace/sources/sources-workspace.tsx", "utf8");
   assert.doesNotMatch(workspace, /visualNow/u);
-  const presenter = readFileSync("apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.tsx", "utf8");
+  const presenter = readDocumentSectionPresenterSource();
   assert.match(presenter, /^const PendingItems = \(/mu);
   assert.doesNotMatch(presenter, /^ {2}const PendingItems = /mu);
-  assert.match(readFileSync("libs/shared/ui/src/styles.css", "utf8"), /\.rq-exec-tree > li > ul > li \{\s+content-visibility: auto;/u);
+  assert.match(readStylesSync(), /\.rq-exec-tree > li > ul > li \{\s+content-visibility: auto;/u);
 });
 
 import {

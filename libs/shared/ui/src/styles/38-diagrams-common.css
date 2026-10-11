@@ -1,0 +1,270 @@
+/* =========================================================
+   RQ DIAGRAMA POR CARRILES V2
+   Diagrama más legible y armónico: carriles suaves con acento, flechas del color de la línea
+   (el marcador vive en <defs>, fuera de las reglas anteriores), tipografías mayores, sin
+   espacio muerto vertical y con vista ampliada.
+   ========================================================= */
+
+.rq-swimlane-flow {
+  --rq-swimlane-edge: color-mix(in srgb, var(--rq-color-text) 58%, var(--rq-color-surface));
+}
+
+.rq-swimlane-flow marker path {
+  fill: var(--rq-swimlane-edge);
+}
+
+.rq-swimlane-flow__viewport {
+  min-height: 0;
+  max-height: none;
+  padding: 12px;
+}
+
+.rq-swimlane-flow[data-expanded="true"] {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+}
+
+.rq-swimlane-flow[data-expanded="true"] .rq-swimlane-flow__viewport {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Carriles: cuerpo casi blanco con un toque del acento, etiqueta suave y barra de color. */
+.rq-swimlane-flow__lanes > g > rect:first-child {
+  fill: color-mix(
+    in srgb,
+    var(--rq-swimlane-accent, var(--rq-action-information)) 4%,
+    var(--rq-color-surface)
+  );
+  stroke: color-mix(in srgb, var(--rq-color-text) 9%, transparent);
+}
+
+.rq-swimlane-flow__lanes > g:nth-child(even) > rect:first-child {
+  fill: color-mix(
+    in srgb,
+    var(--rq-swimlane-accent, var(--rq-action-information)) 8%,
+    var(--rq-color-surface)
+  );
+}
+
+.rq-swimlane-flow__lanes .rq-swimlane-flow__lane-label {
+  fill: color-mix(
+    in srgb,
+    var(--rq-swimlane-accent, var(--rq-action-information)) 16%,
+    var(--rq-color-surface)
+  );
+}
+
+.rq-swimlane-flow__lanes .rq-swimlane-flow__lane-accent {
+  fill: var(--rq-swimlane-accent, var(--rq-action-information));
+}
+
+.rq-swimlane-flow__lanes text {
+  fill: var(--rq-color-text);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.rq-swimlane-flow__lanes .rq-swimlane-flow__lane-kind {
+  fill: var(--rq-color-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 1;
+}
+
+/* Conectores */
+.rq-swimlane-flow__edges path {
+  stroke: var(--rq-swimlane-edge);
+  stroke-width: 1.8;
+}
+
+.rq-swimlane-flow__edge-label rect {
+  fill: var(--rq-color-surface);
+  stroke: color-mix(in srgb, var(--rq-color-text) 16%, transparent);
+}
+
+.rq-swimlane-flow__edge-label text {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* Pasos */
+.rq-swimlane-flow__nodes .rq-process-flow__type {
+  fill: var(--rq-color-muted);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+
+.rq-swimlane-flow__nodes .rq-process-flow__node-label {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.rq-swimlane-flow__nodes .rq-process-flow__node > rect,
+.rq-swimlane-flow__nodes .rq-process-flow__node--decision > polygon {
+  stroke-width: 1.6;
+}
+
+/* RQ DIAGRAMA POR CARRILES V2 FIN */
+
+
+/* =========================================================
+   RQ DIAGRAMAS COMUNES V1
+   El flujo clásico y el entidad-relación comparten con el flujo por carriles: visor sin
+   espacio muerto, vista ampliada, tipografía mayor y flechas discretas. El modelo
+   entidad-relación estrena tarjetas legibles y notación pata de gallo.
+   ========================================================= */
+
+.rq-process-flow {
+  --rq-swimlane-edge: color-mix(in srgb, var(--rq-color-text) 58%, var(--rq-color-surface));
+}
+
+.rq-process-flow__viewport {
+  min-height: 0;
+  max-height: none;
+  padding: 12px;
+}
+
+.rq-process-flow[data-expanded="true"] {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+}
+
+.rq-process-flow[data-expanded="true"] .rq-process-flow__viewport {
+  flex: 1;
+  min-height: 0;
+}
+
+.rq-process-flow__type {
+  fill: var(--rq-color-muted);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.rq-process-flow__node-label {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+/* Entidad-relación */
+.rq-er__line {
+  fill: none;
+  stroke: var(--rq-swimlane-edge);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-er__mark path,
+.rq-er__mark circle {
+  fill: none;
+  stroke: var(--rq-swimlane-edge);
+  stroke-linecap: round;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-er__mark circle {
+  fill: var(--rq-color-surface);
+}
+
+.rq-er__relation-label rect {
+  fill: var(--rq-color-surface);
+  stroke: color-mix(in srgb, var(--rq-color-text) 16%, transparent);
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-er__relation-label text {
+  fill: var(--rq-color-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rq-er__entity {
+  filter: drop-shadow(
+    0 1px 3px color-mix(in srgb, var(--rq-color-text) 12%, transparent)
+  );
+}
+
+.rq-er__card {
+  fill: var(--rq-color-surface);
+  stroke: color-mix(in srgb, var(--rq-action-operation) 55%, var(--rq-color-surface));
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-er__header {
+  fill: color-mix(in srgb, var(--rq-action-operation) 16%, var(--rq-color-surface));
+}
+
+.rq-er__stripe {
+  fill: color-mix(in srgb, var(--rq-color-text) 4%, transparent);
+}
+
+.rq-er__name {
+  fill: var(--rq-color-text);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.rq-er__attribute {
+  fill: var(--rq-color-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.rq-er__attribute--key {
+  font-weight: 850;
+}
+
+.rq-er__required {
+  fill: var(--rq-color-danger-text, var(--rq-action-danger));
+  font-weight: 800;
+}
+
+.rq-er__type,
+.rq-er__empty {
+  fill: var(--rq-color-muted);
+  font-size: 11.5px;
+}
+
+.rq-er__badge rect {
+  stroke: none;
+}
+
+.rq-er__badge text {
+  font-size: 9.5px;
+  font-weight: 850;
+}
+
+.rq-er__badge--pk rect {
+  fill: color-mix(in srgb, var(--rq-action-warning) 24%, var(--rq-color-surface));
+}
+
+.rq-er__badge--pk text {
+  fill: color-mix(in srgb, var(--rq-action-warning) 70%, var(--rq-color-text));
+}
+
+.rq-er__badge--fk rect {
+  fill: color-mix(in srgb, var(--rq-action-information) 20%, var(--rq-color-surface));
+}
+
+.rq-er__badge--fk text {
+  fill: color-mix(in srgb, var(--rq-action-information) 70%, var(--rq-color-text));
+}
+
+/* RQ DIAGRAMAS COMUNES V1 FIN */
+
+

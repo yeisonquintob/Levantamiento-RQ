@@ -3320,9 +3320,7 @@ export function SourcesWorkspace({
           }
           disabledActions={disabledOutcomeActions}
           elapsedSince={
-            trackedGenerationActive
-              ? (latestExecution?.startedAt ?? null)
-              : null
+            trackedGenerationActive ? (latestExecution?.startedAt ?? null) : null
           }
           generationMode={displayedGenerationMode}
           onAction={handleOutcomeAction}

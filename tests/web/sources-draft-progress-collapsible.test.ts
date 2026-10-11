@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "../support/read-styles";
 
 const SOURCE = "apps/web/src/app/workspace/sources/sources-workspace.tsx";
 
@@ -29,7 +30,7 @@ test("el detalle de Borrador por puntos se revela desde la pestaña Mostrar", as
 });
 
 test("el selector de proyecto de los filtros tiene más ancho que los demás campos", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const rule =
     /\.rq-filter-bar > \.rq-field\.rq-project-picker \{[^}]*flex: 1 1 (\d+)px;/u.exec(
       css,
@@ -45,7 +46,7 @@ test("el selector de proyecto de los filtros tiene más ancho que los demás cam
 
 test("el desglose de tokens usa su propia clase y no la del CSS antiguo en cuadrícula", async () => {
   const [css, source] = await Promise.all([
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
     readFile(SOURCE, "utf8"),
   ]);
   assert.match(source, /className="rq-source-token-summary"/u);
@@ -55,7 +56,7 @@ test("el desglose de tokens usa su propia clase y no la del CSS antiguo en cuadr
 
 test("Mostrar lista los puntos existentes (también híbrido) con recuadro propio y lista compacta", async () => {
   const [css, source] = await Promise.all([
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
     readFile(SOURCE, "utf8"),
   ]);
   const visibility = /const showLocalDraftProgress =([^;]*);/u.exec(source);

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readStyles } from "../support/read-styles";
 
 const WORKSPACE = "apps/web/src/app/workspace/projects-workspace.tsx";
 
@@ -42,7 +43,7 @@ test("«Nuevo proyecto» va primero y el menú ☰ después, con Discusión, Fue
 test("la ventana de proyecto es plana: situación segmentada, cierre y pie fijo", async () => {
   const [source, css] = await Promise.all([
     readFile(WORKSPACE, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   assert.match(source, /rq-project-modal rq-project-modal--form/u);
   assert.match(source, /className="rq-project-segmented"/u);
@@ -121,7 +122,7 @@ test("Configuración → Parámetros reúne Barra lateral y Área; la ruta antig
 });
 
 test("los filtros de Proyectos no llevan borde ni aro de enfoque", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const filter = css.match(/\.rq-projects-filter \{([^}]*)\}/u)?.[1] ?? "";
   assert.match(filter, /border: 0;/u);
   assert.match(

@@ -27,6 +27,7 @@ import {
   type DocumentVersionListItem,
   DocumentsWorkspace,
 } from "../../apps/web/src/app/workspace/documents/documents-workspace.js";
+import { readDocumentSectionPresenterSource } from "../support/document-section-presenter-source.js";
 import { SIDEBAR_MENU_DEFINITIONS } from "../../apps/web/src/app/sidebar-navigation.js";
 import { ValidationWorkspace } from "../../apps/web/src/app/workspace/validation/validation-workspace.js";
 import {
@@ -43,6 +44,7 @@ import {
   ScrumEditor,
   ScrumView,
 } from "../../apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.js";
+import { readStyles } from "../support/read-styles.js";
 
 const project: ProjectDetail = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -707,10 +709,7 @@ test("la sección 5 presenta tres pestañas y mantiene compatibilidad histórica
   assert.doesNotMatch(html, /Proceso futuro por carriles/);
   assert.equal((html.match(/role="tabpanel"/gu) ?? []).length, 1);
 
-  const source = await readFile(
-    "apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.tsx",
-    "utf8",
-  );
+  const source = readDocumentSectionPresenterSource();
   assert.match(source, /No existe flujo TO-BE en esta versión histórica\./);
   assert.match(
     source,
@@ -1642,10 +1641,7 @@ test("una versión aprobada es de consulta y el presentador no invoca IA ni red"
   const html = renderToStaticMarkup(
     <RequirementDocumentEditor initialDocument={approved} project={project} />,
   );
-  const presenter = await readFile(
-    "apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.tsx",
-    "utf8",
-  );
+  const presenter = readDocumentSectionPresenterSource();
 
   // La versión aprobada se indica con su estado y queda de solo lectura: no hay
   // botón de edición ni controles de guardado.
@@ -1739,7 +1735,7 @@ test("Análisis desaparece del menú operativo y la URL anterior redirige a Docu
 });
 
 test("el editor es responsive y Web solo consume Gateway", async () => {
-  const styles = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const styles = await readStyles();
   const editor = await readFile(
     "apps/web/src/app/workspace/documents/[documentId]/requirement-document-editor.tsx",
     "utf8",
@@ -1762,13 +1758,8 @@ test("el editor es responsive y Web solo consume Gateway", async () => {
 });
 
 test("los puntos 6, 7 y 8 ofrecen pestañas, jerarquía y trazabilidad responsive", async () => {
-  const [presenter, styles] = await Promise.all([
-    readFile(
-      "apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.tsx",
-      "utf8",
-    ),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
-  ]);
+  const presenter = readDocumentSectionPresenterSource();
+  const styles = await readStyles();
   assert.match(presenter, /role="tablist"/);
   assert.match(presenter, /role="tabpanel"/);
   assert.match(presenter, /ArrowLeft/);

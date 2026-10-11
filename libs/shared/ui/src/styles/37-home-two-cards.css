@@ -1,0 +1,440 @@
+/* =========================================================
+   RQ INICIO DOS TARJETAS V1
+   Fila inferior de Inicio: «Avance por etapa» (barras) a la izquierda y, a la derecha, dos
+   ventanas: «Proceso por días» y «Últimas notificaciones». Tarjetas suaves sin marco; ocupan
+   todo el alto restante (unidades de contenedor) para que Inicio quepa en una pantalla.
+   ========================================================= */
+
+.rq-home-workspace {
+  gap: var(--rq-space-2);
+}
+
+.rq-home-workspace .rq-home-insights {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--rq-space-2);
+  align-items: stretch;
+}
+
+.rq-home-workspace .rq-home-insights > section {
+  min-width: 0;
+  padding: 6px 12px 8px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--rq-color-text) 3.5%, var(--rq-color-surface));
+}
+
+/* Gráfico de barras en media anchura: sin ancho mínimo ni desplazamiento lateral. */
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__viewport {
+  overflow-x: visible;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__plot {
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 2px 0 0;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__bars article {
+  padding-inline: 2px;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__bars footer strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: calc(8.5px * var(--rq-font-scale));
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__project {
+  max-width: 100%;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-section-header {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 4px;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-section-header > div > span {
+  display: none;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-section-header h2 {
+  margin: 0;
+  font-size: calc(16px * var(--rq-font-scale));
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart {
+  --rq-home-track-height: clamp(56px, 11dvh, 118px);
+}
+
+/* Escala 0, 25, 50, 75 y 100 % en una línea, alineada con sus guías. */
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__scale {
+  height: var(--rq-home-track-height);
+  margin-top: 20px;
+  padding: 0;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__scale > span {
+  display: flex;
+  height: 0;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: visible;
+  line-height: 1;
+}
+
+.rq-home-workspace .rq-home-insights .rq-home-stage-chart__bars {
+  --rq-chart-line: color-mix(in srgb, var(--rq-color-text) 14%, transparent);
+  background:
+    linear-gradient(var(--rq-chart-line), var(--rq-chart-line)) 0 20px / 100% 1px
+      no-repeat,
+    linear-gradient(var(--rq-chart-line), var(--rq-chart-line)) 0
+      calc(20px + var(--rq-home-track-height) * 0.25) / 100% 1px no-repeat,
+    linear-gradient(var(--rq-chart-line), var(--rq-chart-line)) 0
+      calc(20px + var(--rq-home-track-height) * 0.5) / 100% 1px no-repeat,
+    linear-gradient(var(--rq-chart-line), var(--rq-chart-line)) 0
+      calc(20px + var(--rq-home-track-height) * 0.75) / 100% 1px no-repeat,
+    linear-gradient(var(--rq-chart-line), var(--rq-chart-line)) 0
+      calc(20px + var(--rq-home-track-height) - 1px) / 100% 1px no-repeat;
+}
+
+/* Ventanas de poca altura (portátiles con barras del navegador): «Etapas» más baja. */
+@media (max-height: 900px) {
+  .rq-home-workspace .rq-home-flow .rq-home-section-header {
+    padding-block: 4px;
+  }
+
+  .rq-home-workspace .rq-home-flow .rq-home-section-header p {
+    display: none;
+  }
+
+  .rq-home-workspace .rq-home-flow-list > li {
+    padding-block: 4px;
+  }
+
+  .rq-home-workspace .rq-home-flow-copy > span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+}
+
+@media (max-height: 760px) {
+  .rq-home-workspace .rq-home-flow .rq-home-section-header > div > span {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .rq-home-workspace .rq-home-insights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1121px) {
+  .rq-home-workspace > .rq-home-layout > .rq-home-primary-column {
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+  }
+
+  .rq-home-workspace .rq-home-insights {
+    min-block-size: 0;
+  }
+
+  .rq-home-workspace .rq-home-insights > section {
+    min-block-size: 0;
+    overflow: hidden;
+    container-type: size;
+  }
+
+  .rq-home-workspace .rq-home-insights .rq-home-stage-chart__viewport {
+    --rq-home-track-height: clamp(56px, calc(100cqh - 165px), 460px);
+  }
+}
+
+
+.rq-home-workspace .rq-home-side-cards {
+  display: grid;
+  min-width: 0;
+  min-block-size: 0;
+  gap: var(--rq-space-2);
+}
+
+.rq-home-workspace .rq-home-side-cards > section {
+  min-width: 0;
+  min-block-size: 0;
+  overflow: hidden;
+  padding: 6px 12px 8px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--rq-color-text) 3.5%, var(--rq-color-surface));
+}
+
+.rq-home-workspace .rq-home-side-cards .rq-home-section-header {
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 4px;
+}
+
+.rq-home-workspace .rq-home-side-cards .rq-home-section-header > div > span {
+  display: none;
+}
+
+.rq-home-workspace .rq-home-side-cards .rq-home-section-header h2 {
+  margin: 0;
+  font-size: calc(16px * var(--rq-font-scale));
+}
+
+/* Gráfico de barras por días */
+.rq-home-days-chart {
+  --rq-days-plot: 130px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: var(--rq-days-plot) auto;
+  column-gap: 6px;
+  row-gap: 6px;
+  margin-top: 16px;
+  transition: opacity 180ms ease;
+}
+
+.rq-home-days-chart[data-ready="false"] {
+  opacity: 0;
+}
+
+.rq-home-days-chart__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+  white-space: nowrap;
+}
+
+.rq-home-days-chart__axis > span {
+  display: flex;
+  height: 0;
+  align-items: center;
+  line-height: 1;
+}
+
+.rq-home-days-chart__axis:first-child > span {
+  justify-content: flex-end;
+}
+
+.rq-home-days-chart__plot {
+  position: relative;
+}
+
+.rq-home-days-chart__grid i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--rq-color-text) 14%, transparent);
+  transform: translateY(50%);
+}
+
+.rq-home-days-chart__bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.rq-home-days-chart__bars > div {
+  position: relative;
+  min-height: 2px;
+  flex: 1;
+  margin-inline: 14%;
+  border-radius: 6px 6px 0 0;
+}
+
+/* Etapas ya terminadas en verde y la actual en naranja, como en «Avance por etapa». */
+.rq-home-days-chart__bars > div[data-state="done"] {
+  background: var(--rq-action-affirmative);
+}
+
+.rq-home-days-chart__bars > div[data-state="current"] {
+  background: var(--rq-action-warning);
+}
+
+.rq-home-days-chart__line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.rq-home-days-chart__line polyline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--rq-color-text) 75%, transparent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-home-days-chart__limit {
+  stroke: var(--rq-action-danger);
+  stroke-dasharray: 4 3;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.rq-home-days-chart__limit-label {
+  position: absolute;
+  left: 6px;
+  margin-top: 3px;
+  color: var(--rq-color-danger-text, var(--rq-action-danger));
+  font-size: calc(9px * var(--rq-font-scale));
+  font-weight: 700;
+}
+
+.rq-home-days-chart__dot {
+  position: absolute;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--rq-color-text);
+  color: var(--rq-color-surface);
+  font-size: calc(9px * var(--rq-font-scale));
+  font-weight: 800;
+  line-height: 1.3;
+  transform: translate(-50%, -50%);
+}
+
+.rq-home-days-chart__labels {
+  display: flex;
+  grid-column: 2;
+}
+
+.rq-home-days-chart__labels > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  justify-items: center;
+  gap: 1px;
+  text-align: center;
+}
+
+.rq-home-days-chart__labels strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: calc(10.5px * var(--rq-font-scale));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-home-days-chart__labels small {
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-home-days-chart__labels > span[data-state="current"] small {
+  color: var(--rq-action-warning);
+}
+
+.rq-home-days-chart__labels > span[data-state="pending"] {
+  opacity: 0.55;
+}
+
+/* Últimas notificaciones */
+.rq-home-notifications__unread {
+  padding: 4px 10px;
+  border-radius: var(--rq-radius-pill);
+  background: color-mix(in srgb, var(--rq-action-danger) 12%, transparent);
+  color: var(--rq-color-danger-text, var(--rq-action-danger));
+  font-size: calc(11px * var(--rq-font-scale));
+  white-space: nowrap;
+}
+
+.rq-home-notifications__list {
+  display: grid;
+  margin: 4px 0 0;
+  padding: 0;
+  gap: 2px;
+  list-style: none;
+}
+
+.rq-home-notifications__list > li > a {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 140ms ease;
+}
+
+.rq-home-notifications__list > li > a:hover,
+.rq-home-notifications__list > li > a:focus-visible {
+  background: color-mix(in srgb, var(--rq-color-text) 7%, transparent);
+  outline: 0;
+}
+
+.rq-home-notifications__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.rq-home-notifications__list > li[data-unread="true"] .rq-home-notifications__dot {
+  background: var(--rq-action-danger);
+}
+
+.rq-home-notifications__list strong {
+  overflow: hidden;
+  font-size: calc(12px * var(--rq-font-scale));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rq-home-notifications__list > li[data-unread="true"] strong {
+  font-weight: 800;
+}
+
+.rq-home-notifications__list time {
+  color: var(--rq-color-muted);
+  font-size: calc(10px * var(--rq-font-scale));
+  white-space: nowrap;
+}
+
+@media (min-width: 1121px) {
+  .rq-home-workspace .rq-home-side-cards {
+    grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+
+  .rq-home-workspace .rq-home-side-cards > section {
+    container-type: size;
+  }
+
+  .rq-home-days-chart {
+    --rq-days-plot: clamp(56px, calc(100cqh - 134px), 340px);
+  }
+
+  /* Solo se muestran las notificaciones que caben sin cortarse. */
+  @container (max-height: 215px) {
+    .rq-home-notifications__list > li:nth-child(n + 4) {
+      display: none;
+    }
+  }
+
+  @container (max-height: 170px) {
+    .rq-home-notifications__list > li:nth-child(n + 3) {
+      display: none;
+    }
+  }
+}
+
+
+/* RQ INICIO DOS TARJETAS V1 FIN */
+
+

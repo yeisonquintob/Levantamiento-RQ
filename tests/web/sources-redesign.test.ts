@@ -19,6 +19,7 @@ import {
   sourceGenerationCell,
   sourcePreparationLabel,
 } from "../../apps/web/src/app/workspace/sources/sources-generation-summary";
+import { readStyles } from "../support/read-styles";
 
 const DIR = "apps/web/src/app/workspace/sources/";
 const AMBIGUOUS_MESSAGE =
@@ -84,7 +85,7 @@ test("el estado activo y el único reloj comparten fila y usan el azul de la bar
       progress: 89,
     }),
   );
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
 
   assert.equal(count(markup, "Tiempo transcurrido"), 1);
   assert.match(
@@ -359,7 +360,7 @@ function contrast(a: string, b: string): number {
 }
 
 test("los cuatro temas definen tokens de texto semántico con contraste ≥ 4.5:1 sobre página, superficie y superficie suave", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const base = themeVars(css, "normal");
   for (const theme of THEMES) {
     const vars = new Map([...base, ...themeVars(css, theme)]);
@@ -420,7 +421,7 @@ function rulesOf(css: string, selectorPrefix: RegExp): string[] {
 }
 
 test("el rediseño no usa alturas rígidas ni colores de error fijos", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const genRules = rulesOf(
     css,
     /\.rq-gen|\.rq-source-prep|\.rq-source-summary/u,
@@ -464,7 +465,7 @@ test("el rediseño no usa alturas rígidas ni colores de error fijos", async () 
 });
 
 test("ningún texto de Fuentes baja de 10 px efectivos en ninguno de los 4 tamaños", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const sourceRules = rulesOf(
     css,
     /\.rq-source|\.rq-sources-workspace|\.rq-gen|\.rq-local-draft/u,
@@ -485,7 +486,7 @@ test("ningún texto de Fuentes baja de 10 px efectivos en ninguno de los 4 tama�
 });
 
 test("las 16 combinaciones tema × tamaño existen y los tamaños escalan con --rq-font-scale", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   assert.equal(THEMES.length * Object.keys(SCALES).length, 16);
   for (const theme of THEMES) {
     assert.match(css, new RegExp(`html\\[data-rq-theme="${theme}"\\]`, "u"));
@@ -502,7 +503,7 @@ test("las 16 combinaciones tema × tamaño existen y los tamaños escalan con --
 });
 
 test("la cuadrícula es flexible y responsive; el movimiento respeta prefers-reduced-motion", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   assert.match(
     css,
     /\.rq-sources-workspace \.rq-gen \{[^}]*grid-template-columns: minmax\(0, 1fr\)/u,
@@ -559,7 +560,7 @@ test("la cuadrícula es flexible y responsive; el movimiento respeta prefers-red
 
 test("las capas antiguas del monitor se eliminaron y las clases ya no se usan", async () => {
   const [css, source] = await Promise.all([
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
   ]);
   for (const dead of [
@@ -587,7 +588,7 @@ test("una ejecución terminada no promete una corrección que no ofrece", () => 
 test("la tabla acota el texto largo del archivo y no existe «Reintentar generación»", async () => {
   const [source, css] = await Promise.all([
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   assert.doesNotMatch(source, /Selecciona al menos una fuente en la tabla/u);
   assert.doesNotMatch(source, /Reintentar generación|"retry-generation"/u);
@@ -603,7 +604,7 @@ test("la tarjeta lateral unifica General, Detalles técnicos y Mostrar en un tab
   const [panel, source, css] = await Promise.all([
     readFile(`${DIR}sources-generation-panel.tsx`, "utf8"),
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   assert.match(css, /"title state controls"/u);
   assert.match(css, /\.rq-gen__live \{\s*display: contents;/u);
@@ -658,7 +659,7 @@ test("la tarjeta de tokens se conserva y cambia según el modo: local, híbrido 
   const [source, panel, css] = await Promise.all([
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
     readFile(`${DIR}sources-generation-panel.tsx`, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   const card =
     source.split("const generalConsumptionNode = (")[1]?.split("\n  );")[0] ??
@@ -722,7 +723,7 @@ test("el KPI de procesamiento muestra el modo de IA, no el selector de versión"
   const [source, panel, css] = await Promise.all([
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
     readFile(`${DIR}sources-generation-panel.tsx`, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
 
   assert.doesNotMatch(panel, /Generación · \{modeLabel\}/u);
@@ -785,7 +786,7 @@ test("la barra de Fuentes ya no repite el retorno a fuentes", async () => {
 });
 
 test("los puntos del borrador conservan recuadro y se compactan solo en Mostrar", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   assert.match(
     css,
     /\.rq-source-consumption-tabs__panel\s+\.rq-local-draft-block-progress__list\s+> li \{[^}]*border: 1px solid[^}]*\}/u,
@@ -865,7 +866,7 @@ test("General omite Duración y Tokens; el badge de estado tiene geometría com�
   const [panel, source, css] = await Promise.all([
     readFile(`${DIR}sources-generation-panel.tsx`, "utf8"),
     readFile(`${DIR}sources-workspace.tsx`, "utf8"),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
   const rows = source.slice(
     source.indexOf("const generationResultRows"),
@@ -982,7 +983,7 @@ test("detalles técnicos: siete filas estándar en el mismo orden para local, nu
 });
 
 test("la barra de Fuentes es adaptable: acciones con columna flexible y envoltura en modo híbrido", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   assert.match(
     css,
     /\.rq-sources-workspace > \.rq-module-commandbar \{\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, auto\);/u,
@@ -998,7 +999,7 @@ test("la barra de Fuentes es adaptable: acciones con columna flexible y envoltur
 });
 
 test("el pipeline híbrido de cinco etapas se reparte en 3+2 y la tarjeta de consumo queda a la derecha", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const panelSource = await readFile(
     "apps/web/src/app/workspace/sources/sources-generation-panel.tsx",
     "utf8",

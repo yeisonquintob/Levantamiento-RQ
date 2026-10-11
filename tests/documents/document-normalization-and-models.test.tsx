@@ -30,6 +30,7 @@ import {
   parseProblemNarrative,
   resolveDiagramModels,
 } from "../../apps/web/src/app/workspace/documents/[documentId]/document-section-presenter.js";
+import { readStyles } from "../support/read-styles.js";
 
 test("punto 6 moderno nunca se reemplaza con las HU-P del punto 7", () => {
   const requirements = {
@@ -1279,7 +1280,7 @@ test("V3 conserva AS-IS, TO-BE y entidad-relación; V2 sigue histórico", () => 
 });
 
 test("las tres pestañas conservan dimensiones en hover, foco y activo", async () => {
-  const css = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const css = await readStyles();
   const base = css.match(
     /\.rq-diagram-model-tabs button \{([\s\S]*?)\n\}/u,
   )?.[1];

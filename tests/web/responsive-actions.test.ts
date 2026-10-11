@@ -1,16 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-
-const uiStylesUrl = new URL(
-  "../../libs/shared/ui/src/styles.css",
-  import.meta.url,
-);
+import { readStyles } from "../support/read-styles";
 
 const marker = "RQ ACCIONES COMPACTAS RESPONSIVE V1";
 
 async function readMobileFix(): Promise<string> {
-  const styles = await readFile(uiStylesUrl, "utf8");
+  const styles = await readStyles();
   const start = styles.indexOf(marker);
   assert.notEqual(start, -1, "falta el bloque de acciones compactas responsive");
   const block = styles.slice(start);

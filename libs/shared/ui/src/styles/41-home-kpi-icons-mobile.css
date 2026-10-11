@@ -1,0 +1,505 @@
+/* HOME_KPI_ICONS_V2: iconos de los indicadores en una ficha redondeada y con color;
+   en el listado, la barra llega hasta el borde derecho del «% avance». */
+.rq-home-workspace > .rq-module-commandbar .rq-kpi__icon {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  flex: 0 0 40px;
+  border-radius: 12px;
+}
+
+.rq-home-workspace .rq-kpi__icon .rq-home-icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2;
+}
+
+.rq-home-workspace .rq-kpi__icon:has(.rq-home-icon--projects) {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-operation) 14%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-operation);
+  border: 1px solid color-mix(in srgb, var(--rq-action-operation) 28%, transparent);
+}
+
+.rq-home-workspace .rq-kpi__icon:has(.rq-home-icon--drafts) {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-consult) 12%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-consult);
+  border: 1px solid color-mix(in srgb, var(--rq-action-consult) 28%, transparent);
+}
+
+.rq-home-workspace .rq-kpi__icon:has(.rq-home-icon--progress) {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 16%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-affirmative);
+  border: 1px solid color-mix(in srgb, var(--rq-action-affirmative) 28%, transparent);
+}
+
+.rq-home-workspace .rq-home-project-state__progress {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+/* HOME_KPI_ICONS_V3: la columna del icono mide lo mismo que la ficha, sin borde, para que
+   el texto no se encime y quede alineado. */
+.rq-home-workspace > .rq-module-commandbar .rq-kpi {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__icon {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.rq-home-workspace .rq-kpi__icon .rq-home-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.8;
+}
+
+/* HOME_FLOW_SOFT_V1: «Etapas del levantamiento» en tonos claros (el gráfico «Avance por etapa»
+   conserva los colores fuertes), así que los círculos dejan de ser sólidos. */
+.rq-home-workspace .rq-home-flow-list > li[data-state="completed"] .rq-home-flow-number {
+  border-color: transparent;
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 18%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-affirmative);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="current"] .rq-home-flow-number {
+  border-color: transparent;
+  background: color-mix(
+    in srgb,
+    var(--rq-action-warning) 20%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-warning);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="completed"] {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 5%,
+    var(--rq-color-surface)
+  );
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="current"] {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-warning) 7%,
+    var(--rq-color-surface)
+  );
+}
+
+/* HOME_CHART_CURRENT_ORANGE_V1: la etapa en desarrollo es naranja también en «Avance por etapa». */
+.rq-home-workspace .rq-home-stage-chart__bars article[data-state="current"] .rq-home-stage-chart__track > span {
+  background: var(--rq-action-warning);
+}
+
+.rq-home-workspace .rq-home-stage-chart__bars article[data-state="current"] footer > span {
+  background: var(--rq-action-warning);
+  color: var(--rq-action-on-solid);
+}
+
+/* HOME_PURPLE_TO_GRAY_V1: el morado de «Etapas del levantamiento» y «Avance por etapa» pasa a gris. */
+.rq-home-workspace .rq-home-flow-list > li .rq-home-flow-number {
+  color: var(--rq-color-muted);
+}
+
+.rq-home-workspace .rq-home-flow-list > li .rq-home-icon {
+  color: var(--rq-color-muted);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="completed"] .rq-home-icon {
+  color: var(--rq-action-affirmative);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="current"] .rq-home-icon {
+  color: var(--rq-action-warning);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="completed"] .rq-home-flow-number {
+  color: var(--rq-action-affirmative);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="current"] .rq-home-flow-number {
+  color: var(--rq-action-warning);
+}
+
+.rq-home-workspace a.rq-home-flow-number--link:hover,
+.rq-home-workspace a.rq-home-flow-number--link:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rq-color-muted) 28%, transparent);
+}
+
+.rq-home-workspace .rq-home-stage-chart__bars article[data-state="pending"] .rq-home-stage-chart__track > span {
+  background: color-mix(in srgb, var(--rq-color-muted) 70%, var(--rq-color-surface));
+}
+
+.rq-home-workspace .rq-home-section-header > div > span {
+  color: var(--rq-color-muted);
+}
+
+/* HOME_ONE_SCREEN_RESPONSIVE_V1: la disposición de una sola pantalla (alto fijo y listado con
+   scroll interno) solo aplica cuando Inicio tiene dos columnas; en pantallas más
+   estrechas la página vuelve a fluir y hace scroll normal. */
+@media (min-width: 1121px) {
+  .rq-main > .rq-content:has(> .rq-home-workspace) {
+    block-size: 100%;
+  }
+
+  .rq-home-workspace {
+    display: flex;
+    min-block-size: 0;
+    block-size: 100%;
+    flex-direction: column;
+  }
+
+  .rq-home-workspace > * {
+    flex: 0 0 auto;
+  }
+
+  .rq-home-workspace > .rq-home-layout {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    align-items: stretch;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .rq-home-workspace .rq-home-primary-column {
+    min-block-size: 0;
+    align-content: start;
+    gap: var(--rq-space-2);
+  }
+
+  .rq-home-workspace .rq-home-project-state {
+    display: flex;
+    min-block-size: 0;
+    flex-direction: column;
+  }
+
+  .rq-home-workspace .rq-home-project-list__content {
+    min-block-size: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .rq-home-workspace .rq-home-project-state__list {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* HOME_FLOW_NARROW_V1: en pantallas angostas el estado de cada etapa va bajo el texto, sin partirse. */
+@media (max-width: 560px) {
+  .rq-home-workspace .rq-home-flow-list > li,
+  .rq-home-workspace .rq-home-flow-list > li:nth-child(2n),
+  .rq-home-workspace .rq-home-flow-list > li:nth-last-child(-n + 2) {
+    grid-template-columns: 28px 18px minmax(0, 1fr);
+  }
+
+  .rq-home-workspace .rq-home-flow-list > li .rq-home-flow-state,
+  .rq-home-workspace .rq-home-flow-list > li .rq-home-flow-progress {
+    grid-column: 3;
+    justify-items: start;
+    justify-self: start;
+    white-space: nowrap;
+  }
+}
+
+/* HOME_MOBILE_COMPACT_V1: Inicio más compacto y con menos separación solo en móvil. */
+@media (max-width: 560px) {
+  .rq-home-workspace {
+    gap: 6px;
+  }
+
+  .rq-home-workspace .rq-home-layout,
+  .rq-home-workspace .rq-home-primary-column {
+    gap: 6px;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar {
+    gap: 6px;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi {
+    min-height: 0;
+    padding: 4px 8px;
+    gap: 8px;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .rq-home-workspace .rq-kpi__icon .rq-home-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi__value {
+    font-size: calc(16px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-module-commandbar__actions {
+    padding: 0;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-module-commandbar__actions .rq-action {
+    min-height: 34px;
+    padding-block: 4px;
+  }
+
+  .rq-home-workspace .rq-home-section-header {
+    gap: 4px;
+    padding: 4px 2px;
+  }
+
+  .rq-home-workspace .rq-home-section-header h2 {
+    margin-top: 0;
+    font-size: calc(17px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace .rq-home-section-header p {
+    margin-top: 2px;
+  }
+
+  .rq-home-workspace .rq-home-current-stage {
+    padding: 4px 9px;
+  }
+
+  .rq-home-workspace .rq-home-flow-list {
+    gap: 4px;
+  }
+
+  .rq-home-workspace .rq-home-flow-list > li,
+  .rq-home-workspace .rq-home-flow-list > li:nth-child(2n),
+  .rq-home-workspace .rq-home-flow-list > li:nth-last-child(-n + 2) {
+    grid-template-columns: 24px 16px minmax(0, 1fr);
+    gap: 2px 8px;
+    padding: 5px 8px;
+  }
+
+  .rq-home-workspace .rq-home-flow-number {
+    width: 24px;
+    height: 24px;
+    font-size: calc(11px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace .rq-home-flow-list > li .rq-home-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .rq-home-workspace .rq-home-flow-list > li .rq-home-flow-state {
+    padding: 1px 8px;
+  }
+
+  .rq-home-workspace .rq-home-project-list__header {
+    padding: 4px 2px;
+  }
+
+  .rq-home-workspace .rq-home-project-list__header h2 {
+    font-size: calc(16px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace .rq-home-project-list__collapse {
+    min-height: 32px;
+    padding-inline: 8px;
+  }
+
+  .rq-home-workspace .rq-home-project-list__search-toggle,
+  .rq-home-workspace .rq-home-project-list__sort {
+    height: 30px;
+  }
+
+  .rq-home-workspace .rq-home-project-state__list > button {
+    gap: 2px 8px;
+    padding: 6px 8px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart {
+    --rq-home-track-height: 84px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart .rq-home-section-header {
+    padding-block: 2px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__project {
+    padding: 0;
+  }
+}
+
+/* HOME_MOBILE_COMPACT_V2: solo móvil. Código RQ y «% avance» en la misma línea, indicadores en una
+   sola fila y gráfico delgado que cabe sin desplazarse a la derecha. */
+@media (max-width: 560px) {
+  .rq-home-workspace .rq-home-project-state__list > button {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 1px;
+  }
+
+  .rq-home-workspace .rq-home-project-state__identity,
+  .rq-home-workspace .rq-home-project-state__stage {
+    display: contents;
+  }
+
+  .rq-home-workspace .rq-home-project-state__identity > strong {
+    grid-column: 1 / -1;
+  }
+
+  .rq-home-workspace .rq-home-project-state__identity > small {
+    grid-column: 1;
+  }
+
+  .rq-home-workspace .rq-home-project-state__stage > strong {
+    grid-column: 2;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .rq-home-workspace .rq-home-project-state__stage > .rq-home-project-state__progress {
+    grid-column: 1 / -1;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi,
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi:nth-child(n) {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "icon value"
+      "copy copy";
+    align-items: center;
+    gap: 2px 6px;
+    padding: 4px 6px;
+    border-top: 0;
+    border-left: 0;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi + .rq-kpi {
+    border-left: 1px solid var(--rq-color-border);
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__icon {
+    grid-area: icon;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__value {
+    grid-area: value;
+    justify-self: end;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__copy {
+    grid-area: copy;
+  }
+
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi .rq-kpi__description {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__viewport {
+    overflow-x: visible;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__plot {
+    min-width: 0;
+    grid-template-columns: 30px minmax(0, 1fr);
+    padding: 2px 4px 4px 0;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart {
+    --rq-home-track-height: 64px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__scale {
+    padding-right: 4px;
+    font-size: calc(8px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__bars article {
+    grid-template-rows: 14px var(--rq-home-track-height) auto;
+    padding-inline: 1px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__bars output {
+    font-size: calc(9px * var(--rq-font-scale));
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__track {
+    width: 18px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__bars article:not(:last-child)::after {
+    right: -8px;
+    font-size: 11px;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__bars footer {
+    gap: 0;
+  }
+
+  .rq-home-workspace .rq-home-stage-chart__bars footer > strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* SHELL_MOBILE_DRAWER_V1: en móvil el menú lateral empieza debajo de la barra superior (antes
+   «Inicio» quedaba tapado) y la X de cerrar es más grande y sin aro de enfoque. */
+@media (max-width: 899px) {
+  .rq-sidebar {
+    padding-top: calc(54px + env(safe-area-inset-top));
+  }
+
+  .rq-menu-button[aria-expanded="true"],
+  .rq-menu-button[aria-expanded="true"]:focus,
+  .rq-menu-button[aria-expanded="true"]:focus-visible {
+    border-color: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+
+  .rq-menu-button[aria-expanded="true"] > span {
+    font-size: 32px;
+    font-weight: 400;
+    line-height: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rq-content[data-rq-navigation-direction] {
+    animation: none;
+  }
+}

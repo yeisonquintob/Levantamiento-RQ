@@ -1,0 +1,607 @@
+/* AI_SOURCES_DRAFT_PROGRESS_COLLAPSIBLE_V1 */
+.rq-sources-workspace .rq-local-draft-block-progress__toggle {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--rq-color-border);
+  border-radius: 6px;
+  background: var(--rq-color-surface);
+  color: var(--rq-color-institutional);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__toggle:hover {
+  background: var(--rq-color-surface-soft);
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress__header > span {
+  margin-left: auto;
+}
+
+.rq-sources-workspace .rq-local-draft-block-progress [hidden] {
+  display: none;
+}
+
+/* AI_SOURCES_TOKEN_BREAKDOWN_V1 */
+.rq-sources-workspace .rq-source-token-summary {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--rq-color-border);
+}
+
+.rq-sources-workspace .rq-source-token-summary > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: calc(11px * var(--rq-font-scale));
+  line-height: 1.35;
+}
+
+.rq-sources-workspace .rq-source-token-summary dt {
+  min-width: 0;
+  color: var(--rq-color-muted);
+  font-weight: 650;
+}
+
+.rq-sources-workspace .rq-source-token-summary dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--rq-color-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-align: right;
+}
+
+.rq-sources-workspace
+  .rq-source-token-summary
+  > div[data-rq-token-row-tone="muted"]
+  dd {
+  color: var(--rq-color-muted);
+  font-weight: 650;
+}
+
+.rq-sources-workspace
+  .rq-source-token-summary
+  > div[data-rq-token-row-tone="warning"]
+  dd {
+  color: #b7791f;
+}
+
+/* Punto 13 «Prototipo»: solicitud de prototipo por bloques. */
+.rq-document-prototype-brief dl {
+  display: grid;
+  gap: 8px 16px;
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+}
+.rq-document-prototype-brief dl > div {
+  display: contents;
+}
+.rq-document-prototype-brief dt {
+  color: var(--rq-color-text-muted, #66727d);
+  font-weight: 600;
+}
+.rq-document-prototype-brief dd {
+  margin: 0;
+}
+.rq-document-prototype-brief article + article {
+  margin-top: 12px;
+}
+.rq-document-prototype-brief h4 {
+  font-size: 0.95rem;
+  margin: 0 0 4px;
+}
+.rq-document-prototype-brief ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+}
+.rq-document-prototype-brief li small {
+  color: var(--rq-color-text-muted, #66727d);
+  display: block;
+}
+
+/* ==========================================================================
+   RQ ACCIONES COMPACTAS RESPONSIVE V1
+   Corrección móvil de alta precedencia: las acciones compactas conservan su
+   ancho intrínseco y el footer de Validación organiza fecha + 3 acciones.
+   ========================================================================== */
+@media (max-width: 760px) {
+  .rq-action.rq-action--compact {
+    width: auto;
+    min-width: 0;
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
+  }
+
+  .rq-validation-project-card > footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 6px;
+  }
+
+  .rq-validation-project-card > footer > small {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .rq-validation-project-card > footer > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rq-validation-project-card > footer > div > .rq-document-open,
+  .rq-validation-project-card > footer > div > .rq-action.rq-action--compact {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    padding: 0 4px;
+    text-align: center;
+    white-space: nowrap;
+  }
+}
+
+/* Índices de Discusión, Fuentes y Ejecución: estados delineados sin relleno. */
+.rq-discussion-index .rq-compact-index-table .rq-status[data-rq-status="success"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-affirmative);
+  color: var(--rq-action-affirmative);
+}
+.rq-discussion-index .rq-compact-index-table .rq-status[data-rq-status="process"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-operation);
+  color: var(--rq-action-operation);
+}
+.rq-discussion-index .rq-compact-index-table .rq-status[data-rq-status="pending"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-warning);
+  color: var(--rq-action-warning);
+}
+.rq-sources-index .rq-compact-index-table .rq-status[data-rq-status="success"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-affirmative);
+  color: var(--rq-action-affirmative);
+}
+.rq-sources-index .rq-compact-index-table .rq-status[data-rq-status="process"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-operation);
+  color: var(--rq-action-operation);
+}
+.rq-sources-index .rq-compact-index-table .rq-status[data-rq-status="pending"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-warning);
+  color: var(--rq-action-warning);
+}
+.rq-execution-workspace .rq-document-table .rq-status[data-rq-status="success"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-affirmative);
+  color: var(--rq-action-affirmative);
+}
+.rq-execution-workspace .rq-document-table .rq-status[data-rq-status="process"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-operation);
+  color: var(--rq-action-operation);
+}
+.rq-execution-workspace .rq-document-table .rq-status[data-rq-status="pending"] {
+  background: var(--rq-color-surface);
+  border: 1px solid var(--rq-action-warning);
+  color: var(--rq-action-warning);
+}
+
+/* RQ INICIO - SECCIONES SIN MARCO EXTERIOR Y LISTADO CONTINUO V1 INICIO
+   Precedencia final: quita solo borde exterior, radio, fondo, sombra y recorte
+   de las secciones; los separadores internos se conservan. El listado de
+   proyectos crece con la página (sin scroll vertical interno). */
+.rq-home-workspace .rq-home-flow,
+.rq-home-workspace .rq-home-project-state {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-home-workspace .rq-home-project-state__list {
+  max-height: none;
+  overflow-y: visible;
+}
+/* RQ INICIO - SECCIONES SIN MARCO EXTERIOR Y LISTADO CONTINUO V1 FIN */
+
+/* CONSUMPTION_TABS_V1: tarjeta lateral de consumo con tres pestañas y tamaño fijo. */
+.rq-sources-workspace .rq-gen__side {
+  block-size: 12rem;
+  overflow: hidden;
+}
+
+.rq-source-consumption-tabs {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--rq-space-2);
+  block-size: 100%;
+  min-height: 0;
+}
+
+.rq-source-consumption-tabs__list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.rq-source-consumption-tabs__tab {
+  min-height: 0;
+  padding: 1px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--rq-color-muted);
+  font-size: calc(11px * var(--rq-font-scale));
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rq-source-consumption-tabs__tab[aria-selected="true"] {
+  border-bottom-color: var(--rq-color-institutional);
+  color: var(--rq-color-institutional);
+}
+
+.rq-source-consumption-tabs__panel {
+  display: grid;
+  align-content: start;
+  gap: var(--rq-space-1);
+  min-height: 0;
+  overflow: auto;
+}
+
+.rq-source-consumption-tabs__panel[hidden] {
+  display: none;
+}
+
+.rq-source-consumption-tabs .rq-gen__technical-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  max-block-size: none;
+  overflow: visible;
+}
+
+/* Detalles técnicos con el mismo patrón compacto que el resumen de General. */
+.rq-source-consumption-tabs .rq-gen__technical-list > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: calc(11px * var(--rq-font-scale));
+  line-height: 1.35;
+}
+
+.rq-source-consumption-tabs .rq-gen__technical-list dt {
+  min-width: 0;
+  color: var(--rq-color-muted);
+  font-size: inherit;
+  font-weight: 650;
+}
+
+.rq-source-consumption-tabs .rq-gen__technical-list dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--rq-color-text);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-align: right;
+}
+
+/* DRAFT_SHOW_TAB_V1: puntos del borrador compactos, con recuadro propio y en
+   dos columnas dentro de la pestaña Mostrar; el scroll vive en la pestaña. */
+@media (min-width: 64.0625rem) {
+  .rq-sources-workspace .rq-gen {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  }
+}
+
+.rq-sources-workspace
+  .rq-source-consumption-tabs__panel
+  .rq-local-draft-block-progress__list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.1875rem;
+  max-block-size: none;
+  overflow: visible;
+}
+
+.rq-sources-workspace
+  .rq-source-consumption-tabs__panel
+  .rq-local-draft-block-progress__list
+  > li {
+  border: 1px solid color-mix(in srgb, var(--rq-color-border) 70%, transparent);
+  border-radius: var(--rq-radius-sm);
+}
+
+/* HYBRID_PIPELINE_RESPONSIVE_V2: según el ancho del contenedor de Fuentes, el
+   procesamiento híbrido (cinco etapas) reparte sus etapas en 3+2 dentro de su
+   columna, de modo que el panel de consumo queda a la derecha igual que en
+   local y nube y nada se recorta. */
+@container rq-sources-content (max-width: 80rem) {
+  .rq-sources-workspace
+    .rq-gen[data-rq-generation-mode="LOCAL_CLOUD"]
+    .rq-gen__pipeline[data-rq-step-count="5"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* SOURCES_CONTENT_FIT_V1: la columna de contenido de Fuentes no puede ser más
+   ancha que la ventana. Con IA híbrida (más texto en la barra y en la tarjeta)
+   la columna automática crecía y recortaba botones, tarjeta y tabla. */
+.rq-main > .rq-content:has(> .rq-sources-workspace) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* SHELL_BRAND_FULL_V1: el icono de panel lateral reemplaza a ☰ y el nombre
+   «Levantamiento RQ» se ve completo junto a él. */
+.rq-menu-button svg,
+.rq-topbar__collapse svg {
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .rq-shell:not([data-sidebar-collapsed="true"]) {
+    --rq-sidebar-width: clamp(208px, 14vw, 232px);
+  }
+
+  .rq-shell:not([data-sidebar-collapsed="true"]) .rq-topbar__identity {
+    gap: 6px;
+    padding-inline: 12px 10px;
+  }
+
+  .rq-topbar__collapse {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .rq-shell:not([data-sidebar-collapsed="true"]) .rq-topbar__identity strong {
+    overflow: visible;
+    font-size: 16px;
+    text-overflow: clip;
+  }
+}
+
+/* HOME_FLOW_COMPACT_V1: tabla «Etapas del levantamiento» más baja y con marco
+   exterior igual a sus divisiones internas. Solo esta tabla. */
+.rq-home-workspace .rq-home-flow-list {
+  border: 1px solid var(--rq-color-border);
+}
+
+.rq-home-workspace .rq-home-flow-list li {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: var(--rq-space-2);
+  padding: 6px var(--rq-space-3);
+}
+
+.rq-home-workspace .rq-home-flow-number {
+  width: 28px;
+  height: 28px;
+  font-size: calc(12px * var(--rq-font-scale));
+}
+
+.rq-home-workspace .rq-home-flow-copy {
+  gap: 1px;
+}
+
+.rq-home-workspace .rq-home-flow-copy > span {
+  line-height: 1.25;
+}
+
+/* HOME_FLOW_NUMBER_LINK_V1: el círculo numerado de cada etapa lleva a su módulo. */
+a.rq-home-flow-number--link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+a.rq-home-flow-number--link:hover,
+a.rq-home-flow-number--link:focus-visible {
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--rq-action-operation) 28%, transparent);
+  transform: scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.rq-home-flow-number--link {
+    transition: none;
+  }
+}
+
+/* HOME_KPI_THREE_V1: con tres indicadores, Inicio los reparte en tres columnas iguales. */
+@media (min-width: 900px) {
+  .rq-home-workspace > .rq-module-commandbar .rq-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* HOME_ONE_SCREEN_V1: Inicio sin marcos en «Avance por etapa» y en el listado, y
+   todo en una sola pantalla: el gráfico es más bajo y el listado de proyectos
+   usa el alto restante con scroll interno. */
+.rq-home-workspace .rq-home-stage-chart {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.rq-home-workspace .rq-home-stage-chart__project {
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+}
+
+.rq-home-workspace .rq-home-stage-chart .rq-home-section-header {
+  padding-block: var(--rq-space-2);
+}
+
+.rq-home-workspace .rq-home-stage-chart__plot {
+  padding-block: 4px 6px;
+}
+
+.rq-home-workspace .rq-home-stage-chart {
+  /* El gráfico crece hacia abajo con el alto de la ventana. */
+  --rq-home-track-height: clamp(104px, 20dvh, 210px);
+}
+
+.rq-home-workspace .rq-home-stage-chart__scale {
+  height: calc(var(--rq-home-track-height) + 24px);
+  padding-top: 12px;
+}
+
+.rq-home-workspace .rq-home-stage-chart__bars {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--rq-home-track-height) / 2 - 3px),
+    color-mix(in srgb, var(--rq-color-border) 65%, transparent)
+      calc(var(--rq-home-track-height) / 2 - 2px)
+  );
+}
+
+.rq-home-workspace .rq-home-stage-chart__bars article {
+  grid-template-rows: 18px var(--rq-home-track-height) auto;
+  gap: 2px;
+}
+
+.rq-home-workspace .rq-home-stage-chart__bars article:not(:last-child)::after {
+  top: calc(var(--rq-home-track-height) / 2 + 12px);
+}
+
+.rq-home-workspace .rq-home-stage-chart__track {
+  height: var(--rq-home-track-height);
+}
+
+.rq-home-workspace .rq-home-project-list__search-toggle {
+  border-color: transparent;
+}
+
+.rq-home-workspace .rq-home-project-list__sort {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* HOME_LIST_FIGURE_V1: el listado muestra «47% avance» donde estaba la etapa y el
+   selector de orden no se remarca al hacer clic. */
+.rq-home-project-state__figure-label {
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+  font-weight: 700;
+}
+
+.rq-home-workspace .rq-home-project-list__sort:focus,
+.rq-home-workspace .rq-home-project-list__sort:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+/* HOME_FLOW_STATUS_V1: estado de cada etapa como etiqueta de color y avance con barra. */
+.rq-home-workspace .rq-home-flow-state {
+  padding: 2px 10px;
+  border-radius: var(--rq-radius-pill);
+  background: var(--rq-color-surface-soft);
+  color: var(--rq-color-muted);
+  font-size: calc(10px * var(--rq-font-scale));
+  font-weight: 800;
+}
+
+.rq-home-workspace .rq-home-flow-state[data-state="completed"] {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-affirmative) 16%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-affirmative);
+}
+
+.rq-home-workspace .rq-home-flow-state[data-state="current"] {
+  background: color-mix(
+    in srgb,
+    var(--rq-action-warning) 18%,
+    var(--rq-color-surface)
+  );
+  color: var(--rq-action-warning);
+}
+
+.rq-home-workspace .rq-home-flow-progress {
+  display: grid;
+  min-width: 96px;
+  gap: 3px;
+  justify-items: end;
+}
+
+.rq-home-workspace .rq-home-flow-progress > small {
+  color: var(--rq-color-muted);
+  font-size: calc(9px * var(--rq-font-scale));
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* HOME_ICONS_V1: iconos en indicadores y etapas; las etapas pasan a celdas sin bordes. */
+.rq-home-workspace .rq-home-icon {
+  display: block;
+  flex: 0 0 auto;
+  color: var(--rq-action-operation);
+}
+
+.rq-home-workspace .rq-kpi__icon .rq-home-icon {
+  color: inherit;
+}
+
+.rq-home-workspace .rq-home-flow-list {
+  gap: 6px;
+  border: 0;
+}
+
+.rq-home-workspace .rq-home-flow-list > li,
+.rq-home-workspace .rq-home-flow-list > li:nth-child(2n),
+.rq-home-workspace .rq-home-flow-list > li:nth-last-child(-n + 2) {
+  grid-template-columns: 28px 18px minmax(0, 1fr) auto;
+  border: 0;
+  border-radius: var(--rq-radius-md);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="completed"] .rq-home-icon {
+  color: var(--rq-action-affirmative);
+}
+
+.rq-home-workspace .rq-home-flow-list > li[data-state="current"] .rq-home-icon {
+  color: var(--rq-action-warning);
+}
+
+/* HOME_FLOW_NO_RULE_V1: sin la línea bajo el encabezado de «Etapas del levantamiento». */
+.rq-home-workspace .rq-home-flow .rq-home-section-header {
+  border-bottom: 0;
+}
+

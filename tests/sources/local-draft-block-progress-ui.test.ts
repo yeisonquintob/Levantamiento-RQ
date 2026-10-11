@@ -7,6 +7,7 @@ import {
   localDraftBlockStatusLabel,
   localDraftBlockStatusSymbol,
 } from "../../apps/web/src/app/workspace/sources/sources-workspace.js";
+import { readStyles } from "../support/read-styles.js";
 
 // Pantalla de Fuentes: el espacio de trabajo y sus componentes de presentación.
 async function readSourcesScreen(): Promise<string> {
@@ -112,7 +113,7 @@ test("la vista diferencia local, local+nube y nube sin repetir tarjetas de prove
 test("el monitor mantiene consecutivos y detalle inferior sin mover el motivo de falla", async () => {
   const [source, styles] = await Promise.all([
     readSourcesScreen(),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
 
   assert.match(source, /PASO_12_MONITOR_PROCESAMIENTO_COMPACTO_V2/u);
@@ -139,7 +140,7 @@ test("el monitor mantiene consecutivos y detalle inferior sin mover el motivo de
 test("el monitor compacto reemplaza Procesando por el reloj y contiene el resumen en su columna", async () => {
   const [source, styles] = await Promise.all([
     readSourcesScreen(),
-    readFile("libs/shared/ui/src/styles.css", "utf8"),
+    readStyles(),
   ]);
 
   // El reloj vive en su propio componente: Fuentes ya no se renderiza cada segundo.
@@ -159,7 +160,7 @@ test("el monitor compacto reemplaza Procesando por el reloj y contiene el resume
 });
 
 test("los estilos se limitan al monitor de Fuentes y diferencian estados", async () => {
-  const styles = await readFile("libs/shared/ui/src/styles.css", "utf8");
+  const styles = await readStyles();
 
   assert.match(styles, /PASO_4_INTERFAZ_PROGRESO_BLOQUES_V1/u);
   assert.match(styles, /PASO_9_VISTA_COMPACTA_TRES_MODOS_V2/u);

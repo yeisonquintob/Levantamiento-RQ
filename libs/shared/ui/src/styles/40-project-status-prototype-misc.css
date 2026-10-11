@@ -1,0 +1,221 @@
+/* RQ ESTADO DEL PROYECTO UNIFICADO V1
+   Una sola insignia (la de Proyectos) para Discusión, Fuentes, Documentos, Validación y
+   Ejecución: completado verde, en curso naranja. La clase se repite para ganar a los
+   contornos que cada índice definía por su cuenta. */
+.rq-status.rq-project-status.rq-project-status.rq-project-status {
+  border: 0;
+}
+.rq-status.rq-project-status.rq-project-status.rq-project-status[data-rq-status="pending"] {
+  background: color-mix(in srgb, var(--rq-action-warning) 18%, var(--rq-color-surface));
+  color: var(--rq-action-warning);
+}
+.rq-status.rq-project-status.rq-project-status.rq-project-status[data-rq-status="success"] {
+  background: color-mix(in srgb, var(--rq-action-affirmative) 16%, var(--rq-color-surface));
+  color: var(--rq-action-affirmative);
+}
+.rq-status.rq-project-status.rq-project-status.rq-project-status[data-rq-status="inactive"] {
+  background: var(--rq-color-surface-soft);
+  color: var(--rq-color-muted);
+}
+.rq-status.rq-project-status.rq-project-status.rq-project-status[data-rq-status="neutral"] {
+  background: var(--rq-color-surface-soft);
+  border: 1px solid var(--rq-color-border);
+  color: var(--rq-color-text);
+}
+
+.rq-status.rq-project-status.rq-project-status.rq-project-status[data-rq-status="process"] {
+  background: color-mix(in srgb, var(--rq-action-operation) 16%, var(--rq-color-surface));
+  color: var(--rq-action-operation);
+}
+
+/* RQ PROTOTIPO UNA PANTALLA V1
+   «Generar prototipo» cabe en una sola pantalla: el encabezado es una línea, las dos tarjetas de
+   configuración se compactan y la vista previa hace scroll dentro de su tarjeta. En pantallas
+   bajas o angostas la página vuelve a fluir con scroll normal. */
+.rq-prototype-workspace > [class*="workspaceMenuSource"] {
+  min-width: 0;
+}
+.rq-prototype-workspace [class*="workspaceSourceTitle"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--rq-color-muted);
+}
+.rq-prototype-workspace .rq-prototype-config .rq-clean-card {
+  padding: 12px 14px;
+}
+.rq-prototype-workspace .rq-prototype-config .rq-clean-card > header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+.rq-prototype-workspace .rq-file-card {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+.rq-prototype-workspace .rq-file-card__icon {
+  width: 36px;
+  height: 36px;
+}
+.rq-prototype-workspace .rq-prototype-config [class*="modelSelector"] {
+  gap: 3px;
+  margin-top: 8px;
+}
+.rq-prototype-workspace .rq-prototype-config [class*="modelSelector"] select {
+  min-height: 34px;
+  padding-block: 4px;
+}
+.rq-prototype-workspace .rq-prototype-config [class*="modelSelector"] small {
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+.rq-prototype-workspace .rq-device-selection > div {
+  gap: 6px;
+  margin-top: 8px;
+}
+.rq-prototype-workspace .rq-device-selection button {
+  gap: 3px;
+  padding: 8px 6px;
+}
+.rq-prototype-workspace .rq-device-selection button small {
+  min-height: 0;
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+.rq-prototype-workspace .rq-device-icon {
+  height: 26px;
+}
+.rq-prototype-workspace .rq-device-icon i {
+  width: 26px;
+  height: 19px;
+}
+.rq-prototype-workspace .rq-device-icon i + i {
+  width: 9px;
+  height: 14px;
+}
+.rq-prototype-workspace .rq-device-icon--mobile i + i {
+  width: 14px;
+  height: 24px;
+}
+.rq-prototype-workspace .rq-prototype-config [class*="stageProgress"] {
+  margin-top: 6px;
+}
+.rq-prototype-workspace .rq-prototype-generate {
+  padding: 10px 14px;
+}
+
+@media (min-width: 1121px) and (min-height: 640px) {
+  .rq-main > .rq-content:has(> .rq-prototype-workspace > .rq-prototype-layout) {
+    block-size: 100%;
+  }
+  .rq-prototype-workspace:has(> .rq-prototype-layout) {
+    display: flex;
+    min-block-size: 0;
+    block-size: 100%;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .rq-prototype-workspace:has(> .rq-prototype-layout) > * {
+    flex: 0 0 auto;
+  }
+  .rq-prototype-workspace > .rq-prototype-layout {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    align-items: stretch;
+    gap: 10px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .rq-prototype-workspace .rq-prototype-config {
+    min-block-size: 0;
+    gap: 8px;
+    overflow-y: auto;
+  }
+  .rq-prototype-workspace .rq-prototype-preview {
+    min-block-size: 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* RQ PROTOTIPO FILTROS EN UNA LINEA V1
+   Historial de prototipos: buscar, estado, fechas (Desde sobre Hasta), ordenar, Limpiar y
+   Actualizar en una sola fila. */
+.rq-projects-filters.rq-prototype-filters {
+  grid-template-columns: minmax(200px, 1.5fr) auto auto auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.rq-prototype-filters__dates {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.rq-prototype-filters__dates .rq-projects-filter {
+  min-height: 32px;
+}
+.rq-prototype-filters > .rq-action {
+  min-height: 38px;
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .rq-projects-filters.rq-prototype-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rq-projects-filters.rq-prototype-filters > .rq-projects-filter--search {
+    grid-column: 1 / -1;
+  }
+}
+
+/* RQ DIALOGO DE CONFIRMACION V1: reemplaza el cuadro nativo del navegador. */
+.rq-confirm-dialog {
+  width: min(440px, calc(100vw - 32px));
+}
+.rq-confirm-dialog__message {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+/* RQ PANEL DE PESTAÑAS EJECUCION V1: el panel conserva el mismo ritmo vertical que el resto. */
+.rq-execution-workspace > .rq-exec-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* RQ LISTAS LARGAS V1: las historias de la checklist de Ejecución fuera de pantalla no se
+   pintan hasta que se acercan (content-visibility), con una altura estimada que el navegador
+   recuerda tras mostrarlas. En proyectos con cientos de tareas reduce el trabajo de pintado. */
+.rq-exec-tree > li > ul > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
+/* RQ TITULOS BALANCEADOS V1: los encabezados reparten sus líneas para no dejar palabras sueltas. */
+.rq-main :is(h1, h2, h3) {
+  text-wrap: balance;
+}
+
+/* RQ CATALOGO DE MODELOS SIN DESBORDE V1: un identificador largo (por ejemplo `llamacpp:<hash>`)
+   ensanchaba la columna de modelos y la lista se montaba sobre el panel de Detalle. Las columnas
+   de la rejilla y el texto de cada modelo pueden encogerse y el nombre se parte. */
+.rq-ai-providers-workspace .rq-ai-cat > * {
+  min-width: 0;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model {
+  min-width: 0;
+  max-width: 100%;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model > span {
+  min-width: 0;
+}
+.rq-ai-providers-workspace .rq-ai-cat__model strong,
+.rq-ai-providers-workspace .rq-ai-cat__model small {
+  overflow-wrap: anywhere;
+}
+
