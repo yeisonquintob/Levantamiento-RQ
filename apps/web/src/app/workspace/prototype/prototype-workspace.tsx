@@ -2031,9 +2031,13 @@ export function PrototypeWorkspace() {
                                 <div>
                                   <strong>Componentes identificados</strong>
                                   <ul>
-                                    {screen.components.map((component) => (
-                                      <li key={component}>{component}</li>
-                                    ))}
+                                    {screen.components.map(
+                                      (component, index) => (
+                                        <li key={`${index}-${component}`}>
+                                          {component}
+                                        </li>
+                                      ),
+                                    )}
                                   </ul>
                                 </div>
                               ) : (

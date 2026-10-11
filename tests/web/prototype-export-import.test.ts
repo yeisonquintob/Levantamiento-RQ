@@ -127,3 +127,13 @@ test("la columna izquierda de Generar prototipo se compacta para caber en una pa
   assert.match(css, /\.rq-device-selection button > small \{\s*display: none;/u);
   assert.match(css, /@media \(min-width: 1121px\) and \(max-height: 700px\)/u);
 });
+
+test("un texto largo del botón principal no ensancha la columna izquierda y la lista de componentes no repite claves", () => {
+  const css = readStylesSync();
+  assert.match(css, /\.rq-prototype-generate \{[^}]*min-width: 0;[^}]*overflow: hidden;/u);
+  assert.match(css, /\.rq-prototype-workspace \.rq-prototype-config > \* \{\s*min-width: 0;/u);
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  // La IA puede devolver dos componentes con el mismo texto: la clave incluye la posición.
+  assert.doesNotMatch(source, /key=\{component\}/u);
+  assert.match(source, /key=\{`\$\{index\}-\$\{component\}`\}/u);
+});

@@ -109,7 +109,17 @@
 }
 
 /* PROTOTYPE_GENERATE_ONE_LINE_V1: «Procesar Markdown» es un botón de una sola línea; el texto
-   secundario se recorta con puntos suspensivos en lugar de partir el título. */
+   secundario se recorta con puntos suspensivos en lugar de partir el título. El botón y la columna
+   pueden encogerse (min-width: 0): sin eso, un texto largo ensanchaba toda la columna izquierda. */
+.rq-prototype-generate {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.rq-prototype-workspace .rq-prototype-config,
+.rq-prototype-workspace .rq-prototype-config > * {
+  min-width: 0;
+}
 .rq-prototype-generate span {
   flex: 0 0 auto;
   white-space: nowrap;
