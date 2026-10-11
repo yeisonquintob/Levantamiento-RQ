@@ -40,7 +40,6 @@ test("modelo de imágenes tiene configuración separada del modelo de texto", ()
   assert.equal(config.model, "image-model-test");
 });
 
-
 test("ComfyUI ejecuta workflow, sondea history y recupera PNG", async () => {
   const originalFetch = globalThis.fetch;
   const png =
@@ -56,7 +55,9 @@ test("ComfyUI ejecuta workflow, sondea history y recupera PNG", async () => {
       return new Response(
         JSON.stringify({
           CheckpointLoaderSimple: {
-            input: { required: { ckpt_name: [["checkpoint-test.safetensors"], {}] } },
+            input: {
+              required: { ckpt_name: [["checkpoint-test.safetensors"], {}] },
+            },
           },
         }),
         { status: 200, headers: { "content-type": "application/json" } },
@@ -76,9 +77,7 @@ test("ComfyUI ejecuta workflow, sondea history y recupera PNG", async () => {
             status: { completed: true, status_str: "success" },
             outputs: {
               "9": {
-                images: [
-                  { filename: "rq.png", subfolder: "", type: "output" },
-                ],
+                images: [{ filename: "rq.png", subfolder: "", type: "output" }],
               },
             },
           },
@@ -140,12 +139,83 @@ test("ComfyUI ejecuta workflow, sondea history y recupera PNG", async () => {
     assert.equal(result.model, "checkpoint-test.safetensors");
     assert.equal(result.imageBase64, png);
     const prompt = workflowBody?.prompt as
-      | Record<string, { class_type?: string; inputs?: Record<string, unknown> }>
+      | Record<
+          string,
+          { class_type?: string; inputs?: Record<string, unknown> }
+        >
       | undefined;
     assert.equal(prompt?.["4"]?.class_type, "CheckpointLoaderSimple");
     assert.equal(prompt?.["3"]?.class_type, "KSampler");
     assert.equal(prompt?.["5"]?.inputs?.width, 1536);
     assert.equal(prompt?.["5"]?.inputs?.height, 1024);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Ollama Images indica cómo instalar el modelo cuando no existe", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({ error: "model 'x/z-image-turbo:latest' not found" }),
+      {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      },
+    )) as typeof fetch;
+
+  try {
+    const configuration = {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      providerType: "OLLAMA_IMAGES",
+      purpose: "IMAGE",
+      model: "x/z-image-turbo:latest",
+      baseUrl: "http://127.0.0.1:11434",
+      timeoutMs: 5_000,
+    };
+    const providers = {
+      resolveImageProviderConfiguration: async () => configuration,
+      resolveImageProvider: async () => ({ configuration, apiKey: null }),
+    };
+    const audits = {
+      create: (value: unknown) => value,
+      save: async (value: unknown) => value,
+    };
+    const service = new InternalImageGenerationService(
+      providers as never,
+      audits as never,
+      {
+        model: "openai-unused",
+        quality: "medium",
+        timeoutMs: 5_000,
+        maxBase64Chars: 1_000_000,
+      },
+    );
+
+    await assert.rejects(
+      () =>
+        service.generate(
+          {
+            purpose: "PROTOTYPE_IMAGE_GENERATION",
+            providerConfigurationId: configuration.id,
+            prompt: "Pantalla corporativa limpia",
+            device: "WEB",
+            requestedSize: "1536x1024",
+          },
+          "corr-ollama-404",
+        ),
+      (error: unknown) => {
+        const response = (
+          error as { getResponse?: () => Record<string, unknown> }
+        ).getResponse?.();
+        assert.equal(response?.errorCode, "OLLAMA_IMAGE_MODEL_NOT_FOUND");
+        assert.match(
+          String(response?.message),
+          /ollama pull x\/z-image-turbo:latest/u,
+        );
+        return true;
+      },
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

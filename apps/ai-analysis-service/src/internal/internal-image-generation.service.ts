@@ -149,10 +149,7 @@ const COMFYUI_UI_NEGATIVE_PROMPT =
   "low quality, blurry, distorted interface, watermark, random letters, illegible text, duplicated elements, cropped layout, laptop, desktop monitor, smartphone hardware, tablet hardware, physical device, device frame, 3d mockup, perspective mockup, isometric view, marketing presentation, moodboard, storyboard, infographic, flowchart, wireframe, sketch";
 
 function comfyUiSeed(): number {
-  return Number.parseInt(
-    randomUUID().replace(/-/gu, "").slice(0, 12),
-    16,
-  );
+  return Number.parseInt(randomUUID().replace(/-/gu, "").slice(0, 12), 16);
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -183,7 +180,13 @@ export function parsePrototypeImageGenerationInternalRequest(
     throw new ConflictException("El prompt visual supera el tamaño permitido.");
   return {
     purpose: "PROTOTYPE_IMAGE_GENERATION",
-    ...(input.providerConfigurationId !== undefined ? { providerConfigurationId: parseProviderConfigurationId(String(input.providerConfigurationId)) } : {}),
+    ...(input.providerConfigurationId !== undefined
+      ? {
+          providerConfigurationId: parseProviderConfigurationId(
+            String(input.providerConfigurationId),
+          ),
+        }
+      : {}),
     prompt: input.prompt.trim(),
     device,
     requestedSize,
@@ -207,10 +210,9 @@ export class InternalImageGenerationService {
     const startedAt = new Date();
 
     if (request.providerConfigurationId) {
-      const selected =
-        await this.providers.resolveImageProviderConfiguration(
-          request.providerConfigurationId,
-        );
+      const selected = await this.providers.resolveImageProviderConfiguration(
+        request.providerConfigurationId,
+      );
       if (selected.providerType === "OLLAMA_IMAGES") {
         return this.generateOllamaImage(
           selected,
@@ -278,7 +280,8 @@ export class InternalImageGenerationService {
       });
       throw new ConflictException({
         errorCode: "PROTOTYPE_IMAGE_DLP_BLOCKED",
-        message: "El contenido visual contiene información sensible no permitida.",
+        message:
+          "El contenido visual contiene información sensible no permitida.",
       });
     }
 
@@ -354,7 +357,8 @@ export class InternalImageGenerationService {
     if (!apiKey) {
       throw new ConflictException({
         errorCode: "OPENAI_IMAGE_CREDENTIAL_NOT_CONFIGURED",
-        message: "El proveedor OpenAI de imágenes no tiene credencial disponible.",
+        message:
+          "El proveedor OpenAI de imágenes no tiene credencial disponible.",
       });
     }
     const model =
@@ -400,7 +404,9 @@ export class InternalImageGenerationService {
     const raw = await response.text();
     if (!response.ok) {
       const retryable =
-        response.status === 408 || response.status === 429 || response.status >= 500;
+        response.status === 408 ||
+        response.status === 429 ||
+        response.status >= 500;
       const code = `OPENAI_IMAGE_HTTP_${response.status}`;
       if (retryable) {
         throw new ServiceUnavailableException({
@@ -480,7 +486,10 @@ export class InternalImageGenerationService {
     try {
       promptResponse = await fetch(`${baseUrl}/prompt`, {
         method: "POST",
-        headers: { accept: "application/json", "content-type": "application/json" },
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
         body: JSON.stringify({
           prompt: workflow,
           client_id: correlationId.slice(0, 100),
@@ -561,7 +570,8 @@ export class InternalImageGenerationService {
         if (statusString === "error") {
           throw new BadGatewayException({
             errorCode: "COMFYUI_EXECUTION_FAILED",
-            message: "ComfyUI informó un error durante la ejecución del workflow.",
+            message:
+              "ComfyUI informó un error durante la ejecución del workflow.",
           });
         }
         if (completed) {
@@ -569,7 +579,8 @@ export class InternalImageGenerationService {
           if (!output) {
             throw new BadGatewayException({
               errorCode: "COMFYUI_IMAGE_NOT_FOUND",
-              message: "El workflow terminó, pero ComfyUI no reportó imagen de salida.",
+              message:
+                "El workflow terminó, pero ComfyUI no reportó imagen de salida.",
             });
           }
           const query = new URLSearchParams({
@@ -589,7 +600,8 @@ export class InternalImageGenerationService {
           if (!imageResponse.ok) {
             throw new BadGatewayException({
               errorCode: `COMFYUI_VIEW_HTTP_${imageResponse.status}`,
-              message: "No fue posible recuperar la imagen generada por ComfyUI.",
+              message:
+                "No fue posible recuperar la imagen generada por ComfyUI.",
             });
           }
           const binary = Buffer.from(await imageResponse.arrayBuffer());
@@ -653,7 +665,8 @@ export class InternalImageGenerationService {
     if (checkpoints.length === 0) {
       throw new ConflictException({
         errorCode: "COMFYUI_CHECKPOINTS_EMPTY",
-        message: "ComfyUI está conectado, pero no tiene checkpoints disponibles.",
+        message:
+          "ComfyUI está conectado, pero no tiene checkpoints disponibles.",
       });
     }
     const configured = configuration.model.trim();
@@ -690,7 +703,8 @@ export class InternalImageGenerationService {
         ) {
           return {
             filename: image.filename,
-            subfolder: typeof image.subfolder === "string" ? image.subfolder : "",
+            subfolder:
+              typeof image.subfolder === "string" ? image.subfolder : "",
             type: image.type,
           };
         }
@@ -780,6 +794,12 @@ export class InternalImageGenerationService {
             message: "Ollama Images no está disponible temporalmente.",
           });
         }
+        if (response.status === 404) {
+          throw new BadGatewayException({
+            errorCode: "OLLAMA_IMAGE_MODEL_NOT_FOUND",
+            message: `El modelo ${configuration.model} no está instalado en Ollama. Descárgalo con: ollama pull ${configuration.model}`,
+          });
+        }
         throw new BadGatewayException({
           errorCode,
           message: "Ollama Images rechazó la solicitud visual.",
@@ -787,10 +807,7 @@ export class InternalImageGenerationService {
       }
 
       const imageBase64 = ollamaImageFromResponse(raw);
-      if (
-        !imageBase64 ||
-        imageBase64.length > this.config.maxBase64Chars
-      ) {
+      if (!imageBase64 || imageBase64.length > this.config.maxBase64Chars) {
         throw new Error("OLLAMA_IMAGE_INVALID_RESPONSE");
       }
 
@@ -824,18 +841,17 @@ export class InternalImageGenerationService {
         ? "OLLAMA_IMAGE_TIMEOUT"
         : "OLLAMA_IMAGE_INVALID_RESPONSE";
 
-      await this.audit(
-        executionId,
-        configuration.id,
-        correlationId,
-        "FAILED",
-        { ...metadata, errorCode, completedAt: new Date().toISOString() },
-      );
+      await this.audit(executionId, configuration.id, correlationId, "FAILED", {
+        ...metadata,
+        errorCode,
+        completedAt: new Date().toISOString(),
+      });
 
       if (timeout) {
         throw new RequestTimeoutException({
           errorCode,
-          message: "Ollama Images excedió el tiempo permitido para generar la imagen.",
+          message:
+            "Ollama Images excedió el tiempo permitido para generar la imagen.",
         });
       }
       throw new BadGatewayException({
