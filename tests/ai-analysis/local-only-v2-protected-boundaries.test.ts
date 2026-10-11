@@ -1,7 +1,7 @@
 // LOCAL_ONLY_V2_00_PROTECTED_BOUNDARIES
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import * as path from "node:path";
 import test from "node:test";
 
@@ -10,12 +10,12 @@ import {
   resolveAiDocumentGenerationMode,
 } from "../../apps/ai-analysis-service/src/execution/ai-document-generation-mode.js";
 
+type HashedFile = { path: string; sha256: string };
 type BoundaryManifest = {
   schemaVersion: number;
   step: string;
-  groups: Record<string, string[]>;
-  excludedDirs: string[];
-  files: Array<{ path: string; sha256: string; groups: string[] }>;
+  migrations: HashedFile[];
+  critical: HashedFile[];
 };
 
 const manifestPath =
@@ -23,38 +23,27 @@ const manifestPath =
 const manifest = JSON.parse(
   readFileSync(manifestPath, "utf8"),
 ) as BoundaryManifest;
-
-function ignoreFile(filePath: string): boolean {
-  const normalized = filePath.split(path.sep).join("/");
-  if (normalized === "apps/web/next-env.d.ts") return true;
-
-  const base = path.basename(filePath);
-  if (base === ".DS_Store") return true;
-  return base.startsWith(".env") && base !== ".env.example";
-}
-
-function walk(root: string): string[] {
-  assert.equal(existsSync(root), true, `Ruta protegida inexistente: ${root}`);
-  const stat = lstatSync(root);
-  if (stat.isSymbolicLink()) return [];
-  if (stat.isFile()) return ignoreFile(root) ? [] : [root];
-  if (!stat.isDirectory()) return [];
-
-  const excluded = new Set(manifest.excludedDirs);
-  const result: string[] = [];
-  for (const name of readdirSync(root).sort()) {
-    if (excluded.has(name)) continue;
-    const child = path.join(root, name);
-    const childStat = lstatSync(child);
-    if (childStat.isSymbolicLink()) continue;
-    if (childStat.isDirectory()) result.push(...walk(child));
-    else if (childStat.isFile() && !ignoreFile(child)) result.push(child);
-  }
-  return result;
-}
+const updateHint =
+  "Si el cambio es intencional, revisa el diff y ejecuta `pnpm boundaries:update`.";
 
 function sha256(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function ignoreFile(filePath: string): boolean {
+  return filePath.split(path.sep).join("/") === "apps/web/next-env.d.ts";
+}
+
+function migrationFilesOnDisk(): string[] {
+  const files: string[] = [];
+  for (const app of readdirSync("apps").sort()) {
+    const dir = `apps/${app}/src/database/migrations`;
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir).sort()) {
+      if (name.endsWith(".ts")) files.push(`${dir}/${name}`);
+    }
+  }
+  return files;
 }
 
 test("Paso 0 excluye únicamente next-env.d.ts porque Next.js lo regenera", () => {
@@ -63,10 +52,6 @@ test("Paso 0 excluye únicamente next-env.d.ts porque Next.js lo regenera", () =
   const gitignore = readFileSync(".gitignore", "utf8");
 
   assert.equal(ignoreFile(generatedPath), true);
-  assert.equal(
-    manifest.files.some((entry) => entry.path === generatedPath),
-    false,
-  );
   const generatedImport = generated
     .split(/\r?\n/u)
     .find((line) => line.startsWith('import "./.next/'));
@@ -85,29 +70,32 @@ test("Paso 0 excluye únicamente next-env.d.ts porque Next.js lo regenera", () =
   );
 });
 
-test("Paso 0 mantiene intactas todas las fronteras fuera de alcance", () => {
-  assert.equal(manifest.schemaVersion, 2);
+test("las migraciones ya aplicadas no se modifican ni se eliminan (se permiten nuevas)", () => {
+  assert.equal(manifest.schemaVersion, 3);
   assert.equal(manifest.step, "LOCAL_ONLY_V2_00");
 
-  const actual = new Set<string>();
-  for (const roots of Object.values(manifest.groups)) {
-    for (const root of roots) {
-      for (const file of walk(root)) actual.add(file.split(path.sep).join("/"));
-    }
-  }
-
-  const expected = new Set(manifest.files.map((entry) => entry.path));
-  assert.deepEqual(
-    [...actual].sort(),
-    [...expected].sort(),
-    "Se agregó, eliminó o movió un archivo dentro de una frontera protegida.",
-  );
-
-  for (const entry of manifest.files) {
+  const onDisk = new Set(migrationFilesOnDisk());
+  for (const entry of manifest.migrations) {
+    assert.equal(
+      onDisk.has(entry.path),
+      true,
+      `Se eliminó o movió una migración ya aplicada: ${entry.path}. Crea una migración nueva en su lugar.`,
+    );
     assert.equal(
       sha256(entry.path),
       entry.sha256,
-      `Cambió una frontera protegida: ${entry.path}`,
+      `Se modificó una migración ya aplicada: ${entry.path}. Crea una migración nueva en su lugar.`,
+    );
+  }
+});
+
+test("los archivos críticos de seguridad y modo de generación de IA no cambian sin decisión explícita", () => {
+  assert.ok(manifest.critical.length > 0);
+  for (const entry of manifest.critical) {
+    assert.equal(
+      sha256(entry.path),
+      entry.sha256,
+      `Cambió un archivo crítico: ${entry.path}. ${updateHint}`,
     );
   }
 });

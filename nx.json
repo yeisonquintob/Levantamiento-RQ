@@ -15,7 +15,8 @@
       "{workspaceRoot}/nx.json",
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/tsconfig.json",
-      "{workspaceRoot}/eslint.config.mjs"
+      "{workspaceRoot}/eslint.config.mjs",
+      { "env": "NEXT_PUBLIC_GATEWAY_URL" }
     ]
   },
   "plugins": [

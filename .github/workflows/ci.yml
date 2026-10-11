@@ -32,9 +32,16 @@ jobs:
       - run: pnpm audit --prod --audit-level high
       - run: pnpm check:secrets
       - run: pnpm check:architecture
-      # Scripts y fixtures fuera de Nx: siempre se comprueban.
-      - run: pnpm exec tsc -p tsconfig.scripts.json --noEmit
-      # En un PR solo se valida lo afectado por el cambio (con caché de Nx); en main, todo.
+      - name: Caché de Nx
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json', 'tsconfig.base.json', 'eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json', 'tsconfig.base.json', 'eslint.config.mjs') }}-
+      # Scripts y fixtures fuera de Nx: siempre se comprueban (una sola vez).
+      - run: pnpm typecheck:scripts
+      # En un PR solo se valida lo afectado por el cambio; en main, todo. Ambos usan la caché de Nx.
       - name: Lint, typecheck y build de los proyectos afectados
         if: github.event_name == 'pull_request'
         env:
@@ -43,7 +50,7 @@ jobs:
         run: pnpm ci:affected
       - name: Lint, typecheck y build completos
         if: github.event_name != 'pull_request'
-        run: pnpm lint:all && pnpm typecheck:all && pnpm build:all
+        run: pnpm lint:all && pnpm typecheck:projects && pnpm build:all
       - run: pnpm test:unit
       - run: pnpm test:web
       - run: pnpm test:events
@@ -69,3 +76,58 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm swagger:validate
+
+  coverage:
+    name: Cobertura de pruebas unitarias
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Construir contratos compartidos
+        run: pnpm nx run shared-contracts:build
+      - name: Cobertura con umbrales mínimos por servicio
+        run: pnpm test:coverage
+
+  e2e-smoke:
+    name: Smoke E2E (sin backend)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Caché de Nx
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .nx/cache
+          key: nx-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-${{ github.sha }}
+          restore-keys: |
+            nx-e2e-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
+      - run: pnpm exec playwright install --with-deps chromium
+      # Playwright levanta `nx start web` (compila antes con la caché de Nx) y ejecuta solo el proyecto «smoke».
+      - run: pnpm test:e2e:smoke
+      - name: Informe de Playwright
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: tmp/playwright-report
+          retention-days: 7
