@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Dos modos:
+#   - por defecto arranca cada servicio con `nx serve`, lo valida y lo detiene (equipo de desarrollo);
+#   - SWAGGER_USE_RUNNING=1 valida los servicios que YA están levantados (CI, tras `ci-stack-up.sh`) y no
+#     arranca ni detiene nada. SWAGGER_SERVICES="gateway identity-service" limita los servicios a validar.
+#
+# Los servicios con base de datos solo registran sus rutas con DATABASE_ENABLED=true, por eso el contrato no
+# puede validarse con la persistencia desactivada.
+USE_RUNNING="${SWAGGER_USE_RUNNING:-0}"
+ONLY_SERVICES="${SWAGGER_SERVICES:-}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$ROOT/tmp/swagger-validation"
 LOG_DIR="$ROOT/logs/swagger-validation"
@@ -33,6 +43,7 @@ kill_tree() {
 
 stop_current() {
   local pids=""
+  [ "$USE_RUNNING" = "1" ] && return 0
   if [ -n "$CURRENT_PID" ]; then
     kill_tree "$CURRENT_PID"
   fi
@@ -68,25 +79,29 @@ cd "$ROOT"
 for entry in "${SERVICES[@]}"; do
   service="${entry%%:*}"
   port="${entry##*:}"
+  if [ -n "$ONLY_SERVICES" ] && [[ " $ONLY_SERVICES " != *" $service "* ]]; then continue; fi
   log_file="$LOG_DIR/$service.log"
   json_file="$TMP_DIR/$service.json"
   CURRENT_PORT="$port"
 
-  if [ "$service" = "workflow-service" ]; then
-    nohup bash -lc \
-      "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development NX_DAEMON=false NX_INTERACTIVE=false NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false; exec pnpm exec nx serve workflow-service --skip-nx-cache" \
-      > "$log_file" 2>&1 &
-  else
-    nohup env \
-      NODE_ENV=development \
-      NX_DAEMON=false \
-      NX_INTERACTIVE=false \
-      NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-      pnpm exec nx serve "$service" --skip-nx-cache \
-      > "$log_file" 2>&1 &
+  if [ "$USE_RUNNING" != "1" ]; then
+    if [ "$service" = "workflow-service" ]; then
+      nohup bash -lc \
+        "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development NX_DAEMON=false NX_INTERACTIVE=false NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false; exec pnpm exec nx serve workflow-service --skip-nx-cache" \
+        > "$log_file" 2>&1 &
+    else
+      nohup env \
+        NODE_ENV=development \
+        NX_DAEMON=false \
+        NX_INTERACTIVE=false \
+        NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+        pnpm exec nx serve "$service" --skip-nx-cache \
+        > "$log_file" 2>&1 &
+    fi
+
   fi
 
-  CURRENT_PID=$!
+  [ "$USE_RUNNING" = "1" ] || CURRENT_PID=$!
   ready=0
 
   for _ in $(seq 1 120); do
@@ -200,4 +215,4 @@ PY_JSON
 done
 
 echo
-echo "✓ Swagger validado en los nueve servicios backend."
+echo "✓ Swagger validado${ONLY_SERVICES:+ ($ONLY_SERVICES)}$([ -n "$ONLY_SERVICES" ] || echo " en los nueve servicios backend")."
