@@ -178,8 +178,10 @@ jobs:
             -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e "MSSQL_SA_PASSWORD=$CI_SQL_PASSWORD" \
             -p 127.0.0.1:1433:1433 mcr.microsoft.com/mssql/server:2022-latest
       - name: Levantar el stack completo (infraestructura, bases, migraciones, servicios y web)
+        env:
+          RQ_USE_NX_CACHE: "1"
         run: bash scripts/ci-stack-up.sh
-      - name: Integración con bases de datos, Redis y Azurite
+      - name: Integración con bases de datos (7 servicios y Prototypes), Redis, Azurite y RabbitMQ
         run: pnpm test:integration
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
         run: pnpm test:e2e:v1

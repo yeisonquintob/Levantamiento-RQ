@@ -146,6 +146,11 @@ for port in 3000 3001 3002 3003 3004 3005 3007 3008 3009 4200; do
   fi
 done
 
+# Por defecto se compila sin caché de Nx (comportamiento local de siempre). El CI define
+# RQ_USE_NX_CACHE=1 para reutilizar la caché y no recompilar lo que no cambió.
+NX_CACHE_ARGS=(--skip-nx-cache)
+if [ "${RQ_USE_NX_CACHE:-0}" = "1" ]; then NX_CACHE_ARGS=(); fi
+
 env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
@@ -154,7 +159,7 @@ env \
     --target=build \
     --projects=identity-service,projects-service,sources-service,documents-service,ai-analysis-service,workflow-service,operations-service,prototypes-service,gateway \
     --configuration=development \
-    --skip-nx-cache \
+    ${NX_CACHE_ARGS[@]+"${NX_CACHE_ARGS[@]}"} \
   > "$LOG_DIR/local-services-build.log" 2>&1
 
 echo "✓ Servicios locales compilados."
@@ -303,7 +308,7 @@ env \
   NX_DAEMON=false \
   NX_INTERACTIVE=false \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
-  pnpm exec nx build shared-ui --skip-nx-cache \
+  pnpm exec nx build shared-ui ${NX_CACHE_ARGS[@]+"${NX_CACHE_ARGS[@]}"} \
   > "$LOG_DIR/shared-ui-build.log" 2>&1
 
 echo "✓ Shared UI preparada."

@@ -2,7 +2,10 @@
 
 El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo en un runner limpio y ejecuta:
 
-1. `pnpm test:integration` — verificación de bases de datos, almacenamiento (Azurite) y colas (Redis).
+1. `pnpm test:integration` — verificación real contra los servicios levantados:
+   - Bases de datos de Identity, Projects, Sources, Documents, Workflow, AI Analysis, Operations y Prototypes (migraciones aplicadas, tablas, índices, claves foráneas y ausencia de secretos).
+   - Almacenamiento (Azurite) y colas (Redis) de Sources.
+   - RabbitMQ: entrega de un evento persistente y versionado conservando `correlationId`, productor y clave de enrutamiento (`events:rabbitmq:smoke`).
 2. `pnpm test:e2e:v1` — recorrido completo por el gateway: login, proyecto, documento, exportación PDF/DOCX, auditoría y notificaciones.
 3. Playwright con sesión real (`login` y `chromium`) sobre datos creados por `documents:editor:e2e:fixture`.
 
