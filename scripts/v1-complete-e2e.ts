@@ -814,6 +814,16 @@ async function main(): Promise<void> {
     console.log(
       "✓ Rutas funcionales principales del frontend respondieron HTTP 200.",
     );
+    if (keepApproved) {
+      // En la interfaz el flujo de validación lleva el proyecto a «Aprobado» al aprobar su documento;
+      // aquí se hace igual para que Ejecución habilite el seguimiento del proyecto que se conserva.
+      stage = "dejar el proyecto aprobado para las pruebas de Ejecución";
+      await request(`/projects/${projectId}`, access, {
+        method: "PATCH",
+        expected: 200,
+        body: { status: "APPROVED" },
+      });
+    }
     keepAfterSuccess = keepApproved;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

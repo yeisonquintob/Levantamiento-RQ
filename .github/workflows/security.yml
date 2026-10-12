@@ -90,6 +90,9 @@ jobs:
           - image: erp-knowledge-service
             dockerfile: Dockerfile
             app: erp-knowledge-service
+          - image: prototypes-service
+            dockerfile: Dockerfile
+            app: prototypes-service
           - image: web
             dockerfile: Dockerfile.web
             app: web
