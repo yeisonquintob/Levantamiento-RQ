@@ -27,6 +27,11 @@ import {
   type PrototypeImageGenerationConfig,
 } from "./prototype-image-generation.config";
 import {
+  buildCheckpointPrompt,
+  resolveCheckpointProfile,
+  type CheckpointProfile,
+} from "./comfyui-checkpoint-prompt";
+import {
   loadComfyUiWorkflowTemplate,
   parseComfyUiWorkflowReference,
   renderComfyUiWorkflowTemplate,
@@ -96,28 +101,15 @@ function comfyUiDimensions(size: "1536x1024" | "1024x1536") {
  */
 const CHECKPOINT_NEGATIVE_PROMPT =
   "multiple screens, collage, grid of screens, mockup, device frame, bezel, notch, phone, laptop, monitor, hand, photo, photograph, realistic, 3d render, perspective, isometric, car, vehicle, landscape, people, machinery, blueprint, diagram, low quality, blurry, watermark, illegible text, duplicated elements, cropped layout";
-// Los modelos «Lightning» usan CFG 1, con el que el negativo no tiene efecto; 1.5 lo activa.
-const CHECKPOINT_CFG = 1.5;
-
-export function buildCheckpointPrompt(
-  prompt: string,
-  device: PrototypeImageGenerationInternalRequest["device"],
-): string {
-  const screen = /^Screen:\s*(.+?)\.?\s*$/mu
-    .exec(prompt)?.[1]
-    ?.replace(/["\\]/gu, "")
-    .slice(0, 80);
-  const subject = screen ? ` "${screen}"` : "";
-  return device === "MOBILE"
-    ? `single flat 2D mobile app screen${subject}, full-frame UI screenshot, portrait, top app header, form with labeled input fields, dropdowns and a primary button, bottom tab bar, white background, muted corporate accent color, minimal clean design, UI design, high quality`
-    : `single flat 2D web application screen${subject}, full-frame UI screenshot, enterprise dashboard layout, narrow left sidebar with menu icons, top header bar, main content area with a form: labeled input fields, dropdowns and a primary button, white background, muted corporate accent color, minimal clean design, UI design, high quality`;
-}
+export { buildCheckpointPrompt, resolveCheckpointProfile };
+export type { CheckpointProfile };
 
 export function buildComfyUiWorkflow(input: {
   checkpoint: string;
   prompt: string;
   negativePrompt?: string;
   cfg?: number;
+  profile?: CheckpointProfile;
   requestedSize: "1536x1024" | "1024x1536";
 }): Record<string, unknown> {
   const { width, height } = comfyUiDimensions(input.requestedSize);
@@ -130,10 +122,10 @@ export function buildComfyUiWorkflow(input: {
       class_type: "KSampler",
       inputs: {
         seed,
-        steps: 4,
-        cfg: input.cfg ?? 1,
-        sampler_name: "euler",
-        scheduler: "sgm_uniform",
+        steps: input.profile?.steps ?? 4,
+        cfg: input.cfg ?? input.profile?.cfg ?? 1,
+        sampler_name: input.profile?.samplerName ?? "euler",
+        scheduler: input.profile?.scheduler ?? "sgm_uniform",
         denoise: 1,
         model: ["4", 0],
         positive: ["6", 0],
@@ -506,7 +498,7 @@ export class InternalImageGenerationService {
         checkpoint,
         prompt: buildCheckpointPrompt(prompt, request.device),
         negativePrompt: CHECKPOINT_NEGATIVE_PROMPT,
-        cfg: CHECKPOINT_CFG,
+        profile: resolveCheckpointProfile(checkpoint),
         requestedSize: request.requestedSize,
       });
       generatedModel = checkpoint;
