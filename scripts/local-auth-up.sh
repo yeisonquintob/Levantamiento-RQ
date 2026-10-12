@@ -21,6 +21,8 @@ fi
 node "$ROOT/scripts/generate-local-jwt-keys.mjs" "${JWT_KEY_ARGS[@]}"
 source "$JWT_KEYS_ENV"
 export JWT_ACCESS_PUBLIC_JWKS_BASE64
+# Los servicios que hacen `source` de un .env más abajo no deben pisar estas claves recién generadas
+# (en el .env.example la clave viene vacía); se vuelve a exportar tras cada `source`.
 
 set -a
 source "$INFRA_ENV"
@@ -254,7 +256,7 @@ start_detached \
   "$PID_DIR/workflow-service.pid" \
   "$LOG_DIR/workflow-service.log" \
   bash -lc \
-  "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development; exec node '$ROOT/apps/workflow-service/dist/main.js'"
+  "set -a; source '$ROOT/apps/documents-service/.env'; set +a; export JWT_ACCESS_PUBLIC_JWKS_BASE64='$JWT_ACCESS_PUBLIC_JWKS_BASE64'; export SERVICE_NAME=workflow-service PORT=3007 DB_NAME=RqWorkflowDb DATABASE_ENABLED=true NODE_ENV=development; exec node '$ROOT/apps/workflow-service/dist/main.js'"
 
 wait_for_url \
   "Workflow Service" \
@@ -265,7 +267,7 @@ start_detached \
   "$PID_DIR/operations-service.pid" \
   "$LOG_DIR/operations-service.log" \
   bash -lc \
-  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export WORKLOAD_JWT_KEY_ID='$LOCAL_OPERATIONS_WORKLOAD_JWT_KEY_ID' WORKLOAD_JWT_PRIVATE_JWK_BASE64='$LOCAL_OPERATIONS_WORKLOAD_JWT_PRIVATE_JWK_BASE64' SERVICE_NAME=operations-service PORT=3008 DB_NAME=RqOperationsDb DATABASE_ENABLED=true NODE_ENV=development REDIS_PORT=\"\${RQ_REDIS_PORT:-6381}\" AZURE_STORAGE_CONNECTION_STRING=\"DefaultEndpointsProtocol=http;AccountName=\${AZURITE_ACCOUNT_NAME};AccountKey=\${AZURITE_ACCOUNT_KEY};BlobEndpoint=http://127.0.0.1:\${RQ_AZURITE_BLOB_PORT}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:\${RQ_AZURITE_QUEUE_PORT}/devstoreaccount1;TableEndpoint=http://127.0.0.1:\${RQ_AZURITE_TABLE_PORT}/devstoreaccount1;\"; exec node '$ROOT/apps/operations-service/dist/main.js'"
+  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export JWT_ACCESS_PUBLIC_JWKS_BASE64='$JWT_ACCESS_PUBLIC_JWKS_BASE64'; export WORKLOAD_JWT_KEY_ID='$LOCAL_OPERATIONS_WORKLOAD_JWT_KEY_ID' WORKLOAD_JWT_PRIVATE_JWK_BASE64='$LOCAL_OPERATIONS_WORKLOAD_JWT_PRIVATE_JWK_BASE64' SERVICE_NAME=operations-service PORT=3008 DB_NAME=RqOperationsDb DATABASE_ENABLED=true NODE_ENV=development REDIS_PORT=\"\${RQ_REDIS_PORT:-6381}\" AZURE_STORAGE_CONNECTION_STRING=\"DefaultEndpointsProtocol=http;AccountName=\${AZURITE_ACCOUNT_NAME};AccountKey=\${AZURITE_ACCOUNT_KEY};BlobEndpoint=http://127.0.0.1:\${RQ_AZURITE_BLOB_PORT}/devstoreaccount1;QueueEndpoint=http://127.0.0.1:\${RQ_AZURITE_QUEUE_PORT}/devstoreaccount1;TableEndpoint=http://127.0.0.1:\${RQ_AZURITE_TABLE_PORT}/devstoreaccount1;\"; exec node '$ROOT/apps/operations-service/dist/main.js'"
 
 wait_for_url \
   "Operations Service" \
@@ -276,7 +278,7 @@ start_detached \
   "$PID_DIR/prototypes-service.pid" \
   "$LOG_DIR/prototypes-service.log" \
   bash -lc \
-  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; \
+  "set -a; source '$ROOT/apps/documents-service/.env'; source '$ROOT/infrastructure/docker/.env'; set +a; export JWT_ACCESS_PUBLIC_JWKS_BASE64='$JWT_ACCESS_PUBLIC_JWKS_BASE64'; \
    export WORKLOAD_JWT_KEY_ID='$LOCAL_PROTOTYPES_WORKLOAD_JWT_KEY_ID' \
    WORKLOAD_JWT_PRIVATE_JWK_BASE64='$LOCAL_PROTOTYPES_WORKLOAD_JWT_PRIVATE_JWK_BASE64' \
    SERVICE_NAME=prototypes-service PORT=3009 DB_NAME=RqPrototypesDb DATABASE_ENABLED=true \
