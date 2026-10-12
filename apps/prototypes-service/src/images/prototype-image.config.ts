@@ -10,6 +10,14 @@ export interface PrototypeImageConfig {
   storageConnectionString: string;
   storageContainer: string;
   maxImageBytes: number;
+  blobReconcile: {
+    /** OFF no hace nada; REPORT solo registra los huérfanos; DELETE los borra. */
+    mode: "OFF" | "REPORT" | "DELETE";
+    intervalMs: number;
+    /** Un archivo solo se considera huérfano pasado este tiempo (cubre subidas en curso). */
+    graceMs: number;
+    maxDeletesPerRun: number;
+  };
 }
 function integer(
   value: string | undefined,
@@ -22,6 +30,16 @@ function integer(
   if (!Number.isInteger(result) || result < min || result > max)
     throw new Error(`${name} debe estar entre ${min} y ${max}.`);
   return result;
+}
+function reconcileMode(
+  value: string | undefined,
+): PrototypeImageConfig["blobReconcile"]["mode"] {
+  const mode = (value?.trim().toUpperCase() || "REPORT") as string;
+  if (mode !== "OFF" && mode !== "REPORT" && mode !== "DELETE")
+    throw new Error(
+      "PROTOTYPE_BLOB_RECONCILE_MODE debe ser OFF, REPORT o DELETE.",
+    );
+  return mode;
 }
 export function loadPrototypeImageConfig(
   environment: NodeJS.ProcessEnv = process.env,
@@ -82,6 +100,30 @@ export function loadPrototypeImageConfig(
     ),
     storageConnectionString,
     storageContainer,
+    blobReconcile: {
+      mode: reconcileMode(environment.PROTOTYPE_BLOB_RECONCILE_MODE),
+      intervalMs: integer(
+        environment.PROTOTYPE_BLOB_RECONCILE_INTERVAL_MS,
+        6 * 60 * 60_000,
+        10 * 60_000,
+        7 * 24 * 60 * 60_000,
+        "PROTOTYPE_BLOB_RECONCILE_INTERVAL_MS",
+      ),
+      graceMs: integer(
+        environment.PROTOTYPE_BLOB_RECONCILE_GRACE_MS,
+        24 * 60 * 60_000,
+        60 * 60_000,
+        30 * 24 * 60 * 60_000,
+        "PROTOTYPE_BLOB_RECONCILE_GRACE_MS",
+      ),
+      maxDeletesPerRun: integer(
+        environment.PROTOTYPE_BLOB_RECONCILE_MAX_DELETES,
+        200,
+        1,
+        10_000,
+        "PROTOTYPE_BLOB_RECONCILE_MAX_DELETES",
+      ),
+    },
     maxImageBytes: integer(
       environment.PROTOTYPE_IMAGE_MAX_BYTES,
       20 * 1024 * 1024,

@@ -33,6 +33,7 @@ import { PrototypeImageGenerationQueue } from "../images/prototype-image-generat
 import { PrototypeImageGenerationService } from "../images/prototype-image-generation.service";
 import { PrototypeImageGenerationWorker } from "../images/prototype-image-generation.worker";
 import { PrototypeImageBlobStorage } from "../images/prototype-image-blob.storage";
+import { PrototypeImageBlobReconciler } from "../images/prototype-image-blob.reconciler";
 import { PrototypeImageSizeMapper } from "../images/prototype-image-size.mapper";
 import { AiAnalysisImageGenerationClient } from "../images/ai-analysis-image-generation.client";
 import { OpenAiPrototypeImageProvider } from "../images/openai-prototype-image.provider";
@@ -108,6 +109,7 @@ const databaseConfig = loadSqlServerDatabaseConfig({
           },
           PrototypeImageGenerationService,
           PrototypeImageGenerationWorker,
+          PrototypeImageBlobReconciler,
         ]
       : []),
   ],

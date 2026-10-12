@@ -88,6 +88,12 @@ function harness(
     findOneBy: async (where: any) =>
       where.id === undefined || where.id === generation.id ? generation : null,
     save: async (value: any) => value,
+    update: async (where: any, partial: any) => {
+      if (where.id !== undefined && where.id !== generation.id)
+        return { affected: 0 };
+      Object.assign(generation, partial);
+      return { affected: 1 };
+    },
   };
   const imageRepo = {
     create: (value: any) => value,
@@ -110,10 +116,19 @@ function harness(
           : item.id === where.id,
       ) ?? null,
     update: async (where: any, partial: any) => {
+      // Fiel a TypeORM: `In([...])` llega como un FindOperator con `.value`.
+      const statuses =
+        where.status === undefined
+          ? null
+          : Array.isArray(where.status?.value)
+            ? where.status.value
+            : [where.status];
       const image = images.find(
         (item) =>
           item.id === where.id &&
-          (where.status === undefined || item.status === where.status),
+          (where.attemptNumber === undefined ||
+            item.attemptNumber === where.attemptNumber) &&
+          (statuses === null || statuses.includes(item.status)),
       );
       if (!image) return { affected: 0 };
       for (const [key, value] of Object.entries(partial)) {
@@ -136,6 +151,7 @@ function harness(
       screens.find((item) => item.id === where.id) ?? null,
   };
   const queue = {
+    cancelGeneration: async () => undefined,
     // La cola simulada no pierde trabajos, así que no hay nada que recuperar.
     ensurePendingJobs: async () => 0,
     enqueue: async (data: any, attemptNumber?: number) => {
@@ -704,4 +720,197 @@ test("un fallo al borrar la versión antigua no impide el reemplazo", async () =
       PNG,
     );
   assert.equal(value.images[0].attemptNumber, 3);
+});
+
+/** Proveedor que responde cuando el test lo decide: simula una IA lenta durante otras operaciones. */
+function slowProvider() {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const provider: PrototypeImageProvider = {
+    generate: async () => {
+      await gate;
+      return {
+        provider: "OPENAI_IMAGES",
+        model: "gpt-image-test",
+        mediaType: "image/png",
+        imageBase64: PNG,
+        executionId: "exec-lento",
+      };
+    },
+  };
+  return { provider, release: () => release() };
+}
+
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+test("un trabajo de un intento anterior no hace nada", async () => {
+  let calls = 0;
+  const value = harness(1, "WEB", {
+    generate: async () => {
+      calls += 1;
+      throw new Error("no debía llamarse");
+    },
+  });
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  value.images[0].attemptNumber = 2;
+  await value.service.process(job, 1, 3);
+  assert.equal(calls, 0);
+  assert.equal(value.images[0].status, "PENDING");
+  assert.equal(value.uploads.length, 0);
+});
+
+test("detener y reintentar: el trabajo antiguo que termina tarde no pisa el nuevo intento", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const running = value.service.process(job, 1, 3);
+  await settle();
+  assert.equal(value.images[0].status, "GENERATING");
+
+  await value.service.stop(value.generation.id, owner);
+  assert.equal(value.images[0].status, "FAILED");
+  await value.service.retryFailed(value.generation.id, owner);
+  assert.equal(value.images[0].attemptNumber, 2);
+  assert.equal(value.images[0].status, "PENDING");
+
+  slow.release();
+  await running;
+  // El trabajo viejo no subió nada ni cambió el estado del intento nuevo.
+  assert.equal(value.uploads.length, 0);
+  assert.equal(value.images[0].status, "PENDING");
+  assert.equal(value.images[0].attemptNumber, 2);
+  assert.equal(value.images[0].storageKey ?? null, null);
+});
+
+test("detener e importar: el trabajo antiguo no reemplaza la imagen importada", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const running = value.service.process(job, 1, 3);
+  await settle();
+  await value.service.stop(value.generation.id, owner);
+  await value.service.importImage(
+    value.generation.id,
+    owner,
+    "01-screen-1-web.png",
+    PNG,
+  );
+  const imported = {
+    storageKey: value.images[0].storageKey,
+    provider: value.images[0].provider,
+    attempt: value.images[0].attemptNumber,
+  };
+  assert.equal(imported.provider, "OTHER");
+
+  slow.release();
+  await running;
+  assert.equal(value.uploads.length, 1, "solo la importación subió un archivo");
+  assert.deepEqual(
+    {
+      storageKey: value.images[0].storageKey,
+      provider: value.images[0].provider,
+      attempt: value.images[0].attemptNumber,
+    },
+    imported,
+  );
+  assert.equal(value.images[0].status, "COMPLETED");
+});
+
+test("eliminar durante la generación: el trabajo no sube archivos ni recrea filas", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const running = value.service.process(job, 1, 3);
+  await settle();
+  // La generación se elimina mientras la IA trabaja: las filas desaparecen.
+  value.images.splice(0);
+  slow.release();
+  await running;
+  assert.equal(value.uploads.length, 0);
+  assert.equal(value.images.length, 0, "no se recreó la imagen");
+});
+
+test("si el intento se pierde mientras se sube el archivo, el archivo nuevo se borra", async () => {
+  const value = harness(1, "WEB");
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const storage = (
+    value.service as never as {
+      storage: { upload: (key: string, data: Buffer) => Promise<void> };
+    }
+  ).storage;
+  const originalUpload = storage.upload;
+  storage.upload = async (key, data) => {
+    await originalUpload(key, data);
+    value.images.splice(0); // eliminada justo después de subir
+  };
+  await value.service.process(job, 1, 3);
+  assert.equal(value.uploads.length, 1);
+  assert.deepEqual(
+    value.deleted,
+    [value.uploads[0].key],
+    "compensación: el blob no queda huérfano",
+  );
+  assert.equal(value.images.length, 0);
+});
+
+test("un trabajo detenido por un reinicio (GENERATING del mismo intento) se retoma", async () => {
+  const value = harness(1, "WEB");
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  value.images[0].status = "GENERATING";
+  await value.service.process(job, 1, 3);
+  assert.equal(value.images[0].status, "COMPLETED");
+  assert.equal(value.uploads.length, 1);
+});
+
+test("si SQL falla al registrar una importación, el archivo subido se borra", async () => {
+  const value = harness(1, "WEB");
+  (
+    value.service as never as { images: { save: () => Promise<never> } }
+  ).images.save = async () => {
+    throw new Error("SQL no disponible");
+  };
+  await assert.rejects(
+    value.service.importImage(
+      value.generation.id,
+      owner,
+      "01-screen-1-web.png",
+      PNG,
+    ),
+    /SQL no disponible/u,
+  );
+  assert.equal(value.uploads.length, 1);
+  assert.deepEqual(value.deleted, [value.uploads[0].key], "no queda huérfano");
+});
+
+test("si SQL falla al completar una imagen generada, el archivo subido se borra", async () => {
+  const value = harness(1, "WEB");
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const repo = (
+    value.service as never as {
+      images: {
+        update: (
+          where: unknown,
+          partial: { status?: string },
+        ) => Promise<unknown>;
+      };
+    }
+  ).images;
+  const originalUpdate = repo.update.bind(repo);
+  repo.update = async (where, partial) => {
+    if (partial.status === "COMPLETED") throw new Error("SQL no disponible");
+    return originalUpdate(where, partial);
+  };
+  // Con intentos agotados el error se contiene; lo importante es que el blob no queda huérfano.
+  await value.service.process(job, 3, 3);
+  assert.equal(value.uploads.length, 1);
+  assert.deepEqual(value.deleted, [value.uploads[0].key]);
 });

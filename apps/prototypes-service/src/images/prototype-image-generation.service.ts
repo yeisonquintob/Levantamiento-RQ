@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import type { Repository } from "typeorm";
+import { In, type Repository } from "typeorm";
 import type {
   PrototypeGeneratedImage,
   PrototypeImageActionResult,
@@ -382,7 +382,14 @@ export class PrototypeImageGenerationService {
       completedAt: now,
       updatedAt: now,
     });
-    const saved = await this.images.save(image);
+    let saved: PrototypeGeneratedImageEntity;
+    try {
+      saved = await this.images.save(image);
+    } catch (error) {
+      // El archivo ya se subió pero SQL no lo registró: se borra para no dejarlo huérfano.
+      await this.discardBlob(storageKey);
+      throw error;
+    }
     await this.discardOlderVersion(olderStorageKey, [
       saved.storageKey,
       saved.previousStorageKey,
@@ -569,6 +576,10 @@ export class PrototypeImageGenerationService {
       },
     });
     if (!image || image.status === "COMPLETED") return;
+    // Intento con el que nació este trabajo: si la imagen ya está en otro (reintento, importación,
+    // detención), el trabajo es obsoleto. Los trabajos anteriores a este campo usan el actual.
+    const epoch = data.attemptNumber ?? image.attemptNumber;
+    if (image.attemptNumber !== epoch) return;
     const specification = await this.specifications.findOne({
       where: {
         id: data.visualSpecificationId,
@@ -584,23 +595,31 @@ export class PrototypeImageGenerationService {
         })
       : null;
     if (!specification || !screen) {
-      await this.fail(
+      await this.failAttempt(
         image,
+        epoch,
         "PROTOTYPE_IMAGE_SOURCE_NOT_FOUND",
         "No se encontró la especificación visual.",
       );
       return;
     }
     const correlationId = randomUUID();
-    Object.assign(image, {
-      status: "GENERATING",
-      correlationId,
-      startedAt: image.startedAt ?? new Date(),
-      errorCode: null,
-      errorMessage: null,
-      updatedAt: new Date(),
-    });
-    await this.images.save(image);
+    // Reclamación atómica: solo avanza si la imagen sigue en este intento y no fue detenida,
+    // reemplazada o eliminada. GENERATING se admite para retomar un trabajo detenido por un reinicio.
+    const claimed = await this.transition(
+      image,
+      epoch,
+      ["PENDING", "GENERATING"],
+      {
+        status: "GENERATING",
+        correlationId,
+        startedAt: image.startedAt ?? new Date(),
+        errorCode: null,
+        errorMessage: null,
+        updatedAt: new Date(),
+      },
+    );
+    if (!claimed) return;
     await this.consolidate(data.generationId);
     try {
       const visual = this.visualDetail(specification);
@@ -615,6 +634,8 @@ export class PrototypeImageGenerationService {
         requestedSize: this.sizeMapper.forDevice(specification.device),
         correlationId,
       });
+      // La IA tarda: antes de subir nada se comprueba que este intento siga vigente.
+      if (!(await this.ownsAttempt(image.id, epoch))) return;
       const latestGeneration = await this.generations.findOneBy({
         id: data.generationId,
       });
@@ -630,28 +651,39 @@ export class PrototypeImageGenerationService {
         specification.device,
         screen.order,
         screen.code,
-        image.attemptNumber,
+        epoch,
       );
       await this.storage.upload(storageKey, png.buffer);
-      Object.assign(image, {
-        provider: result.provider,
-        model: result.model,
-        status: "COMPLETED",
-        mediaType: "image/png",
-        storageKey,
-        width: png.width,
-        height: png.height,
-        errorCode: null,
-        errorMessage: null,
-        completedAt: new Date(),
-        updatedAt: new Date(),
-      });
-      await this.images.save(image);
-      if (generation.imageProvider !== result.provider) {
-        generation.imageProvider = result.provider;
-        generation.updatedAt = new Date();
-        await this.generations.save(generation);
+      let completed: boolean;
+      try {
+        completed = await this.transition(image, epoch, ["GENERATING"], {
+          provider: result.provider,
+          model: result.model,
+          status: "COMPLETED",
+          mediaType: "image/png",
+          storageKey,
+          width: png.width,
+          height: png.height,
+          errorCode: null,
+          errorMessage: null,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (persistError) {
+        // SQL falló tras subir el archivo: no se deja huérfano.
+        await this.discardBlob(storageKey);
+        throw persistError;
       }
+      if (!completed) {
+        // Mientras se subía, el intento fue detenido, reemplazado o eliminado: no deja huérfano.
+        await this.discardBlob(storageKey);
+        return;
+      }
+      if (generation.imageProvider !== result.provider)
+        await this.generations.update(
+          { id: generation.id },
+          { imageProvider: result.provider, updatedAt: new Date() },
+        );
       this.audit(image, screen.code, "COMPLETED", result.executionId);
     } catch (error) {
       const retryable =
@@ -659,14 +691,13 @@ export class PrototypeImageGenerationService {
           ? error.retryable
           : !(error instanceof PrototypeImageValidationError);
       if (retryable && attempt < maxAttempts) {
-        Object.assign(image, {
+        const reset = await this.transition(image, epoch, ["GENERATING"], {
           status: "PENDING",
           errorCode: "PROTOTYPE_IMAGE_TEMPORARY_FAILURE",
           errorMessage: "La generación se reintentará automáticamente.",
           updatedAt: new Date(),
         });
-        await this.images.save(image);
-        await this.consolidate(data.generationId);
+        if (reset) await this.consolidate(data.generationId);
         throw error;
       }
       const code =
@@ -674,31 +705,71 @@ export class PrototypeImageGenerationService {
         error instanceof PrototypeImageValidationError
           ? error.code
           : "PROTOTYPE_IMAGE_GENERATION_FAILED";
-      await this.fail(
+      const failed = await this.failAttempt(
         image,
+        epoch,
         code,
         error instanceof PrototypeImageProviderError
           ? error.message
           : "No fue posible generar una imagen válida.",
       );
-      this.audit(image, screen.code, "FAILED");
+      if (failed) this.audit(image, screen.code, "FAILED");
     }
     await this.consolidate(data.generationId);
   }
 
-  private async fail(
+  /**
+   * Actualización condicionada al intento y al estado de la imagen: si otra operación la cambió
+   * (detener, reintentar, importar, eliminar) no afecta ninguna fila y el trabajo obsoleto no
+   * sobrescribe nada ni recrea filas borradas (a diferencia de `save`).
+   */
+  private async transition(
     image: PrototypeGeneratedImageEntity,
+    epoch: number,
+    from: ReadonlyArray<PrototypeGeneratedImageEntity["status"]>,
+    changes: Partial<PrototypeGeneratedImageEntity>,
+  ): Promise<boolean> {
+    const result = await this.images.update(
+      { id: image.id, attemptNumber: epoch, status: In([...from]) },
+      changes,
+    );
+    if (!result.affected) return false;
+    Object.assign(image, changes);
+    return true;
+  }
+
+  private async ownsAttempt(imageId: string, epoch: number): Promise<boolean> {
+    const current = await this.images.findOne({ where: { id: imageId } });
+    return current?.attemptNumber === epoch && current.status === "GENERATING";
+  }
+
+  private async discardBlob(storageKey: string): Promise<void> {
+    try {
+      await this.storage.delete(storageKey);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "PROTOTYPE_STALE_IMAGE_BLOB_NOT_DELETED",
+          storageKey,
+          reason: error instanceof Error ? error.name : "UNKNOWN",
+        }),
+      );
+    }
+  }
+
+  private async failAttempt(
+    image: PrototypeGeneratedImageEntity,
+    epoch: number,
     code: string,
     message: string,
-  ) {
-    Object.assign(image, {
+  ): Promise<boolean> {
+    return this.transition(image, epoch, ["PENDING", "GENERATING"], {
       status: "FAILED",
       errorCode: code.slice(0, 80),
       errorMessage: message.slice(0, 1000),
       completedAt: new Date(),
       updatedAt: new Date(),
     });
-    await this.images.save(image);
   }
   private async requeue(
     imageId: string,
@@ -806,19 +877,21 @@ export class PrototypeImageGenerationService {
           ? "PARTIALLY_COMPLETED"
           : "COMPLETED"
       : "IMAGE_GENERATING";
-    Object.assign(generation, {
-      totalImages: images.length,
-      completedImages: completed,
-      failedImages: failed,
-      generatedScreens,
-      status,
-      errorCode: failed ? "PROTOTYPE_IMAGES_PARTIAL_FAILURE" : null,
-      errorMessage: failed
-        ? `${failed} imagen(es) no pudieron generarse.`
-        : null,
-      updatedAt: new Date(),
-    });
-    await this.generations.save(generation);
+    await this.generations.update(
+      { id: generationId },
+      {
+        totalImages: images.length,
+        completedImages: completed,
+        failedImages: failed,
+        generatedScreens,
+        status,
+        errorCode: failed ? "PROTOTYPE_IMAGES_PARTIAL_FAILURE" : null,
+        errorMessage: failed
+          ? `${failed} imagen(es) no pudieron generarse.`
+          : null,
+        updatedAt: new Date(),
+      },
+    );
   }
   private async requireGeneration(id: string, requestedByUserId: string) {
     const generation = await this.generations.findOne({

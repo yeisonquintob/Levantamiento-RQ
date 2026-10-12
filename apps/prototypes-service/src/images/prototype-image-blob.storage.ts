@@ -135,6 +135,23 @@ export class PrototypeImageBlobStorage {
       value.details?.errorCode === "BlobNotFound"
     );
   }
+  /** Archivos del contenedor con su fecha de modificación (para reconciliar contra SQL). */
+  async *list(): AsyncGenerator<{ name: string; lastModified: Date }> {
+    try {
+      for await (const blob of this.container.listBlobsFlat())
+        yield {
+          name: blob.name,
+          lastModified: blob.properties.lastModified,
+        };
+    } catch (error) {
+      // Contenedor aún inexistente: no hay nada que reconciliar.
+      if (this.isBlobNotFound(error)) return;
+      const value = error as { statusCode?: number; code?: string };
+      if (value?.statusCode === 404 || value?.code === "ContainerNotFound")
+        return;
+      throw error;
+    }
+  }
   async delete(storageKey: string): Promise<void> {
     await this.container.getBlobClient(storageKey).deleteIfExists();
   }

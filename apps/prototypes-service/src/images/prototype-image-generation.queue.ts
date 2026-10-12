@@ -10,6 +10,12 @@ export interface PrototypeImageGenerationJobData {
   generationId: string;
   visualSpecificationId: string;
   imageRecordId: string;
+  /**
+   * Intento de la imagen con el que nació el trabajo. Es inmutable: si al ejecutarse la imagen ya
+   * está en otro intento (reintento, importación, detención), el trabajo es obsoleto y no escribe.
+   * Opcional por compatibilidad con trabajos creados antes de este campo.
+   */
+  attemptNumber?: number;
 }
 @Injectable()
 export class PrototypeImageGenerationQueue implements OnModuleDestroy {
@@ -32,9 +38,13 @@ export class PrototypeImageGenerationQueue implements OnModuleDestroy {
     data: PrototypeImageGenerationJobData,
     attemptNumber = 1,
   ): Promise<Job<PrototypeImageGenerationJobData>> {
-    return this.queue.add(PROTOTYPE_IMAGE_GENERATION_JOB, data, {
-      jobId: `prototype-image-${data.imageRecordId}-attempt-${attemptNumber}`,
-    });
+    return this.queue.add(
+      PROTOTYPE_IMAGE_GENERATION_JOB,
+      { ...data, attemptNumber },
+      {
+        jobId: `prototype-image-${data.imageRecordId}-attempt-${attemptNumber}`,
+      },
+    );
   }
   get attempts(): number {
     return this.config.attempts;
@@ -86,9 +96,11 @@ export class PrototypeImageGenerationQueue implements OnModuleDestroy {
         await previous.remove().catch(() => undefined);
       }
 
-      await this.queue.add(PROTOTYPE_IMAGE_GENERATION_JOB, item.data, {
-        jobId: recoveryJobId,
-      });
+      await this.queue.add(
+        PROTOTYPE_IMAGE_GENERATION_JOB,
+        { ...item.data, attemptNumber: item.attemptNumber },
+        { jobId: recoveryJobId },
+      );
       runnableImageIds.add(item.data.imageRecordId);
       recovered += 1;
     }
