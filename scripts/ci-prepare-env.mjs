@@ -132,6 +132,8 @@ for (const service of SERVICES) {
         JWT_REFRESH_SECRET: random(),
       });
     }
+    // El E2E de API valida el flujo con el proveedor simulado: en CI no hay IA real ni claves.
+    if (service === "ai-analysis-service") overrides.AI_EXECUTION_MODE = "FAKE";
     // Las conexiones a Redis, Azurite y RabbitMQ deben coincidir con la infraestructura generada.
     for (const key of keys) {
       if (key.endsWith("REDIS_PASSWORD")) overrides[key] = redisPassword;
