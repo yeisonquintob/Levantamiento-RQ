@@ -590,8 +590,13 @@ async function main(): Promise<void> {
     const draft = object(generatedResult.draft);
     // Debe coincidir con DOCUMENT_SECTION_DEFINITIONS (documents-service).
     assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 14);
+    // Desde el esquema 4.x `requirements` solo lleva los requisitos no funcionales (el proveedor simulado
+    // no genera ninguno): el contenido funcional va en `structuredAnalysis.userStories`.
+    const structuredAnalysis = object(draft.structuredAnalysis);
     assert.ok(
-      Array.isArray(draft.requirements) && draft.requirements.length > 0,
+      Array.isArray(structuredAnalysis.userStories) &&
+        structuredAnalysis.userStories.length > 0,
+      "El borrador no contiene historias de usuario.",
     );
 
     stage = "validar aplicación automática sujeta a revisión humana";
