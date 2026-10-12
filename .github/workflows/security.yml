@@ -114,29 +114,28 @@ jobs:
           output: trivy-${{ matrix.image }}.sarif
           severity: HIGH,CRITICAL
           exit-code: "1"
-      # Si el escaneo falla, deja el motivo (hallazgos o error de Trivy) como anotación legible en el PR.
+      # Si el escaneo falla, deja el motivo como anotación legible en el PR: lee el SARIF que generó la
+      # propia acción (los registros de GitHub exigen sesión para verse).
       - name: Resumen de hallazgos de Trivy
         if: failure()
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 \
-            image --severity HIGH,CRITICAL --quiet --format json \
-            "levantamiento-rq-${{ matrix.image }}:security" > trivy-summary.json 2> trivy-summary.err || true
           python3 - <<'PY'
           import json
+          path = "trivy-${{ matrix.image }}.sarif"
           try:
-              data = json.load(open("trivy-summary.json"))
-              found = sorted({
-                  f"{v['PkgName']} {v['InstalledVersion']} {v['VulnerabilityID']} ({v['Severity']})"
-                  for r in data.get("Results", []) for v in (r.get("Vulnerabilities") or [])
-              })
-              secrets = sorted({
-                  f"secreto {s['RuleID']} en {r['Target']}"
-                  for r in data.get("Results", []) for s in (r.get("Secrets") or [])
-              })
-              text = "; ".join(found + secrets)[:900] or "sin hallazgos con Trivy 0.75.0"
-          except Exception:
-              text = " ".join(open("trivy-summary.err").read().split())[-900:] or "sin salida de Trivy"
-          print(f"::error title=Trivy ${{ matrix.image }}::{text}")
+              data = json.load(open(path))
+              items = []
+              for run in data.get("runs", []):
+                  rules = {r["id"]: r for r in run.get("tool", {}).get("driver", {}).get("rules", [])}
+                  for result in run.get("results", []):
+                      rule = rules.get(result.get("ruleId"), {})
+                      text = (result.get("message", {}).get("text") or rule.get("shortDescription", {}).get("text") or "")
+                      items.append(f"{result.get('ruleId')}: {' '.join(text.split())[:110]}")
+              text = " | ".join(sorted(set(items))[:6]) or "el SARIF no contiene resultados"
+              text = f"{len(items)} resultado(s). {text}"
+          except Exception as error:
+              text = f"no se pudo leer {path}: {error}"
+          print(f"::error title=Trivy ${{ matrix.image }}::{text[:900]}")
           PY
       - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         if: always()
