@@ -10,8 +10,9 @@ case "$COMMAND" in
   ensure) SCRIPT="$ROOT/scripts/prototypes-ensure-database.ts" ;;
   migration-run) SCRIPT="$ROOT/scripts/prototypes-run-migrations.ts" ;;
   verify) SCRIPT="$ROOT/scripts/prototypes-verify-database.ts" ;;
+  integration) SCRIPT="$ROOT/scripts/prototypes-images-integration.ts" ;;
   *)
-    echo "Uso: $0 <ensure|migration-run|verify>"
+    echo "Uso: $0 <ensure|migration-run|verify|integration>"
     exit 2
     ;;
 esac

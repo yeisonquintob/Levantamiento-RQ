@@ -58,6 +58,7 @@
     "operations:gateway:e2e": "bash scripts/operations-database-command.sh gateway-e2e",
     "operations:notifications:e2e": "bash scripts/operations-database-command.sh notifications-e2e",
     "projects:db:drop": "TSX_TSCONFIG_PATH=apps/projects-service/tsconfig.app.json node --import tsx scripts/projects-drop-database.ts",
+    "test:integration:prototypes": "bash scripts/prototypes-database-command.sh integration",
     "prototypes:db:ensure": "bash scripts/prototypes-database-command.sh ensure",
     "prototypes:db:verify": "bash scripts/prototypes-database-command.sh verify",
     "prototypes:migration:run": "bash scripts/prototypes-database-command.sh migration-run",

@@ -48,10 +48,20 @@ function migrationFilesOnDisk(): string[] {
 
 test("Paso 0 excluye únicamente next-env.d.ts porque Next.js lo regenera", () => {
   const generatedPath = "apps/web/next-env.d.ts";
-  const generated = readFileSync(generatedPath, "utf8");
   const gitignore = readFileSync(".gitignore", "utf8");
 
   assert.equal(ignoreFile(generatedPath), true);
+  assert.ok(
+    gitignore
+      .split(/\r?\n/u)
+      .some((line) => line.trim() === "/apps/web/next-env.d.ts"),
+    "next-env.d.ts debe seguir declarado como archivo generado en .gitignore.",
+  );
+
+  // El archivo no está en Git: lo crea Next.js al compilar o arrancar la web. En una copia limpia
+  // todavía no existe, así que su contenido solo se valida cuando ya fue generado.
+  if (!existsSync(generatedPath)) return;
+  const generated = readFileSync(generatedPath, "utf8");
   const generatedImport = generated
     .split(/\r?\n/u)
     .find((line) => line.startsWith('import "./.next/'));
@@ -62,12 +72,6 @@ test("Paso 0 excluye únicamente next-env.d.ts porque Next.js lo regenera", () =
     `Import generado inesperado: ${generatedImport ?? "<ausente>"}`,
   );
   assert.match(generated, /NOTE: This file should not be edited/u);
-  assert.ok(
-    gitignore
-      .split(/\r?\n/u)
-      .some((line) => line.trim() === "/apps/web/next-env.d.ts"),
-    "next-env.d.ts debe seguir declarado como archivo generado en .gitignore.",
-  );
 });
 
 test("las migraciones ya aplicadas no se modifican ni se eliminan (se permiten nuevas)", () => {

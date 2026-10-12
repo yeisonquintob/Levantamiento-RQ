@@ -14,6 +14,9 @@ import {
 
 const GATEWAY = "http://127.0.0.1:3000/api/v1";
 const WEB = "http://127.0.0.1:4200";
+// El Gateway rechaza (403) las mutaciones con cookie de sesión que no declaran un origen permitido
+// (protección CSRF). Este cliente no es un navegador, así que envía el origen de la web como haría uno.
+const WEB_ORIGIN = process.env.E2E_WEB_ORIGIN ?? WEB;
 const CORRELATION_ID = randomUUID();
 
 function object(value: unknown): Readonly<Record<string, unknown>> {
@@ -68,6 +71,7 @@ async function request(
     method: options.method ?? "GET",
     headers: {
       accept: "application/json",
+      origin: WEB_ORIGIN,
       "x-correlation-id": CORRELATION_ID,
       ...(sessionCookie ? { cookie: sessionCookie } : {}),
       ...(options.idempotencyKey
@@ -166,6 +170,7 @@ async function uploadFile(
       headers: {
         accept: "application/json",
         cookie: sessionCookie,
+        origin: WEB_ORIGIN,
         "x-correlation-id": CORRELATION_ID,
       },
       body: form,
@@ -583,9 +588,15 @@ async function main(): Promise<void> {
     const generatedResult = object(completedAnalysis.result);
     assert.equal(generatedResult.status, "ACCEPTED");
     const draft = object(generatedResult.draft);
-    assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 13);
+    // Debe coincidir con DOCUMENT_SECTION_DEFINITIONS (documents-service).
+    assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 14);
+    // Desde el esquema 4.x `requirements` solo lleva los requisitos no funcionales (el proveedor simulado
+    // no genera ninguno): el contenido funcional va en `structuredAnalysis.userStories`.
+    const structuredAnalysis = object(draft.structuredAnalysis);
     assert.ok(
-      Array.isArray(draft.requirements) && draft.requirements.length > 0,
+      Array.isArray(structuredAnalysis.userStories) &&
+        structuredAnalysis.userStories.length > 0,
+      "El borrador no contiene historias de usuario.",
     );
 
     stage = "validar aplicación automática sujeta a revisión humana";
@@ -792,7 +803,7 @@ async function main(): Promise<void> {
       "✓ Archivo, Azurite, BullMQ, extracción READY y descarga validados.",
     );
     console.log(
-      "✓ Fake AI, 13 secciones, revisión humana y trazabilidad validadas.",
+      "✓ Fake AI, 14 secciones, revisión humana y trazabilidad validadas.",
     );
     console.log("✓ Comentario, aprobación, bloqueo e historial validados.");
     console.log("✓ PDF/DOCX, SHA-256, auditoría y notificaciones validados.");
@@ -808,6 +819,7 @@ async function main(): Promise<void> {
         method: "POST",
         headers: {
           cookie: fullSessionCookie,
+          origin: WEB_ORIGIN,
           "x-correlation-id": CORRELATION_ID,
         },
         signal: AbortSignal.timeout(15_000),

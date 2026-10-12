@@ -211,7 +211,7 @@
 .history table .deleteAction {
   background: var(--rq-color-danger, #b42318);
 }
-.historyActions button:not(.deleteAction) {
+.historyActions button:not(.deleteAction):not(:global(.rq-row-open)) {
   border-color: color-mix(
     in srgb,
     var(--rq-action-consult) 88%,
@@ -229,7 +229,7 @@
     opacity 150ms ease,
     transform 150ms ease;
 }
-.historyActions button:not(.deleteAction):hover {
+.historyActions button:not(.deleteAction):not(:global(.rq-row-open)):hover {
   border-color: var(--rq-action-consult);
   background: var(--rq-action-consult);
   opacity: 1;
@@ -496,7 +496,7 @@
 }
 .navigation button,
 .secondaryAction {
-  background: white;
+  background: var(--rq-color-surface, #fff);
   border: 1px solid #d8d0de;
   color: #574a62;
 }

@@ -34,3 +34,19 @@ export async function signIn(page: Page): Promise<void> {
     }
   }
 }
+
+/** Estados con los que Ejecución bloquea el seguimiento: el proyecto aún no está aprobado. */
+export const BLOCKED_PROJECT_STATUS =
+  /Documento generado|En validación|Borrador|Discusión|Fuentes/u;
+
+/**
+ * Filas del listado de Ejecución cuyos proyectos permiten seguimiento. Se distinguen por el estado
+ * que muestra la tabla: al abrir un proyecto sin aprobar el aviso de bloqueo aparece después de
+ * cargar, y las pestañas ya se ven detrás de él, así que no sirven para saber si está aprobado.
+ */
+export function trackableProjectRows(page: Page) {
+  return page
+    .getByRole("row")
+    .filter({ has: page.getByRole("button", { name: "Abrir" }) })
+    .filter({ hasNotText: BLOCKED_PROJECT_STATUS });
+}

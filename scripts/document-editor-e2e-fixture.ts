@@ -8,6 +8,9 @@ import {
 } from "../libs/shared/persistence/src/index.js";
 
 const GATEWAY = "http://127.0.0.1:3000/api/v1";
+// El Gateway rechaza (403) las mutaciones con cookie de sesión que no declaran un origen permitido
+// (protección CSRF): este cliente no es un navegador, así que envía el origen de la web.
+const WEB_ORIGIN = process.env.E2E_WEB_ORIGIN ?? "http://127.0.0.1:4200";
 const DOCUMENT_TITLE_PREFIX = "Documento editor E2E";
 const PROJECT_TITLE_PREFIX = "Proyecto editor E2E";
 
@@ -25,7 +28,8 @@ function asObject(value: unknown): Readonly<Record<string, unknown>> {
 }
 
 function asString(value: unknown, name: string): string {
-  if (typeof value !== "string" || !value) throw new Error(`${name} no es texto.`);
+  if (typeof value !== "string" || !value)
+    throw new Error(`${name} no es texto.`);
   return value;
 }
 
@@ -123,7 +127,9 @@ async function prepare(runLabel: string): Promise<void> {
   });
   const signInBody = await signIn.text();
   if (!signIn.ok) {
-    throw new Error(`El inicio de sesión respondió ${signIn.status}: ${signInBody}`);
+    throw new Error(
+      `El inicio de sesión respondió ${signIn.status}: ${signInBody}`,
+    );
   }
 
   const access = responseCookie(signIn, "rq_access");
@@ -153,6 +159,7 @@ async function prepare(runLabel: string): Promise<void> {
       headers: {
         accept: "application/json",
         cookie: access,
+        origin: WEB_ORIGIN,
         "content-type": "application/json",
         "x-correlation-id": randomUUID(),
       },
@@ -171,10 +178,65 @@ async function prepare(runLabel: string): Promise<void> {
       );
     }
     console.log(`✓ Proyecto temporal preparado: ${projectTitle}`);
+
+    // Documento temporal: las pruebas del editor buscan un borrador en el listado de documentos.
+    // `cleanup` lo elimina por el prefijo del título.
+    const projectId = asString(
+      asObject(JSON.parse(projectBody) as unknown).id,
+      "project.id",
+    );
+    const documentTitle = `${DOCUMENT_TITLE_PREFIX} ${runLabel}`;
+    const documentResponse = await fetch(
+      `${GATEWAY}/projects/${projectId}/documents`,
+      {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          cookie: access,
+          origin: WEB_ORIGIN,
+          "content-type": "application/json",
+          "x-correlation-id": randomUUID(),
+        },
+        body: JSON.stringify({
+          title: documentTitle,
+          changeSummary: "Borrador temporal para las pruebas del editor",
+          idempotencyKey: `document-editor-e2e-${runLabel}-${randomUUID()}`,
+        }),
+        signal: AbortSignal.timeout(20000),
+      },
+    );
+    const documentBody = await documentResponse.text();
+    if (documentResponse.status !== 201) {
+      throw new Error(
+        `La creación del documento respondió ${documentResponse.status}: ${documentBody}`,
+      );
+    }
+    console.log(`✓ Documento temporal preparado: ${documentTitle}`);
+
+    // Las pruebas del editor buscan un proyecto en estado «Documento generado»: es el estado al que
+    // llega un proyecto al terminar la generación, y aquí se fija igual sin ejecutar una IA.
+    const generatedResponse = await fetch(`${GATEWAY}/projects/${projectId}`, {
+      method: "PATCH",
+      headers: {
+        accept: "application/json",
+        cookie: access,
+        origin: WEB_ORIGIN,
+        "content-type": "application/json",
+        "x-correlation-id": randomUUID(),
+      },
+      body: JSON.stringify({ status: "DOCUMENT_GENERATED" }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!generatedResponse.ok) {
+      throw new Error(
+        `Marcar el proyecto como «Documento generado» respondió ${generatedResponse.status}: ${await generatedResponse.text()}`,
+      );
+    }
+    console.log("✓ Proyecto en estado «Documento generado».");
   } finally {
     await fetch(`${GATEWAY}/auth/sign-out`, {
       method: "POST",
-      headers: { cookie: `${access}; ${refresh}` },
+      headers: { cookie: `${access}; ${refresh}`, origin: WEB_ORIGIN },
       signal: AbortSignal.timeout(15000),
     }).catch(() => undefined);
   }
@@ -183,7 +245,9 @@ async function prepare(runLabel: string): Promise<void> {
 async function main(): Promise<void> {
   const action = process.argv[2];
   if (action !== "prepare" && action !== "cleanup") {
-    throw new Error("Uso: document-editor-e2e-fixture.ts <prepare|cleanup> [corrida]");
+    throw new Error(
+      "Uso: document-editor-e2e-fixture.ts <prepare|cleanup> [corrida]",
+    );
   }
   await cleanup();
   if (action === "prepare") await prepare(process.argv[3]?.trim() || "1");

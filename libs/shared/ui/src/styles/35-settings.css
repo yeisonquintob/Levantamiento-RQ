@@ -330,7 +330,7 @@
 }
 .rq-ai-providers-workspace .rq-ai-cat__choice[aria-pressed="true"],
 .rq-ai-providers-workspace .rq-ai-cat__model[aria-pressed="true"] {
-  background: #fff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: none;
 }
 .rq-ai-providers-workspace .rq-ai-cat__model strong {
@@ -355,7 +355,7 @@
 }
 .rq-ai-providers-workspace .rq-ai-cat__install-fields input,
 .rq-ai-providers-workspace .rq-ai-cat__install-fields select {
-  background: #fff;
+  background: var(--rq-color-surface, #fff);
   border: 1px solid var(--rq-color-border);
   box-shadow: none;
   min-height: 34px;
@@ -367,13 +367,13 @@
   border-color: var(--rq-action-operation);
 }
 .rq-ai-providers-workspace .rq-ai-cmd__row > code {
-  background: #fff;
+  background: var(--rq-color-surface, #fff);
   font-size: 12px;
 }
 
 /* Menú «Más acciones»: filas de 40px, plano */
 .rq-ai-providers-workspace .rq-ai-row-menu__trigger {
-  background: #fff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: none;
   min-height: 34px;
   min-width: 34px;
@@ -437,7 +437,7 @@
 .rq-project-modal.rq-ai-provider-modal .rq-field input:focus,
 .rq-project-modal.rq-ai-provider-modal .rq-field select:focus,
 .rq-project-modal.rq-ai-provider-modal .rq-field textarea:focus {
-  background: #fff;
+  background: var(--rq-color-surface, #fff);
   border-color: var(--rq-action-operation);
   box-shadow: none;
   outline: 0;

@@ -113,7 +113,33 @@ jobs:
           format: sarif
           output: trivy-${{ matrix.image }}.sarif
           severity: HIGH,CRITICAL
+          # Con formato SARIF la acción ignora `severity` salvo que se limite expresamente: sin esto
+          # fallaba por avisos MEDIUM (zlib de la base Alpine, sprintf-js sin parche).
+          limit-severities-for-sarif: true
           exit-code: "1"
+      # Si el escaneo falla, deja el motivo como anotación legible en el PR: lee el SARIF que generó la
+      # propia acción (los registros de GitHub exigen sesión para verse).
+      - name: Resumen de hallazgos de Trivy
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import json
+          path = "trivy-${{ matrix.image }}.sarif"
+          try:
+              data = json.load(open(path))
+              items = []
+              for run in data.get("runs", []):
+                  rules = {r["id"]: r for r in run.get("tool", {}).get("driver", {}).get("rules", [])}
+                  for result in run.get("results", []):
+                      rule = rules.get(result.get("ruleId"), {})
+                      text = (result.get("message", {}).get("text") or rule.get("shortDescription", {}).get("text") or "")
+                      items.append(f"{result.get('ruleId')}: {' '.join(text.split())[:110]}")
+              text = " | ".join(sorted(set(items))[:6]) or "el SARIF no contiene resultados"
+              text = f"{len(items)} resultado(s). {text}"
+          except Exception as error:
+              text = f"no se pudo leer {path}: {error}"
+          print(f"::error title=Trivy ${{ matrix.image }}::{text[:900]}")
+          PY
       - uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         if: always()
         with:

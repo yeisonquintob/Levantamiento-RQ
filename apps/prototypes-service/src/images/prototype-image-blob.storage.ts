@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import {
   BlobSASPermissions,
   BlobServiceClient,
+  ContainerSASPermissions,
   type ContainerClient,
 } from "@azure/storage-blob";
 import {
@@ -135,24 +136,53 @@ export class PrototypeImageBlobStorage {
       value.details?.errorCode === "BlobNotFound"
     );
   }
-  /** Archivos del contenedor con su fecha de modificación (para reconciliar contra SQL). */
+  /**
+   * Archivos del contenedor con su fecha de modificación (para reconciliar contra SQL).
+   *
+   * Igual que upload/download, el listado va por REST con un SAS de vida corta: el listado del SDK
+   * (`listBlobsFlat`) falla contra Azurite al leer la respuesta (`blobItems` indefinido).
+   */
   async *list(): AsyncGenerator<{ name: string; lastModified: Date }> {
-    try {
-      for await (const blob of this.container.listBlobsFlat())
-        yield {
-          name: blob.name,
-          lastModified: blob.properties.lastModified,
-        };
-    } catch (error) {
+    const sas = await this.container.generateSasUrl({
+      permissions: ContainerSASPermissions.parse("l"),
+      expiresOn: new Date(Date.now() + 5 * 60_000),
+    });
+    let marker = "";
+    do {
+      const url = new URL(sas);
+      url.searchParams.set("restype", "container");
+      url.searchParams.set("comp", "list");
+      url.searchParams.set("maxresults", "1000");
+      if (marker) url.searchParams.set("marker", marker);
+      const response = await fetch(url);
       // Contenedor aún inexistente: no hay nada que reconciliar.
-      if (this.isBlobNotFound(error)) return;
-      const value = error as { statusCode?: number; code?: string };
-      if (value?.statusCode === 404 || value?.code === "ContainerNotFound")
-        return;
-      throw error;
-    }
+      if (response.status === 404) return;
+      if (!response.ok)
+        throw new Error(
+          `No fue posible listar el almacenamiento de prototipos (HTTP ${response.status}).`,
+        );
+      const xml = await response.text();
+      for (const blob of xml.matchAll(/<Blob>([\s\S]*?)<\/Blob>/gu)) {
+        const name = /<Name>([\s\S]*?)<\/Name>/u.exec(blob[1] ?? "")?.[1];
+        const modified = /<Last-Modified>([\s\S]*?)<\/Last-Modified>/u.exec(
+          blob[1] ?? "",
+        )?.[1];
+        if (name && modified)
+          yield { name: decodeXml(name), lastModified: new Date(modified) };
+      }
+      marker = /<NextMarker>([\s\S]*?)<\/NextMarker>/u.exec(xml)?.[1] ?? "";
+    } while (marker);
   }
   async delete(storageKey: string): Promise<void> {
     await this.container.getBlobClient(storageKey).deleteIfExists();
   }
+}
+
+function decodeXml(value: string): string {
+  return value
+    .replace(/&lt;/gu, "<")
+    .replace(/&gt;/gu, ">")
+    .replace(/&quot;/gu, '"')
+    .replace(/&apos;/gu, "'")
+    .replace(/&amp;/gu, "&");
 }

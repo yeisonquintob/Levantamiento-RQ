@@ -56,27 +56,6 @@ jobs:
       - run: pnpm test:events
       - run: git diff --check
 
-  openapi:
-    name: Contratos OpenAPI
-    needs: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      DATABASE_ENABLED: "false"
-      RABBITMQ_ENABLED: "false"
-      NODE_ENV: development
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 11.18.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm swagger:validate
-
   coverage:
     name: Cobertura de pruebas unitarias
     needs: quality
@@ -92,8 +71,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Construir contratos compartidos
-        run: pnpm nx run shared-contracts:build
+      - name: Construir las librerías compartidas
+        run: pnpm nx run-many --target=build --projects='shared-*' --parallel=3
       - name: Cobertura con umbrales mínimos por servicio
         run: pnpm test:coverage
 
@@ -183,8 +162,27 @@ jobs:
         run: bash scripts/ci-stack-up.sh
       - name: Integración con bases de datos (7 servicios y Prototypes), Redis, Azurite y RabbitMQ
         run: pnpm test:integration
+      # Los servicios con base de datos solo publican sus rutas con la persistencia activa: el contrato se
+      # valida aquí, sobre los servicios ya levantados, y no con la base desactivada.
+      - name: Contratos OpenAPI de los servicios levantados
+        env:
+          SWAGGER_USE_RUNNING: "1"
+          SWAGGER_SERVICES: gateway identity-service projects-service sources-service documents-service ai-analysis-service workflow-service operations-service
+        run: pnpm swagger:validate
+      - name: Integración real de la generación de imágenes (SQL Server, Redis y Azurite)
+        run: pnpm test:integration:prototypes
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
-        run: pnpm test:e2e:v1
+        run: |
+          mkdir -p logs
+          set +e
+          pnpm test:e2e:v1 2>&1 | tee logs/e2e-v1.log
+          exit "${PIPESTATUS[0]}"
+      - name: Resumen del E2E de API
+        if: failure()
+        run: |
+          [ -f logs/e2e-v1.log ] || exit 0
+          summary="$(sed -E 's/\x1b\[[0-9;]*m//g' logs/e2e-v1.log | grep -v '^\s*$' | tail -n 14 | tr '\n' ' ' | cut -c1-1200)"
+          echo "::error title=E2E de API::$summary"
       - name: Datos de prueba para los E2E de interfaz
         run: pnpm documents:editor:e2e:fixture prepare ci
       - name: E2E de interfaz con sesión real
@@ -192,6 +190,19 @@ jobs:
       - name: Limpiar datos de prueba
         if: always()
         run: pnpm documents:editor:e2e:fixture cleanup || true
+      # Resume en anotaciones (visibles en el PR sin descargar nada) el final de los registros que
+      # mencionan un error. GitHub admite 10 anotaciones por paso.
+      - name: Resumen de errores del stack
+        if: failure()
+        run: |
+          count=0
+          for file in logs/ci-stack/*.log logs/local-auth/*.log; do
+            [ -f "$file" ] || continue
+            sed -E 's/\x1b\[[0-9;]*m//g' "$file" | grep -qiE "error|failed|cannot|ENOENT|ERR_" || continue
+            count=$((count + 1)); [ "$count" -le 9 ] || break
+            summary="$(sed -E 's/\x1b\[[0-9;]*m//g' "$file" | grep -iE "error|failed|cannot|ENOENT|ERR_" | tail -n 4 | tr '\n' ' ' | cut -c1-700)"
+            echo "::error title=$(basename "$file")::$summary"
+          done
       - name: Registros y informe
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

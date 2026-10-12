@@ -43,14 +43,15 @@ html[data-rq-theme="warm"] {
 }
 
 html[data-rq-theme="dark"] {
-  --rq-color-page: #1e2428;
-  --rq-color-surface: #293136;
-  --rq-color-surface-soft: #333d43;
+  /* Negro de verdad: la página es #000 y las superficies son casi negras; los bordes dan la separación. */
+  --rq-color-page: #000000;
+  --rq-color-surface: #0a0b0c;
+  --rq-color-surface-soft: #141719;
   --rq-color-text: #f2f4f5;
   --rq-color-muted: #c4ced1;
-  --rq-color-border: #4b5a61;
+  --rq-color-border: #2e373c;
   --rq-color-institutional: #bfd0d7;
-  --rq-color-on-institutional: #1e2428;
+  --rq-color-on-institutional: #0a0b0c;
   --rq-color-focus: #9a84b0;
   --rq-action-consult: #9ab8cb;
   /* Texto semántico con contraste ≥ 4.5:1 sobre página, superficie y superficie suave. */
