@@ -49,8 +49,18 @@ export const test = base.extend<{ diagnostics: void }>({
         problems.push(`pageerror: ${oneLine(error.message, 160)}`),
       );
       page.on("console", (message) => {
-        if (message.type() === "error")
-          problems.push(`console: ${oneLine(message.text(), 160)}`);
+        const text = message.text();
+        // Además de los errores, los avisos del servidor de desarrollo que indican una recarga.
+        if (
+          message.type() === "error" ||
+          /fast refresh|hmr|full reload|reload/iu.test(text)
+        )
+          problems.push(`console: ${oneLine(text, 160)}`);
+      });
+      page.on("websocket", (socket) => {
+        socket.on("close", () =>
+          problems.push(`websocket cerrado ${new URL(socket.url()).pathname}`),
+        );
       });
       page.on("response", (response) => {
         if (response.status() >= 400)

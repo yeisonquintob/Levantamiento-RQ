@@ -315,6 +315,27 @@ env \
 
 echo "✓ Shared UI preparada."
 
+# Por defecto la web corre en modo desarrollo (recarga en caliente). RQ_WEB_MODE=start la compila y la sirve
+# en producción, como en el despliegue: es lo que usa CI para los E2E, porque el servidor de desarrollo
+# puede recargar la página a mitad de una prueba y reiniciar su estado.
+WEB_COMMAND=(pnpm exec nx dev web --port=4200 --skip-nx-cache)
+if [ "${RQ_WEB_MODE:-dev}" = "start" ]; then
+  echo "==> Compilando la web para servirla en producción"
+  env \
+    NX_DAEMON=false \
+    NX_INTERACTIVE=false \
+    NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
+    pnpm exec nx build web ${NX_CACHE_ARGS[@]+"${NX_CACHE_ARGS[@]}"} \
+    > "$LOG_DIR/web-build.log" 2>&1 \
+    || {
+      echo "ERROR: la compilación de la web falló."
+      tail -n 60 "$LOG_DIR/web-build.log" || true
+      bash "$ROOT/scripts/local-auth-down.sh" >/dev/null 2>&1 || true
+      exit 1
+    }
+  WEB_COMMAND=(pnpm exec nx start web --port=4200)
+fi
+
 env \
   RQ_ALLOWED_DEV_ORIGINS="$RQ_ALLOWED_DEV_ORIGINS_RUNTIME" \
   NX_DAEMON=false \
@@ -322,7 +343,7 @@ env \
   NX_TASKS_RUNNER_DYNAMIC_OUTPUT=false \
   node "$ROOT/scripts/start-detached-process.mjs" \
     "$LOG_DIR/web.log" \
-    pnpm exec nx dev web --port=4200 --skip-nx-cache \
+    "${WEB_COMMAND[@]}" \
   > "$PID_DIR/web.pid"
 
 wait_for_url \

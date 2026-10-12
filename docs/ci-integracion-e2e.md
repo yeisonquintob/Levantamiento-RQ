@@ -24,6 +24,7 @@ El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo
 - Redis, RabbitMQ y Azurite arrancan con `scripts/infrastructure-up.sh`. SQL Server arranca en un contenedor efímero del propio job.
 - Se crean las bases y se aplican las migraciones de identity, projects, sources, documents, ai, workflow y operations. La creación de cada base se autoriza solo dentro del script (`*_CREATE_DATABASE`).
 - Se crea un administrador de prueba con `identity:bootstrap-admin` y se arranca todo con `scripts/local-auth-up.sh`.
+- En CI la web se compila y se sirve en producción (`RQ_WEB_MODE=start`, como en el despliegue). Con el servidor de desarrollo (`nx dev web`, el modo por defecto en local) una recarga de la página a mitad de una prueba reinicia el estado de la pantalla y la prueba falla de forma intermitente. Si una prueba de navegador falla, el paso deja una anotación «Diagnóstico E2E» con la URL final, el texto visible, los errores de consola, las respuestas HTTP fallidas, el número de cargas del documento y los últimos cambios de URL (`e2e/diagnostics.ts`).
 
 ## Credenciales
 
