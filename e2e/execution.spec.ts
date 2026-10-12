@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./diagnostics";
 
 import { requireApprovedProject, requireCredentials, trackableProjectRows } from "./support";
 

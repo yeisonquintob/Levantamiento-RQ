@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./diagnostics";
 
 import { MARKDOWN, PNG_BYTES, mockPrototypeApi } from "./prototype-mocks";
 import { requireCredentials } from "./support";
