@@ -19,6 +19,12 @@ mkdir -p "$LOG_DIR"
 echo "==> Configuración local de CI"
 node scripts/ci-prepare-env.mjs
 
+echo "==> Librerías compartidas"
+# Los scripts de bases de datos y migraciones importan las librerías compartidas desde su carpeta dist.
+pnpm exec nx run-many --target=build --projects='shared-*' --parallel=3 \
+  > "$LOG_DIR/shared-build.log" 2>&1 \
+  || { tail -n 40 "$LOG_DIR/shared-build.log"; exit 1; }
+
 echo "==> Infraestructura (Redis, RabbitMQ, Azurite)"
 bash scripts/infrastructure-up.sh
 
