@@ -352,6 +352,10 @@ async function main(): Promise<void> {
   let reviewId: string | null = null;
   let fullSessionCookie: string | null = null;
   let identityCreated = false;
+  // Solo en CI (base efímera): conserva el proyecto aprobado con su plan de trabajo para que las pruebas
+  // de Ejecución del navegador tengan un proyecto aprobado real. En local siempre se limpia.
+  const keepApproved = process.env.V1_E2E_KEEP_APPROVED === "1";
+  let keepAfterSuccess = false;
   let stage = "conectar las bases de dominio";
 
   const identityDb = await database(
@@ -810,6 +814,7 @@ async function main(): Promise<void> {
     console.log(
       "✓ Rutas funcionales principales del frontend respondieron HTTP 200.",
     );
+    keepAfterSuccess = keepApproved;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Etapa fallida: ${stage}. ${message}`);
@@ -826,129 +831,135 @@ async function main(): Promise<void> {
       }).catch(() => undefined);
     }
 
-    if (exportIds.length > 0) {
-      const paths = (await operationsDb.query(
-        "SELECT StoragePath FROM dbo.ExportArtifacts WHERE ExportRequestId IN (SELECT value FROM OPENJSON(@0))",
-        [JSON.stringify(exportIds)],
-      )) as Array<{ StoragePath: string }>;
-      exportBlobPaths.push(...paths.map((row) => row.StoragePath));
-    }
-    await operationsDb.query(
-      `DELETE FROM dbo.NotificationRequests
-       WHERE ProjectId = @0 OR RecipientUserId = @1;
-       DELETE FROM dbo.AuditEvents
-       WHERE ProjectId = @0 OR ActorUserId = @1 OR CorrelationId = @2;
-       DELETE FROM dbo.IntegrationEventInbox WHERE CorrelationId = @2;`,
-      [projectId, userId, CORRELATION_ID],
-    );
-    if (exportIds.length > 0) {
-      await operationsDb.query(
-        "DELETE FROM dbo.ExportRequests WHERE Id IN (SELECT value FROM OPENJSON(@0))",
-        [JSON.stringify(exportIds)],
+    if (keepAfterSuccess) {
+      console.log(
+        "✓ Se conserva el proyecto aprobado con su plan de trabajo (V1_E2E_KEEP_APPROVED=1).",
       );
-    }
-    if (reviewId) {
-      await workflowDb.query(
-        "DELETE FROM dbo.WorkflowReviewRequests WHERE Id = @0",
-        [reviewId],
-      );
-    }
-    if (analysisRequestId) {
-      await aiDb.query(
-        `DELETE FROM dbo.AnalysisResults WHERE AnalysisRequestId = @0;
-         DELETE FROM dbo.AnalysisExecutions WHERE AnalysisRequestId = @0;
-         DELETE FROM dbo.AnalysisRequestSources WHERE AnalysisRequestId = @0;
-         DELETE FROM dbo.AnalysisRequests WHERE Id = @0;`,
-        [analysisRequestId],
-      );
-    }
-    if (documentId) {
-      await documentsDb.query(
-        "DELETE FROM dbo.RequirementDocuments WHERE Id = @0",
-        [documentId],
-      );
-    }
-    if (appliedTemplateId) {
-      await documentsDb.query(
-        `DELETE FROM dbo.AppliedDocumentTemplates
-         WHERE Id = @0 AND NOT EXISTS (
-           SELECT 1 FROM dbo.RequirementDocuments WHERE AppliedTemplateId = @0
-         )`,
-        [appliedTemplateId],
-      );
-    }
-    if (sourceId) {
-      await sourcesDb.query("DELETE FROM dbo.Sources WHERE Id = @0", [
-        sourceId,
-      ]);
-    }
-    if (projectId) {
-      await projectsDb.query(
-        `DELETE FROM dbo.ProjectParticipants WHERE ProjectId = @0;
-         DELETE FROM dbo.Projects WHERE Id = @0;`,
-        [projectId],
-      );
-    }
-    if (identityCreated) {
-      await identityDb.transaction(async (manager) => {
-        await manager.query(
-          "DELETE FROM dbo.IdentityRefreshSessions WHERE UserId = @0",
-          [userId],
-        );
-        await manager.query(
-          "DELETE FROM dbo.IdentitySecurityAudit WHERE ActorUserId = @0 OR TargetUserId = @0",
-          [userId],
-        );
-        await manager.query(
-          "DELETE FROM dbo.IdentityUserRoles WHERE UserId = @0",
-          [userId],
-        );
-        await manager.query("DELETE FROM dbo.IdentityUsers WHERE Id = @0", [
-          userId,
-        ]);
-      });
-    }
-
-    const storage = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
-    if (storage) {
-      const blobService = BlobServiceClient.fromConnectionString(storage);
-      if (sourceContainer && sourceBlobPath) {
-        await blobService
-          .getContainerClient(sourceContainer)
-          .getBlobClient(sourceBlobPath)
-          .deleteIfExists();
+    } else {
+      if (exportIds.length > 0) {
+        const paths = (await operationsDb.query(
+          "SELECT StoragePath FROM dbo.ExportArtifacts WHERE ExportRequestId IN (SELECT value FROM OPENJSON(@0))",
+          [JSON.stringify(exportIds)],
+        )) as Array<{ StoragePath: string }>;
+        exportBlobPaths.push(...paths.map((row) => row.StoragePath));
       }
-      await Promise.all(
-        exportBlobPaths.map((path) =>
-          blobService
-            .getContainerClient("rq-exports")
-            .getBlobClient(path)
-            .deleteIfExists(),
-        ),
+      await operationsDb.query(
+        `DELETE FROM dbo.NotificationRequests
+         WHERE ProjectId = @0 OR RecipientUserId = @1;
+         DELETE FROM dbo.AuditEvents
+         WHERE ProjectId = @0 OR ActorUserId = @1 OR CorrelationId = @2;
+         DELETE FROM dbo.IntegrationEventInbox WHERE CorrelationId = @2;`,
+        [projectId, userId, CORRELATION_ID],
       );
-    }
+      if (exportIds.length > 0) {
+        await operationsDb.query(
+          "DELETE FROM dbo.ExportRequests WHERE Id IN (SELECT value FROM OPENJSON(@0))",
+          [JSON.stringify(exportIds)],
+        );
+      }
+      if (reviewId) {
+        await workflowDb.query(
+          "DELETE FROM dbo.WorkflowReviewRequests WHERE Id = @0",
+          [reviewId],
+        );
+      }
+      if (analysisRequestId) {
+        await aiDb.query(
+          `DELETE FROM dbo.AnalysisResults WHERE AnalysisRequestId = @0;
+           DELETE FROM dbo.AnalysisExecutions WHERE AnalysisRequestId = @0;
+           DELETE FROM dbo.AnalysisRequestSources WHERE AnalysisRequestId = @0;
+           DELETE FROM dbo.AnalysisRequests WHERE Id = @0;`,
+          [analysisRequestId],
+        );
+      }
+      if (documentId) {
+        await documentsDb.query(
+          "DELETE FROM dbo.RequirementDocuments WHERE Id = @0",
+          [documentId],
+        );
+      }
+      if (appliedTemplateId) {
+        await documentsDb.query(
+          `DELETE FROM dbo.AppliedDocumentTemplates
+           WHERE Id = @0 AND NOT EXISTS (
+             SELECT 1 FROM dbo.RequirementDocuments WHERE AppliedTemplateId = @0
+           )`,
+          [appliedTemplateId],
+        );
+      }
+      if (sourceId) {
+        await sourcesDb.query("DELETE FROM dbo.Sources WHERE Id = @0", [
+          sourceId,
+        ]);
+      }
+      if (projectId) {
+        await projectsDb.query(
+          `DELETE FROM dbo.ProjectParticipants WHERE ProjectId = @0;
+           DELETE FROM dbo.Projects WHERE Id = @0;`,
+          [projectId],
+        );
+      }
+      if (identityCreated) {
+        await identityDb.transaction(async (manager) => {
+          await manager.query(
+            "DELETE FROM dbo.IdentityRefreshSessions WHERE UserId = @0",
+            [userId],
+          );
+          await manager.query(
+            "DELETE FROM dbo.IdentitySecurityAudit WHERE ActorUserId = @0 OR TargetUserId = @0",
+            [userId],
+          );
+          await manager.query(
+            "DELETE FROM dbo.IdentityUserRoles WHERE UserId = @0",
+            [userId],
+          );
+          await manager.query("DELETE FROM dbo.IdentityUsers WHERE Id = @0", [
+            userId,
+          ]);
+        });
+      }
 
-    if (sourceId) {
-      await removeQueueJobs(
-        process.env.SOURCES_PROCESSING_QUEUE?.trim() || "source-processing",
-        (job) => object(job.data).sourceId === sourceId,
-      );
-    }
-    if (analysisRequestId) {
-      await removeQueueJobs(
-        process.env.AI_PROCESSING_QUEUE?.trim() || "ai-analysis-processing",
-        (job) => object(job.data).analysisRequestId === analysisRequestId,
-      );
-    }
-    if (exportIds.length > 0) {
-      const exportSet = new Set(exportIds);
-      await removeQueueJobs(
-        process.env.OPERATIONS_EXPORT_QUEUE?.trim() || "rq-exports-v1",
-        (job) =>
-          exportSet.has(
-            string(object(job.data).exportRequestId, "job.exportRequestId"),
+      const storage = process.env.AZURE_STORAGE_CONNECTION_STRING?.trim();
+      if (storage) {
+        const blobService = BlobServiceClient.fromConnectionString(storage);
+        if (sourceContainer && sourceBlobPath) {
+          await blobService
+            .getContainerClient(sourceContainer)
+            .getBlobClient(sourceBlobPath)
+            .deleteIfExists();
+        }
+        await Promise.all(
+          exportBlobPaths.map((path) =>
+            blobService
+              .getContainerClient("rq-exports")
+              .getBlobClient(path)
+              .deleteIfExists(),
           ),
-      );
+        );
+      }
+
+      if (sourceId) {
+        await removeQueueJobs(
+          process.env.SOURCES_PROCESSING_QUEUE?.trim() || "source-processing",
+          (job) => object(job.data).sourceId === sourceId,
+        );
+      }
+      if (analysisRequestId) {
+        await removeQueueJobs(
+          process.env.AI_PROCESSING_QUEUE?.trim() || "ai-analysis-processing",
+          (job) => object(job.data).analysisRequestId === analysisRequestId,
+        );
+      }
+      if (exportIds.length > 0) {
+        const exportSet = new Set(exportIds);
+        await removeQueueJobs(
+          process.env.OPERATIONS_EXPORT_QUEUE?.trim() || "rq-exports-v1",
+          (job) =>
+            exportSet.has(
+              string(object(job.data).exportRequestId, "job.exportRequestId"),
+            ),
+        );
+      }
     }
 
     await operationsDb.destroy();
@@ -958,7 +969,8 @@ async function main(): Promise<void> {
     await sourcesDb.destroy();
     await projectsDb.destroy();
     await identityDb.destroy();
-    console.log("✓ Fixtures, blobs y trabajos temporales eliminados.");
+    if (!keepAfterSuccess)
+      console.log("✓ Fixtures, blobs y trabajos temporales eliminados.");
   }
 }
 
