@@ -23,6 +23,13 @@ import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 @Injectable()
 export class PrototypesClientService {
   constructor(@Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig) {}
+  limits(token: string) {
+    return this.request<{ importImageMaxBytes: number }>(
+      "/api/v1/prototypes/generations/limits",
+      "GET",
+      token,
+    );
+  }
   aiOptions(token: string) {
     return this.request<PrototypeAiOptions>(
       "/api/v1/prototypes/generations/providers",

@@ -34,6 +34,7 @@ import { buildZip, type ZipEntry } from "./zip-store";
 import { runWithConcurrency } from "../concurrency";
 import {
   buildPromptExportTxt,
+  PROTOTYPE_IMPORT_MAX_BYTES,
   importPayload,
   promptExportFileName,
 } from "./prototype-prompt-export";
@@ -134,6 +135,8 @@ export function PrototypeWorkspace() {
     total: number;
   } | null>(null);
   const [importingImages, setImportingImages] = useState(false);
+  // Límite de importación publicado por el servidor (por defecto, el mismo valor que el servidor).
+  const [importMaxBytes, setImportMaxBytes] = useState(PROTOTYPE_IMPORT_MAX_BYTES);
   const [downloadingAll, setDownloadingAll] = useState<{
     done: number;
     total: number;
@@ -290,6 +293,21 @@ export function PrototypeWorkspace() {
     const timer = window.setTimeout(() => setAiOptionsError(null), 8_000);
     return () => window.clearTimeout(timer);
   }, [aiOptionsError]);
+
+  useEffect(() => {
+    let active = true;
+    void getJson<{ importImageMaxBytes: number }>(
+      "/api/v1/prototypes/generations/limits",
+    )
+      .then((limits) => {
+        if (active && Number.isFinite(limits.importImageMaxBytes) && limits.importImageMaxBytes > 0)
+          setImportMaxBytes(limits.importImageMaxBytes);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1105,7 +1123,7 @@ export function PrototypeWorkspace() {
       try {
         const result = await postJson<PrototypeImageActionResult>(
           `/api/v1/prototypes/generations/${encodeURIComponent(generation.id)}/images/import`,
-          await importPayload(file),
+          await importPayload(file, importMaxBytes),
         );
         imported += 1;
         setGeneration(result.generation);

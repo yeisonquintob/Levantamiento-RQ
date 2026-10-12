@@ -27,6 +27,8 @@ export interface UiScenario {
   screenCount?: number;
   images?: Array<Record<string, unknown>>;
   progress?: Record<string, unknown>;
+  /** Límite de importación que publica el servidor (por defecto 20 MB). */
+  importMaxBytes?: number;
 }
 
 const CODES = ["login", "dashboard", "clientes", "aprobaciones", "usuarios"];
@@ -179,6 +181,10 @@ export async function mockPrototypeUi(
         ],
       });
     }
+    if (path === "generations/limits")
+      return json(route, {
+        importImageMaxBytes: scenario.importMaxBytes ?? 20 * 1024 * 1024,
+      });
     if (path === "generations") return json(route, [generation]);
     if (path === `generations/${GENERATION_ID}`) return json(route, generation);
     if (path === `generations/${GENERATION_ID}/screens`)

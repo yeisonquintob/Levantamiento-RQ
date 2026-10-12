@@ -35,3 +35,36 @@ export function resolvePrototypeImageBodyLimit(
       JSON_ENVELOPE_BYTES,
   );
 }
+
+/** Límite de cuerpo JSON del resto de rutas de Gateway y Prototypes (20 MB). */
+export const DEFAULT_JSON_BODY_LIMIT = 20 * 1024 * 1024;
+
+export interface RouteOptionsLike {
+  url: string;
+  method: string | string[];
+  bodyLimit?: number;
+}
+
+/** Instancia de Fastify, descrita de forma estructural para no depender del paquete. */
+export interface RouteHookHost {
+  addHook(name: "onRoute", hook: (route: RouteOptionsLike) => void): unknown;
+}
+
+const IMPORT_ROUTE = /\/generations\/[^/]+\/images\/import$/u;
+
+/**
+ * Sube el límite de cuerpo SOLO en la ruta de importación de imágenes (el PNG viaja en base64);
+ * las demás rutas conservan el límite general. Debe registrarse antes de que se creen las rutas.
+ */
+export function limitBodyForPrototypeImport(
+  host: RouteHookHost,
+  environment: Record<string, string | undefined>,
+): number {
+  const importLimit = resolvePrototypeImageBodyLimit(environment);
+  host.addHook("onRoute", (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    if (methods.includes("POST") && IMPORT_ROUTE.test(route.url))
+      route.bodyLimit = importLimit;
+  });
+  return importLimit;
+}

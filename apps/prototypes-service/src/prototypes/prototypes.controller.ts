@@ -107,6 +107,13 @@ export class PrototypesController {
     );
   }
 
+  @Get("limits")
+  @ApiOperation({ summary: "Límites efectivos de importación de imágenes" })
+  limits(@Req() request: PrototypesRequest) {
+    this.actorId(request);
+    return this.images.limits();
+  }
+
   @Get("providers")
   aiOptions(@Req() request: PrototypesRequest) {
     this.actorId(request);

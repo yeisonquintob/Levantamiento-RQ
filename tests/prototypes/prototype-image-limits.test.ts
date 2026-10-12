@@ -58,3 +58,51 @@ test("un valor inválido de PROTOTYPE_IMAGE_MAX_BYTES usa el valor por defecto",
     10 * MB,
   );
 });
+
+test("solo la ruta de importación acepta un cuerpo mayor que el límite general", async () => {
+  const { default: Fastify } = await import("fastify");
+  const { limitBodyForPrototypeImport } =
+    await import("../../libs/shared/config/src/lib/prototype-image-limits");
+  const app = Fastify({ bodyLimit: 1024 });
+  const importLimit = limitBodyForPrototypeImport(app as never, {});
+  app.post("/api/v1/prototypes/generations/:id/images/import", async () => ({
+    ok: true,
+  }));
+  app.post("/api/v1/prototypes/generations", async () => ({ ok: true }));
+  app.post("/api/v1/otra/images/import", async () => ({ ok: true }));
+  app.get("/api/v1/prototypes/generations/:id/images/import", async () => ({
+    ok: true,
+  }));
+  await app.ready();
+
+  const body = JSON.stringify({
+    fileName: "01-login-web.png",
+    imageBase64: "A".repeat(4096),
+  });
+  const headers = { "content-type": "application/json" };
+  const send = (url: string) =>
+    app.inject({ method: "POST", url, headers, payload: body });
+
+  assert.ok(importLimit > 20 * MB);
+  // Importación: pasa el cuerpo de 4 KB aunque el límite general sea de 1 KB.
+  assert.equal(
+    (await send("/api/v1/prototypes/generations/abc/images/import")).statusCode,
+    200,
+  );
+  // El resto de rutas conserva el límite general.
+  assert.equal((await send("/api/v1/prototypes/generations")).statusCode, 413);
+  assert.equal((await send("/api/v1/otra/images/import")).statusCode, 413);
+  await app.close();
+});
+
+test("el límite de importación sigue a PROTOTYPE_IMAGE_MAX_BYTES", async () => {
+  const { default: Fastify } = await import("fastify");
+  const { limitBodyForPrototypeImport } =
+    await import("../../libs/shared/config/src/lib/prototype-image-limits");
+  const app = Fastify();
+  const limit = limitBodyForPrototypeImport(app as never, {
+    PROTOTYPE_IMAGE_MAX_BYTES: String(50 * MB),
+  });
+  assert.ok(limit >= base64Size(50 * MB));
+  await app.close();
+});

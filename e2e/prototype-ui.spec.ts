@@ -191,4 +191,37 @@ test.describe("Generar prototipo (navegador, API simulada)", () => {
     expect(body.fileName).toBe("01-login-web.png");
     expect(body.imageBase64.length).toBe(Math.ceil((19 * mb) / 3) * 4);
   });
+
+  test("la importación usa el límite que publica el servidor, no un valor fijo", async ({
+    page,
+  }) => {
+    const { calls } = await mockPrototypeUi(page, {
+      importMaxBytes: 5 * 1024 * 1024,
+    });
+    await openGeneration(page);
+    const input = page.locator('input[type="file"][accept="image/png"]');
+    const mb = 1024 * 1024;
+
+    // 6 MB entra en el máximo antiguo (20 MB) pero supera el configurado en el servidor (5 MB).
+    await input.setInputFiles({
+      name: "01-login-web.png",
+      mimeType: "image/png",
+      buffer: Buffer.alloc(6 * mb, 1),
+    });
+    await expect(
+      page.getByText(/«01-login-web\.png» pesa 6\.0 MB y el máximo es 5 MB/u),
+    ).toBeVisible();
+    expect(
+      calls.filter((call) => call.path.endsWith("/images/import")),
+    ).toEqual([]);
+
+    await input.setInputFiles({
+      name: "01-login-web.png",
+      mimeType: "image/png",
+      buffer: Buffer.alloc(4 * mb, 1),
+    });
+    await expect(page.getByText(/1 imagen importada de 1/u)).toBeVisible({
+      timeout: 30_000,
+    });
+  });
 });

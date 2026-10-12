@@ -68,6 +68,11 @@ export class PrototypeImageGenerationService {
     private readonly config: PrototypeImageConfig,
   ) {}
 
+  /** Límites efectivos que la web necesita conocer (se configuran en el servidor). */
+  limits(): { importImageMaxBytes: number } {
+    return { importImageMaxBytes: this.config.maxImageBytes };
+  }
+
   async start(
     generationId: string,
     actorId: string,

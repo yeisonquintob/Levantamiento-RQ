@@ -38,6 +38,11 @@ function token(request: RequestLike): string {
 @Controller("prototypes/generations")
 export class PrototypesGatewayController {
   constructor(private readonly prototypes: PrototypesClientService) {}
+  @Get("limits")
+  @ApiOperation({ summary: "Límites efectivos de importación de imágenes" })
+  limits(@Req() request: RequestLike) {
+    return this.prototypes.limits(token(request));
+  }
   @Get("providers")
   aiOptions(@Req() request: RequestLike) {
     return this.prototypes.aiOptions(token(request));

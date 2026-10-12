@@ -203,3 +203,16 @@ test("la importación rechaza antes de convertir lo que el servidor no aceptarí
   assert.doesNotThrow(() => assertImportableImage({ name: "a.png", size: 10, type: "" }));
   await assert.rejects(() => importPayload(new File([new Uint8Array(1)], "x.jpg", { type: "image/jpeg" })), /no es un PNG/u);
 });
+
+test("el límite de importación se puede configurar y el mensaje lo refleja", async () => {
+  const { assertImportableImage } = await import("../../apps/web/src/app/workspace/prototype/prototype-prompt-export");
+  const mb = 1024 * 1024;
+  assert.doesNotThrow(() => assertImportableImage({ name: "a.png", size: 50 * mb, type: "image/png" }, 50 * mb));
+  assert.throws(
+    () => assertImportableImage({ name: "a.png", size: 6 * mb, type: "image/png" }, 5 * mb),
+    /pesa 6\.0 MB y el máximo es 5 MB/u,
+  );
+  const source = read("apps/web/src/app/workspace/prototype/prototype-workspace.tsx");
+  assert.match(source, /\/api\/v1\/prototypes\/generations\/limits/u);
+  assert.match(source, /importPayload\(file, importMaxBytes\)/u);
+});
