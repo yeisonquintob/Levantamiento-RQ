@@ -12,9 +12,9 @@
     "@levantamiento-rq/shared-messaging": "workspace:*",
     "@levantamiento-rq/shared-observability": "workspace:*",
     "@levantamiento-rq/shared-persistence": "workspace:*",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-fastify": "11.1.28",
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-fastify": "11.2.7",
     "@nestjs/swagger": "11.4.6",
     "@nestjs/typeorm": "11.0.3",
     "bullmq": "5.61.2",
@@ -32,6 +32,6 @@
     "unpdf": "1.6.2"
   },
   "devDependencies": {
-    "@nestjs/testing": "^11.0.0"
+    "@nestjs/testing": "^11.2.7"
   }
 }

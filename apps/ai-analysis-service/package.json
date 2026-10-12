@@ -12,9 +12,9 @@
     "@levantamiento-rq/shared-messaging": "workspace:*",
     "@levantamiento-rq/shared-observability": "workspace:*",
     "@levantamiento-rq/shared-persistence": "workspace:*",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/platform-fastify": "11.1.28",
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-fastify": "11.2.7",
     "@nestjs/swagger": "11.4.6",
     "@nestjs/typeorm": "11.0.3",
     "ajv": "8.18.0",
@@ -28,9 +28,9 @@
     "supports-color": "7.2.0",
     "tslib": "^2.3.0",
     "typeorm": "0.3.31",
-    "undici": "7.29.0"
+    "undici": "7.29.1"
   },
   "devDependencies": {
-    "@nestjs/testing": "^11.0.0"
+    "@nestjs/testing": "^11.2.7"
   }
 }
