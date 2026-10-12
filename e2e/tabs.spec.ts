@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { requireCredentials } from "./support";
+import { requireCredentials, trackableProjectRows } from "./support";
 
 /** Cada pestaña debe apuntar (aria-controls) a un panel que exista y esté etiquetado por ella. */
 async function expectTabsControlPanels(page: Page) {
@@ -25,14 +25,12 @@ test.describe("Pestañas accesibles", () => {
 
   test("Ejecución: las pestañas controlan su panel y el panel se etiqueta con la pestaña activa", async ({ page }) => {
     await page.goto("/workspace/execution");
-    const rows = page.getByRole("button", { name: "Abrir" });
-    let opened = false;
-    for (let index = 0; index < (await rows.count()) && !opened; index += 1) {
-      await page.goto("/workspace/execution");
-      await rows.nth(index).click();
-      opened = await page.getByRole("tab", { name: /Resumen de cumplimiento/u }).isVisible({ timeout: 4_000 }).catch(() => false);
-    }
-    test.skip(!opened, "No hay un proyecto aprobado con plan de trabajo.");
+    // Un proyecto aprobado (sin aviso de bloqueo): se reconoce por el estado del listado.
+    await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
+    const trackable = trackableProjectRows(page);
+    test.skip((await trackable.count()) === 0, "No hay un proyecto aprobado con plan de trabajo.");
+    await trackable.first().getByRole("button", { name: "Abrir" }).click();
+    await expect(page.getByRole("tab", { name: /Resumen de cumplimiento/u })).toBeVisible();
     await expectTabsControlPanels(page);
     const panel = page.getByRole("tabpanel");
     await expect(panel).toHaveAttribute("aria-labelledby", "rq-exec-tab-summary");

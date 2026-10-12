@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { requireCredentials } from "./support";
+import { requireCredentials, trackableProjectRows } from "./support";
 
 test.describe("Ejecución", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,20 +15,14 @@ test.describe("Ejecución", () => {
   });
 
   test("las pestañas del seguimiento se recorren con las flechas del teclado", async ({ page }) => {
-    // Abre el primer proyecto que permita seguimiento (aprobado): no muestra el aviso de bloqueo.
-    const rows = page.getByRole("button", { name: "Abrir" });
-    const count = await rows.count();
-    let opened = false;
-    for (let index = 0; index < count && !opened; index += 1) {
-      await page.goto("/workspace/execution");
-      await rows.nth(index).click();
-      if (await page.getByRole("tab", { name: /Resumen de cumplimiento/u }).isVisible({ timeout: 4_000 }).catch(() => false)) {
-        opened = true;
-      }
-    }
-    test.skip(!opened, "No hay un proyecto aprobado con plan de trabajo para probar.");
+    // Abre un proyecto aprobado (sin aviso de bloqueo); sin ninguno no hay seguimiento que probar.
+    await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
+    const trackable = trackableProjectRows(page);
+    test.skip((await trackable.count()) === 0, "No hay un proyecto aprobado con plan de trabajo para probar.");
+    await trackable.first().getByRole("button", { name: "Abrir" }).click();
     const summary = page.getByRole("tab", { name: /Resumen de cumplimiento/u });
     const tasks = page.getByRole("tab", { name: /Actividades y tareas/u });
+    await expect(summary).toBeVisible();
     await summary.focus();
     await page.keyboard.press("ArrowRight");
     await expect(tasks).toBeFocused();
@@ -38,17 +32,17 @@ test.describe("Ejecución", () => {
   });
 
   test("la checklist de tareas se muestra y marcar queda bloqueado si no hay permisos de edición", async ({ page }) => {
-    const rows = page.getByRole("button", { name: "Abrir" });
-    let opened = false;
-    for (let index = 0; index < (await rows.count()) && !opened; index += 1) {
-      await page.goto("/workspace/execution");
-      await rows.nth(index).click();
-      opened = await page.getByRole("tab", { name: /Actividades y tareas/u }).isVisible({ timeout: 4_000 }).catch(() => false);
-    }
-    test.skip(!opened, "No hay un proyecto aprobado con plan de trabajo.");
-    await page.getByRole("tab", { name: /Actividades y tareas/u }).click();
-    // Solo lectura: nunca se marca nada en esta prueba.
-    await expect(page.getByRole("checkbox", { name: /Tarea .* hecha/u }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
+    const trackable = trackableProjectRows(page);
+    test.skip((await trackable.count()) === 0, "No hay un proyecto aprobado con plan de trabajo.");
+    await trackable.first().getByRole("button", { name: "Abrir" }).click();
+    const tasksTab = page.getByRole("tab", { name: /Actividades y tareas/u });
+    await expect(tasksTab).toBeVisible();
+    await tasksTab.click();
+    // Solo lectura: nunca se marca nada en esta prueba. Sin tareas en el plan no hay checklist.
+    const checklist = page.getByRole("checkbox", { name: /Tarea .* hecha/u }).first();
+    test.skip(!(await checklist.isVisible().catch(() => false)), "El proyecto aprobado no tiene tareas en su plan.");
+    await expect(checklist).toBeVisible();
   });
 
   test("un proyecto sin aprobar abre el aviso de bloqueo y permite regresar", async ({ page }) => {
@@ -83,23 +77,29 @@ test.describe("Filtros en la URL", () => {
     requireCredentials();
     await page.goto("/workspace/execution");
     const search = page.getByPlaceholder("Código, título o área");
+    // El término sale de los datos existentes (el código del primer proyecto), no de uno fijo.
+    const firstRow = page.locator("tbody tr").first();
+    await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
+    const code = /RQ-\d{4}-\d{6}/u.exec(await firstRow.innerText())?.[0].toLowerCase();
+    test.skip(!code, "No hay proyectos con código para probar el filtro.");
+    const term = code ?? "";
     // Se escribe letra a letra: la URL cambia en cada tecla y el campo no pierde el foco.
     await search.click();
-    await search.pressSequentially("soat", { delay: 40 });
+    await search.pressSequentially(term, { delay: 40 });
     await expect(search).toBeFocused();
-    await expect(search).toHaveValue("soat");
-    await expect(page).toHaveURL(/[?&]q=soat/u);
+    await expect(search).toHaveValue(term);
+    await expect(page).toHaveURL(new RegExp(`[?&]q=${term}`, "u"));
 
     await page.reload();
-    await expect(search).toHaveValue("soat");
+    await expect(search).toHaveValue(term);
     // Solo quedan los proyectos que coinciden con el filtro recuperado de la URL.
     const rows = page.locator("tbody tr");
     await expect(rows.first()).toBeVisible();
-    for (const text of await rows.allInnerTexts()) expect(text.toLowerCase()).toContain("soat");
+    for (const text of await rows.allInnerTexts()) expect(text.toLowerCase()).toContain(term);
 
     // Un enlace con el filtro ya puesto funciona igual, y «Limpiar» deja la URL sin filtros.
-    await page.goto("/workspace/execution?q=soat");
-    await expect(search).toHaveValue("soat");
+    await page.goto(`/workspace/execution?q=${term}`);
+    await expect(search).toHaveValue(term);
     await page.getByRole("button", { name: "Limpiar" }).click();
     await expect(search).toHaveValue("");
     await expect(page).not.toHaveURL(/[?&]q=/u);

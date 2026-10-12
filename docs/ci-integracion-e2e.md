@@ -11,6 +11,11 @@ El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo
 4. `pnpm test:e2e:v1` — recorrido completo por el gateway: login, proyecto, documento, exportación PDF/DOCX, auditoría y notificaciones.
 5. Playwright con sesión real (`login` y `chromium`) sobre datos creados por `documents:editor:e2e:fixture`.
 
+   `documents:editor:e2e:fixture prepare` crea un proyecto y un documento temporales y deja el proyecto en
+   «Documento generado», que es lo que buscan las pruebas del editor. Las pruebas de Ejecución que necesitan
+   un proyecto **aprobado con plan de trabajo** (flechas del teclado, checklist y pestañas) se omiten si no lo
+   hay: ese recorrido lo cubre el E2E de API. Ninguna prueba depende de datos de un equipo concreto.
+
 ## Cómo se levanta (`scripts/ci-stack-up.sh`)
 
 - `scripts/ci-prepare-env.mjs` genera `infrastructure/docker/.env` y `apps/*/.env` a partir de los `.env.example`. Nunca sobrescribe un `.env` existente salvo con `--force`.
