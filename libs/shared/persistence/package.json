@@ -16,7 +16,7 @@
     }
   },
   "dependencies": {
-    "@nestjs/common": "^11.0.0",
+    "@nestjs/common": "^11.2.7",
     "@nestjs/typeorm": "11.0.3",
     "mssql": "12.7.0",
     "supports-color": "7.2.0",
