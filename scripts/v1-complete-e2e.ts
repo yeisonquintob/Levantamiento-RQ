@@ -588,7 +588,8 @@ async function main(): Promise<void> {
     const generatedResult = object(completedAnalysis.result);
     assert.equal(generatedResult.status, "ACCEPTED");
     const draft = object(generatedResult.draft);
-    assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 13);
+    // Debe coincidir con DOCUMENT_SECTION_DEFINITIONS (documents-service).
+    assert.equal(Array.isArray(draft.sections) ? draft.sections.length : 0, 14);
     assert.ok(
       Array.isArray(draft.requirements) && draft.requirements.length > 0,
     );
@@ -797,7 +798,7 @@ async function main(): Promise<void> {
       "✓ Archivo, Azurite, BullMQ, extracción READY y descarga validados.",
     );
     console.log(
-      "✓ Fake AI, 13 secciones, revisión humana y trazabilidad validadas.",
+      "✓ Fake AI, 14 secciones, revisión humana y trazabilidad validadas.",
     );
     console.log("✓ Comentario, aprobación, bloqueo e historial validados.");
     console.log("✓ PDF/DOCX, SHA-256, auditoría y notificaciones validados.");
