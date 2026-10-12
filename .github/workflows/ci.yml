@@ -183,6 +183,8 @@ jobs:
         run: bash scripts/ci-stack-up.sh
       - name: Integración con bases de datos (7 servicios y Prototypes), Redis, Azurite y RabbitMQ
         run: pnpm test:integration
+      - name: Integración real de la generación de imágenes (SQL Server, Redis y Azurite)
+        run: pnpm test:integration:prototypes
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
         run: pnpm test:e2e:v1
       - name: Datos de prueba para los E2E de interfaz
