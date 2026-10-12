@@ -15,6 +15,8 @@ export default defineConfig({
   reporter: [
     ["list"],
     ["html", { open: "never", outputFolder: "tmp/playwright-report" }],
+    // En GitHub Actions cada fallo queda como anotación visible en el PR (los registros exigen sesión).
+    ...(process.env.GITHUB_ACTIONS ? ([["github"]] as const) : []),
   ],
   outputDir: "tmp/playwright-results",
   use: {
