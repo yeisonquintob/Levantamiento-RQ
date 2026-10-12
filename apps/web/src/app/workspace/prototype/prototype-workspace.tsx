@@ -524,9 +524,13 @@ export function PrototypeWorkspace() {
   );
 
   useEffect(() => {
-    // Navegación externa (flecha lateral): sin ?view=source se vuelve al listado.
+    // Navegación externa (flecha lateral): sin ?view=source se vuelve al listado. `useSearchParams` se
+    // actualiza en una transición de Next y puede ir por detrás de la URL real (en un navegador lento
+    // devolvía el listado con la URL todavía en ?view=source), así que también se comprueba la URL real.
+    const liveView = new URLSearchParams(window.location.search).get("view");
     if (
       viewParam !== "source" &&
+      liveView !== "source" &&
       expectedViewParam.current === "source" &&
       workspaceViewRef.current === "SOURCE"
     ) {

@@ -13,6 +13,37 @@ function oneLine(value: string, max: number): string {
 export const test = base.extend<{ diagnostics: void }>({
   diagnostics: [
     async ({ page }, use, testInfo) => {
+      // Traza dentro de la página: cuántas veces se cargó el documento y cada cambio de URL con el
+      // archivo que lo provocó (distingue una recarga real de un cambio de estado de React).
+      await page.addInitScript(() => {
+        const w = window as unknown as { __rqTrace?: string[] };
+        const trace = (w.__rqTrace ??= []);
+        try {
+          window.sessionStorage.setItem(
+            "rqLoads",
+            String(Number(window.sessionStorage.getItem("rqLoads") ?? 0) + 1),
+          );
+        } catch {
+          /* sin sessionStorage */
+        }
+        for (const method of ["pushState", "replaceState"] as const) {
+          const original = window.history[method].bind(window.history);
+          window.history[method] = (data, unused, url) => {
+            const caller =
+              (new Error().stack ?? "")
+                .split("\n")
+                .slice(2, 4)
+                .map((line) =>
+                  line.trim().replace(/^at /u, "").split("/").pop(),
+                )
+                .join(">") || "?";
+            trace.push(
+              `${method}(${String(url).replace(/^https?:\/\/[^/]+/u, "")}) por ${caller}`,
+            );
+            return original(data, unused, url);
+          };
+        }
+      });
       const problems: string[] = [];
       page.on("pageerror", (error) =>
         problems.push(`pageerror: ${oneLine(error.message, 160)}`),
@@ -48,14 +79,26 @@ export const test = base.extend<{ diagnostics: void }>({
       } catch {
         text = "(no se pudo leer la página)";
       }
+      let trace = "";
+      try {
+        const data = await page.evaluate(() => ({
+          loads: window.sessionStorage.getItem("rqLoads"),
+          trace:
+            (window as unknown as { __rqTrace?: string[] }).__rqTrace ?? [],
+        }));
+        trace = `cargas=${data.loads} cambios_de_url=${data.trace.slice(-8).join(" | ")}`;
+      } catch {
+        trace = "(sin traza)";
+      }
       const detail = [
         `url=${page.url()}`,
+        trace,
         `texto=${text}`,
         `eventos=${problems.slice(-12).join(" | ") || "ninguno"}`,
       ].join(" ## ");
       // Las anotaciones de GitHub usan %0A para el salto de línea; aquí todo va en una sola línea.
       console.log(
-        `::error title=Diagnóstico E2E: ${oneLine(testInfo.title, 70).replace(/[:,]/gu, " ")}::${detail.replace(/%/gu, "%25").slice(0, 1500)}`,
+        `::error title=Diagnóstico E2E: ${oneLine(testInfo.title, 70).replace(/[:,]/gu, " ")}::${detail.replace(/%/gu, "%25").slice(0, 2200)}`,
       );
     },
     { auto: true },
