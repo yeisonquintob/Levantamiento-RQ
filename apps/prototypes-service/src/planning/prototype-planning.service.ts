@@ -249,6 +249,8 @@ export class PrototypePlanningService {
         status: "FAILED",
         errorCode: code,
         errorMessage: message,
+        // Sin plan vigente: FAILED con totalScreens > 0 significa que falló algo posterior al plan.
+        totalScreens: 0,
         updatedAt: new Date(),
       });
       await this.generations.save(generation);

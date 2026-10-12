@@ -252,7 +252,10 @@ export class PrototypeImageGenerationService {
         .map((specification) => {
           const screen = screens.get(specification.screenId);
           const size = this.sizeMapper.forDevice(specification.device);
-          const [width, height] = size.split("x").map(Number) as [number, number];
+          const [width, height] = size.split("x").map(Number) as [
+            number,
+            number,
+          ];
           return {
             screenCode: screen?.code ?? "screen",
             screenName: screen?.name ?? "Pantalla",
@@ -350,7 +353,10 @@ export class PrototypeImageGenerationService {
     );
     await this.storage.upload(storageKey, png.buffer);
     const now = new Date();
-    const image = existing ?? this.images.create({ id: randomUUID(), createdAt: now });
+    // Solo se conservan la versión actual y la anterior: la que ya era «anterior» se retira.
+    const olderStorageKey = existing?.previousStorageKey ?? null;
+    const image =
+      existing ?? this.images.create({ id: randomUUID(), createdAt: now });
     Object.assign(image, {
       generationId,
       visualSpecificationId: match.specification.id,
@@ -377,6 +383,10 @@ export class PrototypeImageGenerationService {
       updatedAt: now,
     });
     const saved = await this.images.save(image);
+    await this.discardOlderVersion(olderStorageKey, [
+      saved.storageKey,
+      saved.previousStorageKey,
+    ]);
     this.audit(saved, match.screen.code, "IMPORTED");
     await this.consolidate(generationId);
     const refreshed = await this.requireGeneration(generationId, actorId);
@@ -496,6 +506,29 @@ export class PrototypeImageGenerationService {
     });
     await this.generations.save(generation);
     return this.result(generation, all);
+  }
+
+  /**
+   * `previousStorageKey` guarda una sola versión anterior: al rotarla, la que ya era «anterior»
+   * quedaría sin referencia (huérfana en Blob Storage), así que se borra. Un fallo al borrar no
+   * detiene la operación; solo se registra.
+   */
+  private async discardOlderVersion(
+    olderKey: string | null | undefined,
+    keep: ReadonlyArray<string | null | undefined>,
+  ): Promise<void> {
+    if (!olderKey || keep.includes(olderKey)) return;
+    try {
+      await this.storage.delete(olderKey);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: "PROTOTYPE_OLDER_IMAGE_VERSION_NOT_DELETED",
+          storageKey: olderKey,
+          reason: error instanceof Error ? error.name : "UNKNOWN",
+        }),
+      );
+    }
   }
 
   async deleteGeneration(
@@ -688,6 +721,9 @@ export class PrototypeImageGenerationService {
           ? "Solo se pueden reintentar imágenes fallidas."
           : "Solo se pueden regenerar imágenes completadas.",
       );
+    // Se leen antes del update: la entidad puede reflejar ya los valores nuevos.
+    const olderStorageKey = current.previousStorageKey;
+    const replacedStorageKey = current.storageKey;
     const update = await this.images.update(
       { id: current.id, status: requiredStatus },
       {
@@ -709,6 +745,7 @@ export class PrototypeImageGenerationService {
     if (!image)
       throw new NotFoundException("La imagen de prototipo no existe.");
     if (update.affected) {
+      await this.discardOlderVersion(olderStorageKey, [replacedStorageKey]);
       Object.assign(generation, {
         status: "IMAGE_GENERATING",
         errorCode: null,

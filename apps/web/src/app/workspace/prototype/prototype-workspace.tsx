@@ -903,7 +903,7 @@ export function PrototypeWorkspace() {
 
       if (
         current.status === "SOURCE_READY" ||
-        (current.status === "FAILED" && current.totalImages === 0) ||
+        (current.status === "FAILED" && !hasCompletedPrototypePlan(current)) ||
         force
       ) {
         setBusyLabel("Interpretando Markdown…");

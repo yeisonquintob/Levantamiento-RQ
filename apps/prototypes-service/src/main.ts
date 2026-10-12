@@ -9,6 +9,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import {
   loadBaseServiceConfig,
   loadEnvironmentFiles,
+  resolvePrototypeImageBodyLimit,
 } from "@levantamiento-rq/shared-config";
 import { registerRuntimeTelemetry } from "@levantamiento-rq/shared-observability";
 loadEnvironmentFiles({
@@ -22,7 +23,10 @@ async function bootstrap(): Promise<void> {
   const { AppModule } = await import("./app/app.module.js");
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ bodyLimit: 20 * 1024 * 1024 }),
+    // Una imagen importada viaja en base64 (+33 %): el límite sale de PROTOTYPE_IMAGE_MAX_BYTES.
+    new FastifyAdapter({
+      bodyLimit: resolvePrototypeImageBodyLimit(process.env),
+    }),
   );
   const prefix = "api/v1";
   registerRuntimeTelemetry(app.getHttpAdapter().getInstance(), {

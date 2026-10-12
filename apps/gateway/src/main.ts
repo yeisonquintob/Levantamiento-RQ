@@ -10,7 +10,10 @@ import {
 } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
-import { loadEnvironmentFiles } from "@levantamiento-rq/shared-config";
+import {
+  loadEnvironmentFiles,
+  resolvePrototypeImageBodyLimit,
+} from "@levantamiento-rq/shared-config";
 import {
   ApplicationExceptionFilter,
   CorrelationIdInterceptor,
@@ -34,8 +37,11 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    // 20 MB: una imagen PNG importada a la galería viaja en base64 dentro del JSON.
-    new FastifyAdapter({ bodyLimit: 20 * 1024 * 1024 }),
+    // Una imagen PNG importada a la galería viaja en base64 dentro del JSON (+33 %): el límite sale
+    // de PROTOTYPE_IMAGE_MAX_BYTES (el mismo valor que usa Prototypes Service).
+    new FastifyAdapter({
+      bodyLimit: resolvePrototypeImageBodyLimit(process.env),
+    }),
   );
 
   await app.register(fastifyMultipart as never, {

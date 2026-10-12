@@ -188,3 +188,18 @@ test("el TXT aclara que medidas y tipos de dato son especificaciones y no deben 
   assert.match(txt, /UUID, string, datetime/u);
   assert.match(txt, /Medidas \(especificación interna: NO las dibujes/u);
 });
+
+test("la importación rechaza antes de convertir lo que el servidor no aceptaría", async () => {
+  const { PROTOTYPE_IMPORT_MAX_BYTES, assertImportableImage, importPayload } = await import(
+    "../../apps/web/src/app/workspace/prototype/prototype-prompt-export"
+  );
+  assert.doesNotThrow(() => assertImportableImage({ name: "01-login-web.png", size: PROTOTYPE_IMPORT_MAX_BYTES, type: "image/png" }));
+  assert.throws(
+    () => assertImportableImage({ name: "grande.png", size: PROTOTYPE_IMPORT_MAX_BYTES + 1, type: "image/png" }),
+    /«grande\.png» pesa 20\.0 MB y el máximo es 20 MB/u,
+  );
+  assert.throws(() => assertImportableImage({ name: "foto.jpg", size: 10, type: "image/jpeg" }), /no es un PNG/u);
+  // El navegador a veces no informa el tipo: se acepta y la validación definitiva la hace el servidor.
+  assert.doesNotThrow(() => assertImportableImage({ name: "a.png", size: 10, type: "" }));
+  await assert.rejects(() => importPayload(new File([new Uint8Array(1)], "x.jpg", { type: "image/jpeg" })), /no es un PNG/u);
+});

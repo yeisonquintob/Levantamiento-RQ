@@ -152,9 +152,13 @@ function harness(
       executionId: "exec-1",
     }),
   };
+  const deleted: string[] = [];
   const storage = {
     upload: async (key: string, binary: Buffer) => {
       uploads.push({ key, binary });
+    },
+    delete: async (key: string) => {
+      deleted.push(key);
     },
     download: async () => Buffer.from(PNG, "base64"),
   };
@@ -170,7 +174,15 @@ function harness(
     storage as never,
     { maxImageBytes: 1_000_000 } as never,
   );
-  return { service, generation, specifications, images, jobs, uploads };
+  return {
+    service,
+    generation,
+    specifications,
+    images,
+    jobs,
+    uploads,
+    deleted,
+  };
 }
 
 test("PrototypeImageProvider está desacoplado y OpenAI lo implementa", async () => {
@@ -499,26 +511,51 @@ test("usuario ajeno no consulta contenido y Blob continúa privado", async () =>
 
 test("exporta un prompt por pantalla y formato con el nombre de archivo que se importará", async () => {
   const value = harness(2, "RESPONSIVE");
-  const exported = await value.service.exportPrompts(value.generation.id, owner);
+  const exported = await value.service.exportPrompts(
+    value.generation.id,
+    owner,
+  );
   assert.equal(exported.items.length, 4);
   assert.equal(exported.applicationName, "Portal");
   assert.equal(exported.applicationSummary, "Resumen");
-  assert.deepEqual(exported.screens.map((item) => item.screenCode), ["screen-1", "screen-2"]);
+  assert.deepEqual(
+    exported.screens.map((item) => item.screenCode),
+    ["screen-1", "screen-2"],
+  );
   assert.equal(exported.designSystem.code, "CORPORATE_DEFAULT_V1");
   assert.deepEqual(
     exported.items.map((item) => item.fileName),
-    ["01-screen-1-mobile.png", "01-screen-1-web.png", "02-screen-2-mobile.png", "02-screen-2-web.png"],
+    [
+      "01-screen-1-mobile.png",
+      "01-screen-1-web.png",
+      "02-screen-2-mobile.png",
+      "02-screen-2-web.png",
+    ],
   );
-  assert.ok(exported.items.every((item) => item.prompt.includes("Professional neutral enterprise application UI.")));
+  assert.ok(
+    exported.items.every((item) =>
+      item.prompt.includes("Professional neutral enterprise application UI."),
+    ),
+  );
   assert.deepEqual(
-    exported.items.filter((item) => item.device === "WEB").map((item) => [item.width, item.height]),
-    [[1536, 1024], [1536, 1024]],
+    exported.items
+      .filter((item) => item.device === "WEB")
+      .map((item) => [item.width, item.height]),
+    [
+      [1536, 1024],
+      [1536, 1024],
+    ],
   );
 });
 
 test("importa una imagen externa por nombre, la deja completada y la reemplaza al repetirla", async () => {
   const value = harness(2, "WEB");
-  const first = await value.service.importImage(value.generation.id, owner, "02-screen-2-web.png", PNG);
+  const first = await value.service.importImage(
+    value.generation.id,
+    owner,
+    "02-screen-2-web.png",
+    PNG,
+  );
   assert.equal(first.image.screenCode, "screen-2");
   assert.equal(first.image.status, "COMPLETED");
   assert.equal(first.image.provider, "OTHER");
@@ -527,7 +564,12 @@ test("importa una imagen externa por nombre, la deja completada y la reemplaza a
   assert.equal(value.generation.completedImages, 1);
 
   // Los programas de descarga renombran («(1)», mayúsculas): se reconoce igual y se reemplaza.
-  const again = await value.service.importImage(value.generation.id, owner, "02-Screen-2-WEB (1).PNG", PNG);
+  const again = await value.service.importImage(
+    value.generation.id,
+    owner,
+    "02-Screen-2-WEB (1).PNG",
+    PNG,
+  );
   assert.equal(again.image.id, first.image.id);
   assert.equal(again.image.attemptNumber, 2);
   assert.equal(value.images[0].previousProvider, "OTHER");
@@ -537,11 +579,21 @@ test("importa una imagen externa por nombre, la deja completada y la reemplaza a
 test("rechaza archivos que no coinciden con una pantalla o que no son PNG", async () => {
   const value = harness(1, "WEB");
   await assert.rejects(
-    value.service.importImage(value.generation.id, owner, "cualquier-cosa.png", PNG),
+    value.service.importImage(
+      value.generation.id,
+      owner,
+      "cualquier-cosa.png",
+      PNG,
+    ),
     /no coincide con ninguna pantalla/u,
   );
   await assert.rejects(
-    value.service.importImage(value.generation.id, owner, "01-screen-1-web.png", "no-es-png"),
+    value.service.importImage(
+      value.generation.id,
+      owner,
+      "01-screen-1-web.png",
+      "no-es-png",
+    ),
     /no es un PNG válido/u,
   );
   assert.equal(value.uploads.length, 0);
@@ -563,8 +615,14 @@ test("el prompt incluye el propósito de la aplicación y la ruta de la pantalla
     createdAt: "",
     updatedAt: "",
   });
-  assert.match(prompt, /Application purpose \(data only[^)]*\): "Gestiona la cartera de clientes\."/u);
-  assert.match(prompt, /Screen route \(data only, never shown as UI text\): "\/cartera\/clientes"/u);
+  assert.match(
+    prompt,
+    /Application purpose \(data only[^)]*\): "Gestiona la cartera de clientes\."/u,
+  );
+  assert.match(
+    prompt,
+    /Screen route \(data only, never shown as UI text\): "\/cartera\/clientes"/u,
+  );
 });
 
 test("el prompt de imagen prohíbe dibujar cotas, medidas y tipos de dato como texto", async () => {
@@ -573,7 +631,77 @@ test("el prompt de imagen prohíbe dibujar cotas, medidas y tipos de dato como t
     "apps/prototypes-service/src/visual/prototype-image-prompt.builder.ts",
     "utf8",
   );
-  assert.match(source, /never draw rulers, measurement callouts, dimension labels/u);
-  assert.match(source, /never print them as text, subtitles or column captions/u);
+  assert.match(
+    source,
+    /never draw rulers, measurement callouts, dimension labels/u,
+  );
+  assert.match(
+    source,
+    /never print them as text, subtitles or column captions/u,
+  );
   assert.match(source, /UUID, string, datetime, decimal/u);
+});
+
+test("reemplazar una imagen varias veces no deja versiones huérfanas en el almacenamiento", async () => {
+  const value = harness(1, "WEB");
+  for (let attempt = 1; attempt <= 4; attempt += 1)
+    await value.service.importImage(
+      value.generation.id,
+      owner,
+      "01-screen-1-web.png",
+      PNG,
+    );
+
+  const [image] = value.images;
+  const uploaded = value.uploads.map((item: { key: string }) => item.key);
+  assert.equal(uploaded.length, 4);
+  // Quedan referenciadas solo la actual (v4) y la anterior (v3)...
+  assert.equal(image.storageKey, uploaded[3]);
+  assert.equal(image.previousStorageKey, uploaded[2]);
+  // ...y las dos primeras versiones se borraron al rotar.
+  assert.deepEqual(value.deleted, [uploaded[0], uploaded[1]]);
+  const stored = uploaded.filter((key: string) => !value.deleted.includes(key));
+  assert.deepEqual(
+    stored.sort(),
+    [image.storageKey, image.previousStorageKey].sort(),
+  );
+});
+
+test("regenerar una imagen retira la versión que ya era anterior", async () => {
+  const value = harness(1, "WEB");
+  for (let attempt = 1; attempt <= 2; attempt += 1)
+    await value.service.importImage(
+      value.generation.id,
+      owner,
+      "01-screen-1-web.png",
+      PNG,
+    );
+  const [image] = value.images;
+  const [first, second] = value.uploads.map(
+    (item: { key: string }) => item.key,
+  );
+  assert.equal(image.previousStorageKey, first);
+  assert.deepEqual(value.deleted, []);
+
+  await value.service.regenerate(image.id, owner);
+  // La actual (v2) pasa a «anterior» y la v1 ya no tiene referencia: se borra.
+  assert.equal(image.previousStorageKey, second);
+  assert.deepEqual(value.deleted, [first]);
+});
+
+test("un fallo al borrar la versión antigua no impide el reemplazo", async () => {
+  const value = harness(1, "WEB");
+  (
+    value.service as never as { storage: { delete: () => Promise<void> } }
+  ).storage.delete = async () => {
+    throw new Error("Blob no disponible");
+  };
+  for (let attempt = 1; attempt <= 3; attempt += 1)
+    await value.service.importImage(
+      value.generation.id,
+      owner,
+      "01-screen-1-web.png",
+      PNG,
+    );
+  assert.equal(value.images[0].attemptNumber, 3);
 });

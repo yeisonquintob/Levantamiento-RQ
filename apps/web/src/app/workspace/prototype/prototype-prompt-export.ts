@@ -95,7 +95,10 @@ export function buildPromptExportTxt(
         ? [
             `Objetivo: ${screen.objective}`,
             ...(screen.components.length
-              ? ["Componentes:", ...screen.components.map((component) => `  - ${component}`)]
+              ? [
+                  "Componentes:",
+                  ...screen.components.map((component) => `  - ${component}`),
+                ]
               : []),
           ]
         : []),
@@ -135,7 +138,23 @@ export async function fileToBase64(file: Blob): Promise<string> {
   return btoa(binary);
 }
 
+/** Tamaño máximo de un PNG importado (igual al valor por defecto del servidor). */
+export const PROTOTYPE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+
+/** Rechaza antes de convertir a base64 lo que el servidor no aceptaría. */
+export function assertImportableImage(
+  file: Pick<File, "name" | "size" | "type">,
+): void {
+  if (file.type && file.type !== "image/png")
+    throw new Error(`«${file.name}» no es un PNG.`);
+  if (file.size > PROTOTYPE_IMPORT_MAX_BYTES)
+    throw new Error(
+      `«${file.name}» pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo es ${PROTOTYPE_IMPORT_MAX_BYTES / 1024 / 1024} MB.`,
+    );
+}
+
 /** Cuerpo de la importación de una imagen: el nombre del archivo decide a qué pantalla va. */
 export async function importPayload(file: File) {
+  assertImportableImage(file);
   return { fileName: file.name, imageBase64: await fileToBase64(file) };
 }

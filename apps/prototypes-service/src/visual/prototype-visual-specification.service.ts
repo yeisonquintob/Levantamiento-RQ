@@ -42,6 +42,7 @@ export class PrototypeVisualSpecificationService {
       throw new ConflictException(
         "La generación debe tener un plan listo antes de preparar el formato visual.",
       );
+    const previousStatus = generation.status;
     generation.status = "VISUAL_SPEC_BUILDING";
     generation.errorCode = null;
     generation.errorMessage = null;
@@ -102,8 +103,10 @@ export class PrototypeVisualSpecificationService {
         total: result.length,
       };
     } catch {
+      // El plan sigue vigente: se vuelve al estado anterior para poder reintentar sin reinterpretar
+      // el Markdown (pasar a FAILED lo hacía parecer un fallo de planificación).
       Object.assign(generation, {
-        status: "FAILED",
+        status: previousStatus,
         errorCode: "PROTOTYPE_VISUAL_SPEC_FAILED",
         errorMessage: "No fue posible preparar las especificaciones visuales.",
         updatedAt: new Date(),
