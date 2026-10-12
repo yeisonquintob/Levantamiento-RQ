@@ -98,7 +98,7 @@
     "test:web": "node --import tsx --test tests/web/*.test.ts",
     "test:coverage": "bash scripts/test-coverage.sh",
     "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test --project=smoke",
+    "test:e2e:smoke": "playwright test --project=smoke --project=ui",
     "test:workflow": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx --test tests/workflow/*.test.ts",
     "test:structural": "pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:workflow",
     "test:unit": "pnpm test:auth && pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:prototypes && pnpm test:audit && pnpm test:ai && pnpm test:workflow && pnpm test:operations",

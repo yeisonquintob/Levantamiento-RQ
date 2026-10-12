@@ -23,16 +23,24 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  // En CI se levanta la web compilada (sin backend: el smoke simula el gateway). En local se reutiliza
-  // el servidor ya levantado por el script de arranque.
+  // En CI se levanta la web compilada y una pasarela falsa (solo responde a /auth/me): las pruebas
+  // «smoke» y «ui» no necesitan backend. En local se reutilizan los servidores ya levantados.
   webServer:
     process.env.CI && !process.env.E2E_BASE_URL
-      ? {
-          command: `pnpm exec nx start web --port=${port}`,
-          url: `http://127.0.0.1:${port}/sign-in`,
-          reuseExistingServer: false,
-          timeout: 180_000,
-        }
+      ? [
+          {
+            command: "node e2e/support/fake-gateway.mjs",
+            url: "http://127.0.0.1:3000/api/v1/auth/me",
+            reuseExistingServer: false,
+            timeout: 30_000,
+          },
+          {
+            command: `pnpm exec nx start web --port=${port}`,
+            url: `http://127.0.0.1:${port}/sign-in`,
+            reuseExistingServer: false,
+            timeout: 180_000,
+          },
+        ]
       : undefined,
   globalTeardown: "./e2e/global-teardown.ts",
   projects: [
@@ -40,6 +48,12 @@ export default defineConfig({
     {
       name: "smoke",
       testMatch: /smoke\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    // Generar prototipo en el navegador con la API simulada (también sin backend ni credenciales).
+    {
+      name: "ui",
+      testMatch: /prototype-ui\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     // El acceso se prueba sin sesión previa; el resto reutiliza la sesión de «setup».
@@ -55,7 +69,12 @@ export default defineConfig({
     },
     {
       name: "chromium",
-      testIgnore: [/login\.spec\.ts/, /smoke\.spec\.ts/, /auth\.setup\.ts/],
+      testIgnore: [
+        /login\.spec\.ts/,
+        /smoke\.spec\.ts/,
+        /prototype-ui\.spec\.ts/,
+        /auth\.setup\.ts/,
+      ],
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
