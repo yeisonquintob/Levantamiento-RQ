@@ -14,6 +14,9 @@ import {
 
 const GATEWAY = "http://127.0.0.1:3000/api/v1";
 const WEB = "http://127.0.0.1:4200";
+// El Gateway rechaza (403) las mutaciones con cookie de sesión que no declaran un origen permitido
+// (protección CSRF). Este cliente no es un navegador, así que envía el origen de la web como haría uno.
+const WEB_ORIGIN = process.env.E2E_WEB_ORIGIN ?? WEB;
 const CORRELATION_ID = randomUUID();
 
 function object(value: unknown): Readonly<Record<string, unknown>> {
@@ -68,6 +71,7 @@ async function request(
     method: options.method ?? "GET",
     headers: {
       accept: "application/json",
+      origin: WEB_ORIGIN,
       "x-correlation-id": CORRELATION_ID,
       ...(sessionCookie ? { cookie: sessionCookie } : {}),
       ...(options.idempotencyKey
@@ -166,6 +170,7 @@ async function uploadFile(
       headers: {
         accept: "application/json",
         cookie: sessionCookie,
+        origin: WEB_ORIGIN,
         "x-correlation-id": CORRELATION_ID,
       },
       body: form,
@@ -808,6 +813,7 @@ async function main(): Promise<void> {
         method: "POST",
         headers: {
           cookie: fullSessionCookie,
+          origin: WEB_ORIGIN,
           "x-correlation-id": CORRELATION_ID,
         },
         signal: AbortSignal.timeout(15_000),
