@@ -18,7 +18,8 @@
   color: var(--rq-action-operation);
 }
 
-/* ROW_OPEN_BUTTON_V1: botón «Abrir» de las filas de tabla; blanco y morado al pasar el cursor, mismo tamaño en todas las vistas. */
+/* ROW_OPEN_BUTTON_V1: botón «Abrir» de las filas de tabla; superficie del tema y morado al pasar el cursor, mismo tamaño en todas las vistas.
+   El fondo y el texto salen del tema (en Oscuro el texto es claro: un fondo blanco fijo lo hacía ilegible). */
 .rq-action.rq-row-open,
 .rq-action.rq-row-open[data-rq-tone],
 .rq-documents-index .rq-action.rq-row-open[data-document-action] {
@@ -33,7 +34,7 @@
   padding: 0 12px;
   border: 1px solid var(--rq-color-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--rq-color-surface);
   color: var(--rq-color-text);
   font-weight: 700;
   white-space: nowrap;
@@ -51,7 +52,7 @@
   .rq-action.rq-row-open[data-document-action]:is(:hover, :focus-visible) {
   border-color: var(--rq-action-operation);
   background: var(--rq-action-operation);
-  color: #fff;
+  color: var(--rq-action-on-solid, #fff);
   transform: none;
 }
 

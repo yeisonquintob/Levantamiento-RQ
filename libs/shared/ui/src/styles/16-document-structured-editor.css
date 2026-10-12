@@ -1675,7 +1675,7 @@
 /* RQ COMPARAR VERSIONES - VISUAL V1.3.2 INICIO */
 
 .rq-document-compare-modal {
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 /* Cabecera y controles */
@@ -1686,13 +1686,13 @@
 }
 
 .rq-document-compare-modal .rq-document-compare-summary {
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   border-bottom: 1px solid #d9dedf;
 }
 
 .rq-document-compare-modal .rq-document-compare-summary__stat,
 .rq-document-compare-modal .rq-document-compare-picker {
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   border-color: #d9dedf;
   box-shadow: 0 1px 3px rgb(24 35 40 / 8%);
 }
@@ -1709,7 +1709,7 @@
   overflow: hidden;
   border: 1px solid #d9dedf;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: 0 2px 8px rgb(24 35 40 / 7%);
 }
 
@@ -1749,7 +1749,7 @@
   padding: 12px;
   border: 1px solid #d9dedf;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 /* Estructura nueva, si ya está presente */
@@ -1763,19 +1763,19 @@
   overflow: hidden;
   border: 1px solid #d9dedf;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 .rq-document-compare-modal .rq-document-compare-pane__content {
   padding: 12px;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 /* Encabezado documental */
 .rq-document-compare-modal .rq-document-header-grid > div,
 .rq-document-compare-modal .rq-document-person-grid > article {
   border-color: #d9dedf;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: 0 1px 3px rgb(24 35 40 / 6%);
 }
 
@@ -1784,7 +1784,7 @@
 .rq-document-compare-modal .rq-document-objectives-specific,
 .rq-document-compare-modal .rq-document-objectives-specific > section {
   border-color: #d9dedf;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: 0 1px 3px rgb(24 35 40 / 6%);
 }
 
@@ -1793,7 +1793,7 @@
 .rq-document-compare-modal .rq-document-pending-view > section,
 .rq-document-compare-modal .rq-document-approvals-view > section {
   border-color: #d9dedf;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: 0 1px 3px rgb(24 35 40 / 6%);
 }
 
@@ -1804,7 +1804,7 @@
 .rq-document-compare-modal .rq-document-sprint-card,
 .rq-document-compare-modal .rq-document-business-card {
   border-color: #d9dedf;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
   box-shadow: 0 1px 3px rgb(24 35 40 / 6%);
 }
 
@@ -1837,11 +1837,11 @@
 .rq-document-compare-modal .rq-document-responsive-table {
   overflow: hidden;
   border-color: #d9dedf;
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 .rq-document-compare-modal .rq-document-responsive-table td {
-  background: #ffffff;
+  background: var(--rq-color-surface, #fff);
 }
 
 .rq-document-compare-modal
