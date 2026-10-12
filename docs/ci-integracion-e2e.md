@@ -11,6 +11,8 @@ El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo
 4. `pnpm test:e2e:v1` — recorrido completo por el gateway: login, proyecto, documento, exportación PDF/DOCX, auditoría y notificaciones.
 5. Playwright con sesión real (`login` y `chromium`) sobre datos creados por `documents:editor:e2e:fixture`.
 
+   El E2E de API se ejecuta con `V1_E2E_KEEP_APPROVED=1`: deja creado un proyecto aprobado con su plan de trabajo (la base es efímera), y Playwright con `E2E_REQUIRE_APPROVED=1` falla —en vez de omitir— las pruebas de Ejecución si ese proyecto no existe. En un equipo local, sin esas variables, esas pruebas se omiten si no hay un proyecto aprobado.
+
    `documents:editor:e2e:fixture prepare` crea un proyecto y un documento temporales y deja el proyecto en
    «Documento generado», que es lo que buscan las pruebas del editor. Las pruebas de Ejecución que necesitan
    un proyecto **aprobado con plan de trabajo** (flechas del teclado, checklist y pestañas) se omiten si no lo

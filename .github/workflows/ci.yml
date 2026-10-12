@@ -30,6 +30,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --prod --audit-level high
+      # La auditoría de producción no ve la cadena de compilación (Nx, webpack, swc...): una herramienta
+      # vulnerable también ejecuta código en el equipo de desarrollo y en el CI.
+      - name: Auditoría completa (incluye la cadena de desarrollo)
+        run: pnpm audit --audit-level high
       - run: pnpm check:secrets
       - run: pnpm check:architecture
       - name: Caché de Nx
@@ -172,6 +176,9 @@ jobs:
       - name: Integración real de la generación de imágenes (SQL Server, Redis y Azurite)
         run: pnpm test:integration:prototypes
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
+        env:
+          # La base es efímera: se conserva el proyecto aprobado con su plan para las pruebas de Ejecución.
+          V1_E2E_KEEP_APPROVED: "1"
         run: |
           mkdir -p logs
           set +e
@@ -186,6 +193,9 @@ jobs:
       - name: Datos de prueba para los E2E de interfaz
         run: pnpm documents:editor:e2e:fixture prepare ci
       - name: E2E de interfaz con sesión real
+        env:
+          # Con el proyecto aprobado garantizado, las pruebas de Ejecución fallan en vez de omitirse.
+          E2E_REQUIRE_APPROVED: "1"
         run: pnpm exec playwright test --project=login --project=chromium
       - name: Limpiar datos de prueba
         if: always()

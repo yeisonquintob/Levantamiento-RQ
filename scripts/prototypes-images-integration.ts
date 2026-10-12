@@ -349,6 +349,179 @@ async function main(): Promise<void> {
       );
     }
 
+    // 7) Segunda entrega del mismo trabajo: solo un worker genera; el segundo no borra el archivo válido.
+    {
+      const id = await seed(1);
+      provider.holdNext = true;
+      const callsBefore = provider.calls;
+      await imageService.start(id, user);
+      await until(
+        "la IA tiene el trabajo retenido",
+        async () =>
+          provider.calls === callsBefore + 1 &&
+          (await rows(id))[0]?.status === "GENERATING",
+      );
+      const [row] = await rows(id);
+      // BullMQ entrega otra vez el mismo trabajo (lock perdido, «stalled», segunda réplica).
+      await imageService.process(
+        {
+          generationId: id,
+          visualSpecificationId: row?.visualSpecificationId ?? "",
+          imageRecordId: row?.id ?? "",
+          attemptNumber: row?.attemptNumber,
+        },
+        1,
+        3,
+      );
+      assert.equal(
+        provider.calls,
+        callsBefore + 1,
+        "solo un worker llama a la IA",
+      );
+      provider.releaseAll();
+      await until(
+        "la imagen completada",
+        async () => (await rows(id))[0]?.status === "COMPLETED",
+      );
+      const [done] = await rows(id);
+      const stored = await blobNames(id);
+      assert.deepEqual(
+        stored,
+        [done?.storageKey],
+        "el archivo válido sigue referenciado",
+      );
+      ok(
+        "segunda entrega del mismo trabajo: un solo worker genera y el archivo válido se conserva",
+      );
+    }
+
+    // 8) GENERATING abandonado: lo recupera progress() con un intento nuevo; el worker antiguo no pisa nada.
+    {
+      const id = await seed(1);
+      provider.holdNext = true;
+      const callsBefore = provider.calls;
+      await imageService.start(id, user);
+      await until(
+        "la IA tiene el trabajo retenido",
+        async () =>
+          provider.calls === callsBefore + 1 &&
+          (await rows(id))[0]?.status === "GENERATING",
+      );
+      // Se simula que lleva demasiado tiempo sin actividad y que el vencimiento es de 1 s.
+      const previousStale = config.staleGeneratingMs;
+      config.staleGeneratingMs = 1_000;
+      await images.update(
+        { generationId: id },
+        { updatedAt: new Date(Date.now() - 60_000) },
+      );
+      await imageService.progress(id, user);
+      config.staleGeneratingMs = previousStale;
+      const [reopened] = await rows(id);
+      assert.equal(reopened?.attemptNumber, 2, "se abrió un intento nuevo");
+      provider.releaseAll(); // el worker original termina tarde
+      await until(
+        "el intento 2 completado",
+        async () => (await rows(id))[0]?.status === "COMPLETED",
+      );
+      const [done] = await rows(id);
+      assert.equal(done?.attemptNumber, 2);
+      const stored = await blobNames(id);
+      assert.equal(
+        stored.length,
+        1,
+        `solo el archivo del intento 2: ${stored.join(", ")}`,
+      );
+      assert.equal(done?.storageKey, stored[0]);
+      ok(
+        "GENERATING abandonado: se recupera con un intento nuevo y el worker antiguo no pisa nada",
+      );
+    }
+
+    // 9) Consolidaciones concurrentes sobre SQL real: ninguna deja la generación atrás.
+    {
+      const id = await seed(4);
+      await imageService.start(id, user);
+      await until(
+        "las 4 imágenes completadas",
+        async () =>
+          (await generations.findOneBy({ id }))?.status === "COMPLETED",
+      );
+      // Estado obsoleto (como dejaría una consolidación antigua que llegó tarde).
+      await generations.update(
+        { id },
+        { status: "IMAGE_GENERATING", completedImages: 0 },
+      );
+      const consolidate = (
+        imageService as unknown as {
+          consolidate: (generationId: string) => Promise<void>;
+        }
+      ).consolidate.bind(imageService);
+      await Promise.all(Array.from({ length: 24 }, () => consolidate(id)));
+      const after = await generations.findOneBy({ id });
+      assert.equal(after?.status, "COMPLETED");
+      assert.equal(after?.completedImages, 4);
+      // progress() también reconcilia por sí solo.
+      await generations.update({ id }, { status: "IMAGE_GENERATING" });
+      const progress = await imageService.progress(id, user);
+      assert.equal(progress.status, "COMPLETED");
+      ok(
+        "consolidaciones concurrentes (bloqueo real de SQL Server) y reconciliación en progress()",
+      );
+    }
+
+    // 10) Eliminar con un archivo que no se puede borrar: no quedan filas vivas apuntando a archivos perdidos.
+    {
+      const id = await seed(2);
+      await imageService.start(id, user);
+      await until(
+        "las 2 imágenes completadas",
+        async () =>
+          (await generations.findOneBy({ id }))?.status === "COMPLETED",
+      );
+      const before = await blobNames(id);
+      assert.equal(before.length, 2);
+      const realDelete = storage.delete.bind(storage);
+      let failedOnce = false;
+      storage.delete = async (key: string) => {
+        if (!failedOnce) {
+          failedOnce = true;
+          throw new Error("Blob no disponible");
+        }
+        await realDelete(key);
+      };
+      try {
+        await imageService.deleteGeneration(id, user);
+      } finally {
+        storage.delete = realDelete;
+      }
+      assert.equal((await rows(id)).length, 0, "no quedan filas");
+      assert.equal(await generations.findOneBy({ id }), null);
+      const left = await blobNames(id);
+      assert.equal(
+        left.length,
+        1,
+        "queda un archivo huérfano, recuperable por reconciliación",
+      );
+      const reconciler = new PrototypeImageBlobReconciler(storage, images, {
+        ...config,
+        blobReconcile: {
+          mode: "DELETE",
+          intervalMs: 3_600_000,
+          graceMs: 3_600_000,
+          maxDeletesPerRun: 50,
+        },
+      });
+      await reconciler.reconcile(new Date(Date.now() + 2 * 3_600_000));
+      assert.deepEqual(
+        await blobNames(id),
+        [],
+        "el reconciliador limpia el huérfano",
+      );
+      ok(
+        "eliminar con un archivo que falla: la metadata se va primero y el huérfano se reconcilia",
+      );
+    }
+
     console.log(
       `\nIntegración de imágenes de prototipos correcta (${passed.length} escenarios).`,
     );

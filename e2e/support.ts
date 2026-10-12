@@ -50,3 +50,16 @@ export function trackableProjectRows(page: Page) {
     .filter({ has: page.getByRole("button", { name: "Abrir" }) })
     .filter({ hasNotText: BLOCKED_PROJECT_STATUS });
 }
+
+/**
+ * Exige un proyecto aprobado con plan de trabajo. En CI (`E2E_REQUIRE_APPROVED=1`) existe siempre —el E2E
+ * de API lo deja creado— y su ausencia es un fallo; en un equipo local, donde puede no haberlo, la
+ * prueba se omite. Así una prueba no queda en verde por omitirse sin que nadie lo note.
+ */
+export function requireApprovedProject(available: number, reason: string): void {
+  if (process.env.E2E_REQUIRE_APPROVED === "1") {
+    expect(available, `${reason} (el CI debe dejar un proyecto aprobado)`).toBeGreaterThan(0);
+    return;
+  }
+  test.skip(available === 0, reason);
+}

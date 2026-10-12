@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { requireCredentials, trackableProjectRows } from "./support";
+import { requireApprovedProject, requireCredentials, trackableProjectRows } from "./support";
 
 test.describe("Ejecución", () => {
   test.beforeEach(async ({ page }) => {
@@ -18,7 +18,7 @@ test.describe("Ejecución", () => {
     // Abre un proyecto aprobado (sin aviso de bloqueo); sin ninguno no hay seguimiento que probar.
     await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
     const trackable = trackableProjectRows(page);
-    test.skip((await trackable.count()) === 0, "No hay un proyecto aprobado con plan de trabajo para probar.");
+    requireApprovedProject(await trackable.count(), "No hay un proyecto aprobado con plan de trabajo para probar.");
     await trackable.first().getByRole("button", { name: "Abrir" }).click();
     const summary = page.getByRole("tab", { name: /Resumen de cumplimiento/u });
     const tasks = page.getByRole("tab", { name: /Actividades y tareas/u });
@@ -34,14 +34,14 @@ test.describe("Ejecución", () => {
   test("la checklist de tareas se muestra y marcar queda bloqueado si no hay permisos de edición", async ({ page }) => {
     await expect(page.getByRole("button", { name: "Abrir" }).first()).toBeVisible();
     const trackable = trackableProjectRows(page);
-    test.skip((await trackable.count()) === 0, "No hay un proyecto aprobado con plan de trabajo.");
+    requireApprovedProject(await trackable.count(), "No hay un proyecto aprobado con plan de trabajo.");
     await trackable.first().getByRole("button", { name: "Abrir" }).click();
     const tasksTab = page.getByRole("tab", { name: /Actividades y tareas/u });
     await expect(tasksTab).toBeVisible();
     await tasksTab.click();
     // Solo lectura: nunca se marca nada en esta prueba. Sin tareas en el plan no hay checklist.
     const checklist = page.getByRole("checkbox", { name: /Tarea .* hecha/u }).first();
-    test.skip(!(await checklist.isVisible().catch(() => false)), "El proyecto aprobado no tiene tareas en su plan.");
+    requireApprovedProject((await checklist.isVisible().catch(() => false)) ? 1 : 0, "El proyecto aprobado no tiene tareas en su plan.");
     await expect(checklist).toBeVisible();
   });
 

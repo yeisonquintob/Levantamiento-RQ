@@ -10,6 +10,12 @@ export interface PrototypeImageConfig {
   storageConnectionString: string;
   storageContainer: string;
   maxImageBytes: number;
+  /**
+   * Una imagen en GENERATING que no se actualiza en este tiempo se considera abandonada (worker caído
+   * o trabajo perdido) y se recupera como un reintento nuevo. Debe superar la duración máxima de una
+   * generación para no quitarle el trabajo a un worker que sigue vivo.
+   */
+  staleGeneratingMs: number;
   blobReconcile: {
     /** OFF no hace nada; REPORT solo registra los huérfanos; DELETE los borra. */
     mode: "OFF" | "REPORT" | "DELETE";
@@ -100,6 +106,13 @@ export function loadPrototypeImageConfig(
     ),
     storageConnectionString,
     storageContainer,
+    staleGeneratingMs: integer(
+      environment.PROTOTYPE_IMAGE_STALE_MS,
+      30 * 60_000,
+      60_000,
+      24 * 60 * 60_000,
+      "PROTOTYPE_IMAGE_STALE_MS",
+    ),
     blobReconcile: {
       mode: reconcileMode(environment.PROTOTYPE_BLOB_RECONCILE_MODE),
       intervalMs: integer(
