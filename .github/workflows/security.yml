@@ -113,6 +113,9 @@ jobs:
           format: sarif
           output: trivy-${{ matrix.image }}.sarif
           severity: HIGH,CRITICAL
+          # Con formato SARIF la acción ignora `severity` salvo que se limite expresamente: sin esto
+          # fallaba por avisos MEDIUM (zlib de la base Alpine, sprintf-js sin parche).
+          limit-severities-for-sarif: true
           exit-code: "1"
       # Si el escaneo falla, deja el motivo como anotación legible en el PR: lee el SARIF que generó la
       # propia acción (los registros de GitHub exigen sesión para verse).

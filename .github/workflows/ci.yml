@@ -172,7 +172,17 @@ jobs:
       - name: Integración real de la generación de imágenes (SQL Server, Redis y Azurite)
         run: pnpm test:integration:prototypes
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)
-        run: pnpm test:e2e:v1
+        run: |
+          mkdir -p logs
+          set +e
+          pnpm test:e2e:v1 2>&1 | tee logs/e2e-v1.log
+          exit "${PIPESTATUS[0]}"
+      - name: Resumen del E2E de API
+        if: failure()
+        run: |
+          [ -f logs/e2e-v1.log ] || exit 0
+          summary="$(sed -E 's/\x1b\[[0-9;]*m//g' logs/e2e-v1.log | grep -v '^\s*$' | tail -n 14 | tr '\n' ' ' | cut -c1-1200)"
+          echo "::error title=E2E de API::$summary"
       - name: Datos de prueba para los E2E de interfaz
         run: pnpm documents:editor:e2e:fixture prepare ci
       - name: E2E de interfaz con sesión real
