@@ -6,9 +6,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig*.json ./
 COPY apps ./apps
 COPY libs ./libs
 ARG APP_NAME
-RUN test -n "$APP_NAME" && pnpm install --frozen-lockfile && pnpm nx build "$APP_NAME" --skip-nx-cache && pnpm prune --prod
+RUN test -n "$APP_NAME" && pnpm install --frozen-lockfile && pnpm nx build "$APP_NAME" --skip-nx-cache && CI=true pnpm prune --prod
 
 FROM node:24-alpine AS runtime
+# La imagen solo ejecuta `node`: npm, npx y corepack no se usan y sus dependencias internas
+# (brace-expansion, tar, undici...) generaban avisos de Trivy ajenos al proyecto.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 WORKDIR /app
 ARG APP_NAME
