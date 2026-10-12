@@ -55,6 +55,10 @@ jobs:
       - name: Lint, typecheck y build completos
         if: github.event_name != 'pull_request'
         run: pnpm lint:all && pnpm typecheck:projects && pnpm build:all
+      # Las pruebas importan las librerías compartidas ya compiladas (dist). En un PR solo se construye
+      # lo afectado, así que se garantizan siempre (con la caché de Nx son instantáneas si no cambiaron).
+      - name: Construir las librerías compartidas
+        run: pnpm nx run-many --target=build --projects='shared-*' --parallel=3
       - run: pnpm test:unit
       - run: pnpm test:web
       - run: pnpm test:events
