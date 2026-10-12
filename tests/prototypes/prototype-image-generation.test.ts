@@ -79,7 +79,7 @@ function harness(
   const images: any[] = [];
   const jobs: any[] = [];
   const uploads: any[] = [];
-  const generationRepo = {
+  const generationRepo: any = {
     findOne: async ({ where }: any) =>
       where.requestedByUserId && where.requestedByUserId !== owner
         ? null
@@ -88,15 +88,32 @@ function harness(
     findOneBy: async (where: any) =>
       where.id === undefined || where.id === generation.id ? generation : null,
     save: async (value: any) => value,
+    delete: async () => ({ affected: 1 }),
     update: async (where: any, partial: any) => {
       if (where.id !== undefined && where.id !== generation.id)
         return { affected: 0 };
       Object.assign(generation, partial);
       return { affected: 1 };
     },
+    // Fiel a TypeORM: la consolidación abre una transacción y trabaja con los repositorios del manager.
+    manager: {
+      transaction: async (work: (manager: unknown) => Promise<unknown>) =>
+        work({
+          getRepository: (entity: { name: string }) =>
+            entity.name === "PrototypeGenerationEntity"
+              ? generationRepo
+              : imageRepo,
+        }),
+    },
   };
   const imageRepo = {
     create: (value: any) => value,
+    delete: async (where: any) => {
+      for (let index = images.length - 1; index >= 0; index -= 1)
+        if (images[index].generationId === where.generationId)
+          images.splice(index, 1);
+      return { affected: 1 };
+    },
     save: async (value: any) => {
       for (const item of Array.isArray(value) ? value : [value])
         if (!images.includes(item)) images.push(item);
@@ -128,6 +145,10 @@ function harness(
           item.id === where.id &&
           (where.attemptNumber === undefined ||
             item.attemptNumber === where.attemptNumber) &&
+          // uniqueidentifier: SQL Server compara los GUID sin distinguir mayúsculas.
+          (where.correlationId === undefined ||
+            String(item.correlationId).toLowerCase() ===
+              String(where.correlationId).toLowerCase()) &&
           (statuses === null || statuses.includes(item.status)),
       );
       if (!image) return { affected: 0 };
@@ -139,11 +160,13 @@ function harness(
     },
   };
   const specificationRepo = {
+    delete: async () => ({ affected: 1 }),
     find: async () => specifications,
     findOne: async ({ where }: any) =>
       specifications.find((item) => item.id === where.id) ?? null,
   };
   const screenRepo = {
+    delete: async () => ({ affected: 1 }),
     find: async () => screens,
     findByIds: async (ids: string[]) =>
       screens.filter((item) => ids.includes(item.id)),
@@ -188,7 +211,7 @@ function harness(
     new PrototypeImagePromptBuilder(),
     new PrototypeImageSizeMapper(),
     storage as never,
-    { maxImageBytes: 1_000_000 } as never,
+    { maxImageBytes: 1_000_000, staleGeneratingMs: 60_000 } as never,
   );
   return {
     service,
@@ -860,14 +883,151 @@ test("si el intento se pierde mientras se sube el archivo, el archivo nuevo se b
   assert.equal(value.images.length, 0);
 });
 
-test("un trabajo detenido por un reinicio (GENERATING del mismo intento) se retoma", async () => {
+test("una segunda entrega del mismo trabajo no genera ni sube nada ni borra el archivo del primero", async () => {
+  const slow = slowProvider();
+  let calls = 0;
+  const counting: PrototypeImageProvider = {
+    generate: async (request) => {
+      calls += 1;
+      return slow.provider.generate(request);
+    },
+  };
+  const value = harness(1, "WEB", counting);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const first = value.service.process(job, 1, 3);
+  await settle();
+  assert.equal(value.images[0].status, "GENERATING");
+  // BullMQ vuelve a entregar el mismo trabajo (lock perdido, «stalled» o segunda réplica).
+  await value.service.process(job, 1, 3);
+  assert.equal(calls, 1, "solo el primer worker llama a la IA");
+  slow.release();
+  await first;
+  assert.equal(value.images[0].status, "COMPLETED");
+  assert.equal(value.uploads.length, 1);
+  assert.deepEqual(
+    value.deleted,
+    [],
+    "el segundo worker no borra el archivo válido del primero",
+  );
+});
+
+test("un GENERATING sin dueño no lo reclama otro worker: lo recupera progress() con un intento nuevo", async () => {
   const value = harness(1, "WEB");
   await value.service.start(value.generation.id, owner);
   const job = { ...value.jobs[0], attemptNumber: 1 };
-  value.images[0].status = "GENERATING";
+  // Un worker que murió dejó la imagen en GENERATING.
+  Object.assign(value.images[0], {
+    status: "GENERATING",
+    correlationId: "worker-muerto",
+  });
   await value.service.process(job, 1, 3);
+  assert.equal(value.images[0].status, "GENERATING", "no se reclama");
+  assert.equal(value.uploads.length, 0);
+
+  // Aún dentro del vencimiento: no se toca.
+  await value.service.progress(value.generation.id, owner);
+  assert.equal(value.images[0].attemptNumber, 1);
+  assert.equal(value.images[0].status, "GENERATING");
+
+  // Pasado el vencimiento se reabre como intento nuevo y se vuelve a encolar.
+  value.images[0].updatedAt = new Date(Date.now() - 120_000);
+  await value.service.progress(value.generation.id, owner);
+  assert.equal(value.images[0].status, "PENDING");
+  assert.equal(value.images[0].attemptNumber, 2);
+  assert.equal(value.images[0].correlationId, null);
+  assert.equal(value.jobs.at(-1).attemptNumber, 2);
+
+  await value.service.process(value.jobs.at(-1), 1, 3);
+  assert.equal(value.images[0].status, "COMPLETED");
+  assert.match(value.images[0].storageKey, /-v2\.png$/u);
+});
+
+test("si el worker original sigue vivo tras la recuperación, no sube nada ni pisa el intento nuevo", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const original = value.service.process(job, 1, 3);
+  await settle();
+  value.images[0].updatedAt = new Date(Date.now() - 120_000);
+  await value.service.progress(value.generation.id, owner);
+  assert.equal(value.images[0].attemptNumber, 2);
+  slow.release();
+  await original;
+  assert.equal(value.uploads.length, 0, "el dueño anterior ya no sube");
+  assert.equal(value.images[0].status, "PENDING");
+  assert.equal(value.images[0].attemptNumber, 2);
+});
+
+test("un worker que perdió la reclamación (otro token) no completa ni sube", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const running = value.service.process(job, 1, 3);
+  await settle();
+  value.images[0].correlationId = "otro-worker";
+  slow.release();
+  await running;
+  assert.equal(value.uploads.length, 0);
+  assert.equal(value.images[0].status, "GENERATING");
+  assert.equal(value.images[0].correlationId, "otro-worker");
+});
+
+test("el token de la reclamación se reconoce aunque SQL Server lo devuelva en mayúsculas (uniqueidentifier)", async () => {
+  const slow = slowProvider();
+  const value = harness(1, "WEB", slow.provider);
+  await value.service.start(value.generation.id, owner);
+  const job = { ...value.jobs[0], attemptNumber: 1 };
+  const running = value.service.process(job, 1, 3);
+  await settle();
+  // El motor guarda el GUID y lo devuelve en mayúsculas: sigue siendo el mismo token.
+  value.images[0].correlationId = value.images[0].correlationId.toUpperCase();
+  slow.release();
+  await running;
   assert.equal(value.images[0].status, "COMPLETED");
   assert.equal(value.uploads.length, 1);
+});
+
+test("progress() reconcilia una generación que quedó en IMAGE_GENERATING con todas las imágenes terminadas", async () => {
+  const value = harness(1, "WEB");
+  await value.service.start(value.generation.id, owner);
+  await value.service.process({ ...value.jobs[0], attemptNumber: 1 }, 1, 3);
+  // Una consolidación antigua llegó tarde y revirtió el estado.
+  Object.assign(value.generation, { status: "IMAGE_GENERATING" });
+  const progress = await value.service.progress(value.generation.id, owner);
+  assert.equal(progress.status, "COMPLETED");
+  assert.equal(value.generation.status, "COMPLETED");
+});
+
+test("eliminar: la metadata se borra primero y un archivo que no se puede borrar no aborta ni deja filas vivas", async () => {
+  const value = harness(2, "WEB");
+  await value.service.start(value.generation.id, owner);
+  for (const job of [...value.jobs])
+    await value.service.process({ ...job, attemptNumber: 1 }, 1, 3);
+  assert.ok(value.uploads.length >= 2);
+  const storage = (
+    value.service as never as {
+      storage: { delete: (key: string) => Promise<void> };
+    }
+  ).storage;
+  const attempted: string[] = [];
+  storage.delete = async (key) => {
+    attempted.push(key);
+    if (attempted.length === 1) throw new Error("Blob no disponible");
+  };
+  const result = await value.service.deleteGeneration(
+    value.generation.id,
+    owner,
+  );
+  assert.equal(result.deleted, true);
+  assert.equal(value.images.length, 0, "no quedan filas apuntando a archivos");
+  assert.equal(
+    attempted.length,
+    value.uploads.length,
+    "se intentan todos los archivos aunque uno falle",
+  );
 });
 
 test("si SQL falla al registrar una importación, el archivo subido se borra", async () => {
