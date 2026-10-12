@@ -52,7 +52,7 @@ jobs:
           upload-artifact: true
 
   # Una imagen por aplicación desplegable (las mismas del parámetro `workloads` de Bicep).
-  # Prototypes queda fuera mientras no forme parte del cierre técnico de la V1.
+  # prototypes-service forma parte de la matriz: se construye y se escanea con Trivy como el resto.
   container:
     name: Contenedor ${{ matrix.image }}
     runs-on: ubuntu-latest

@@ -77,6 +77,7 @@ function harness(
       updatedAt: new Date(),
     }));
   const images: any[] = [];
+  const state = { generationExists: true };
   const jobs: any[] = [];
   const uploads: any[] = [];
   const generationRepo: any = {
@@ -88,22 +89,46 @@ function harness(
     findOneBy: async (where: any) =>
       where.id === undefined || where.id === generation.id ? generation : null,
     save: async (value: any) => value,
-    delete: async () => ({ affected: 1 }),
+    delete: async () => {
+      state.generationExists = false;
+      return { affected: 1 };
+    },
     update: async (where: any, partial: any) => {
       if (where.id !== undefined && where.id !== generation.id)
         return { affected: 0 };
       Object.assign(generation, partial);
       return { affected: 1 };
     },
-    // Fiel a TypeORM: la consolidación abre una transacción y trabaja con los repositorios del manager.
+    // Fiel a TypeORM: abre una transacción con los repositorios del manager y, si algo lanza, la revierte.
     manager: {
-      transaction: async (work: (manager: unknown) => Promise<unknown>) =>
-        work({
-          getRepository: (entity: { name: string }) =>
-            entity.name === "PrototypeGenerationEntity"
-              ? generationRepo
-              : imageRepo,
-        }),
+      transaction: async (work: (manager: unknown) => Promise<unknown>) => {
+        const snapshot = {
+          images: [...images],
+          specifications: [...specifications],
+          screens: [...screens],
+          generationExists: state.generationExists,
+        };
+        try {
+          return await work({
+            getRepository: (entity: { name: string }) =>
+              ({
+                PrototypeGenerationEntity: generationRepo,
+                PrototypeVisualSpecificationEntity: specificationRepo,
+                PrototypeScreenEntity: screenRepo,
+              })[entity.name] ?? imageRepo,
+          });
+        } catch (error) {
+          images.splice(0, images.length, ...snapshot.images);
+          specifications.splice(
+            0,
+            specifications.length,
+            ...snapshot.specifications,
+          );
+          screens.splice(0, screens.length, ...snapshot.screens);
+          state.generationExists = snapshot.generationExists;
+          throw error;
+        }
+      },
     },
   };
   const imageRepo = {
@@ -160,13 +185,23 @@ function harness(
     },
   };
   const specificationRepo = {
-    delete: async () => ({ affected: 1 }),
+    delete: async (where: any) => {
+      for (let index = specifications.length - 1; index >= 0; index -= 1)
+        if (specifications[index].generationId === where.generationId)
+          specifications.splice(index, 1);
+      return { affected: 1 };
+    },
     find: async () => specifications,
     findOne: async ({ where }: any) =>
       specifications.find((item) => item.id === where.id) ?? null,
   };
   const screenRepo = {
-    delete: async () => ({ affected: 1 }),
+    delete: async (where: any) => {
+      for (let index = screens.length - 1; index >= 0; index -= 1)
+        if (screens[index].generationId === where.generationId)
+          screens.splice(index, 1);
+      return { affected: 1 };
+    },
     find: async () => screens,
     findByIds: async (ids: string[]) =>
       screens.filter((item) => ids.includes(item.id)),
@@ -217,6 +252,8 @@ function harness(
     service,
     generation,
     specifications,
+    screens,
+    state,
     images,
     jobs,
     uploads,
@@ -1028,6 +1065,46 @@ test("eliminar: la metadata se borra primero y un archivo que no se puede borrar
     value.uploads.length,
     "se intentan todos los archivos aunque uno falle",
   );
+});
+
+test("eliminar: si falla un borrado SQL, la transacción se revierte y no se toca ningún archivo", async () => {
+  const value = harness(2, "WEB");
+  await value.service.start(value.generation.id, owner);
+  for (const job of [...value.jobs])
+    await value.service.process({ ...job, attemptNumber: 1 }, 1, 3);
+  const before = {
+    images: value.images.length,
+    specifications: value.specifications.length,
+    screens: value.screens.length,
+  };
+  assert.ok(before.images > 0 && before.specifications > 0);
+  const internals = value.service as never as {
+    specifications: { delete: (where: unknown) => Promise<unknown> };
+    storage: { delete: (key: string) => Promise<void> };
+  };
+  // Las imágenes ya se borraron dentro de la transacción cuando falla la eliminación de especificaciones.
+  const original = internals.specifications.delete;
+  internals.specifications.delete = async () => {
+    throw new Error("SQL no disponible");
+  };
+  const attempted: string[] = [];
+  internals.storage.delete = async (key) => {
+    attempted.push(key);
+  };
+  await assert.rejects(
+    value.service.deleteGeneration(value.generation.id, owner),
+    /SQL no disponible/u,
+  );
+  assert.equal(value.images.length, before.images, "imágenes restauradas");
+  assert.equal(
+    value.specifications.length,
+    before.specifications,
+    "especificaciones restauradas",
+  );
+  assert.equal(value.screens.length, before.screens, "pantallas restauradas");
+  assert.equal(value.state.generationExists, true, "la generación sigue");
+  assert.deepEqual(attempted, [], "no se elimina ningún archivo");
+  internals.specifications.delete = original;
 });
 
 test("si SQL falla al registrar una importación, el archivo subido se borra", async () => {
