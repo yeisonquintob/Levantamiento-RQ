@@ -27,7 +27,12 @@ import {
 import { AppModule } from "./app/app.module";
 import { ACCESS_COOKIE, hasCookie, REFRESH_COOKIE } from "./auth/cookies";
 import { loadGatewayConfig } from "./config/gateway-config";
-import { isBrowserMutationAllowed } from "./security/gateway-security";
+import {
+  corsHeadersForAllowedOrigin,
+  hasAccessCredential,
+  isBrowserMutationAllowed,
+  requiresAccessCredential,
+} from "./security/gateway-security";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/gateway/.env"],
@@ -102,13 +107,47 @@ async function bootstrap(): Promise<void> {
           ? correlationHeader[0]
           : correlationHeader) ?? randomUUID();
 
-      await reply.status(403).send({
+      return reply.status(403).send({
         type: "about:blank",
         title: "Solicitud rechazada",
         status: 403,
         detail: "El origen de la solicitud no está autorizado.",
         correlationId,
       });
+    }
+
+    // Sin credencial no se llega a leer el cuerpo: una carga anónima no consume memoria del Gateway.
+    // Los servicios siguen validando la firma del token; esto solo corta el tráfico anónimo a tiempo.
+    const authorizationHeader = request.headers.authorization;
+    if (
+      requiresAccessCredential({
+        method: request.method,
+        url: request.url,
+        globalPrefix: config.globalPrefix,
+      }) &&
+      !hasAccessCredential({
+        cookieHeader,
+        authorization: Array.isArray(authorizationHeader)
+          ? authorizationHeader[0]
+          : authorizationHeader,
+      })
+    ) {
+      const correlationHeader = request.headers["x-correlation-id"];
+      const correlationId =
+        (Array.isArray(correlationHeader)
+          ? correlationHeader[0]
+          : correlationHeader) ?? randomUUID();
+
+      return reply
+        .headers(corsHeadersForAllowedOrigin(origin, config.webOrigins))
+        .status(401)
+        .send({
+          type: "about:blank",
+          title: "Autenticación requerida",
+          status: 401,
+          detail: "Se requiere una sesión válida.",
+          correlationId,
+        });
     }
   });
 

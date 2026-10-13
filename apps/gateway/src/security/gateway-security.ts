@@ -1,3 +1,5 @@
+import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
+
 export interface RateLimitDecision {
   allowed: boolean;
   retryAfterSeconds: number;
@@ -72,4 +74,60 @@ export function isBrowserMutationAllowed(input: {
   if (!input.origin) return !input.hasSessionCookie;
 
   return originAllowed;
+}
+
+/**
+ * Rutas del Gateway que se pueden llamar sin sesión (relativas al prefijo global). El resto exige una
+ * credencial de acceso ANTES de leer el cuerpo de la petición.
+ */
+export const PUBLIC_GATEWAY_ROUTES: readonly string[] = [
+  "health",
+  "auth/register",
+  "auth/sign-in",
+  "auth/refresh",
+  "auth/sign-out",
+  "auth/microsoft/start",
+  "auth/microsoft/callback",
+];
+
+export function requiresAccessCredential(input: {
+  method: string;
+  url: string;
+  globalPrefix: string;
+}): boolean {
+  // La verificación previa de CORS no lleva credenciales.
+  if (input.method.toUpperCase() === "OPTIONS") return false;
+
+  const path = input.url.split("?", 1)[0] ?? "";
+  const prefix = `/${input.globalPrefix.replace(/^\/+|\/+$/gu, "")}/`;
+  // Fuera de la API (por ejemplo /api/docs en desarrollo) no se exige credencial aquí.
+  if (!path.startsWith(prefix)) return false;
+
+  const relative = path.slice(prefix.length).replace(/\/+$/u, "");
+  return !PUBLIC_GATEWAY_ROUTES.includes(relative);
+}
+
+/** Hay una credencial de acceso presente (cookie de sesión o `Authorization: Bearer`); no valida su firma. */
+export function hasAccessCredential(input: {
+  cookieHeader?: string;
+  authorization?: string;
+}): boolean {
+  if (readCookie(input.cookieHeader, ACCESS_COOKIE)) return true;
+  return /^Bearer\s+\S+/iu.test(input.authorization ?? "");
+}
+
+/**
+ * Cabeceras CORS para una respuesta que el Gateway envía antes de que actúe el plugin de CORS (rechazos
+ * tempranos). Sin ellas el navegador no puede leer el 401 y la web no llega a renovar la sesión caducada.
+ */
+export function corsHeadersForAllowedOrigin(
+  origin: string | undefined,
+  webOrigins: readonly string[],
+): Record<string, string> {
+  if (!origin || !webOrigins.includes(origin)) return {};
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-credentials": "true",
+    vary: "Origin",
+  };
 }

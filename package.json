@@ -106,7 +106,7 @@
     "test:workflow": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx --test tests/workflow/*.test.ts",
     "test:structural": "pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:workflow",
     "test:dependencies": "node --import tsx --test tests/dependencies/*.test.ts",
-    "test:unit": "pnpm test:dependencies && pnpm test:auth && pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:prototypes && pnpm test:audit && pnpm test:ai && pnpm test:workflow && pnpm test:operations",
+    "test:unit": "pnpm test:dependencies && pnpm test:auth && pnpm test:gateway && pnpm test:projects && pnpm test:sources && pnpm test:documents && pnpm test:prototypes && pnpm test:audit && pnpm test:ai && pnpm test:workflow && pnpm test:operations",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "typecheck:projects": "nx run-many --target=typecheck --all --parallel=3",
     "typecheck:all": "pnpm typecheck:scripts && pnpm typecheck:projects",
@@ -126,7 +126,9 @@
     "workflow:db:verify": "bash scripts/workflow-database-command.sh verify",
     "workflow:gateway:e2e": "TSX_TSCONFIG_PATH=apps/workflow-service/tsconfig.app.json node --import tsx scripts/workflow-gateway-e2e.ts",
     "workflow:migration:revert": "bash scripts/workflow-database-command.sh migration-revert",
-    "workflow:migration:run": "bash scripts/workflow-database-command.sh migration-run"
+    "workflow:migration:run": "bash scripts/workflow-database-command.sh migration-run",
+    "test:gateway": "TSX_TSCONFIG_PATH=apps/gateway/tsconfig.app.json node --import tsx --test tests/gateway/*.test.ts",
+    "test:exposure": "TSX_TSCONFIG_PATH=tsconfig.scripts.json node --import tsx scripts/exposure-check.ts"
   },
   "private": true,
   "devDependencies": {

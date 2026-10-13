@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  PayloadTooLargeException,
   Body,
   Controller,
   Delete,
@@ -169,6 +170,12 @@ export class SourcesGatewayController {
     @Req() request: RequestLike,
     @Param("projectId") projectId: string,
   ) {
+    // La credencial se exige antes de leer ningún archivo (el Gateway también la corta antes del cuerpo) y se
+    // valida con una consulta ligera al servicio de fuentes: el multipart se lee de forma perezosa, así que
+    // un token inválido o sin acceso al proyecto nunca llega a cargar archivos en la memoria del Gateway.
+    const accessToken = requireAccessToken(request);
+    await this.sources.summary(accessToken, projectId);
+
     if (!request.isMultipart()) {
       throw new BadRequestException("La carga debe usar multipart/form-data.");
     }
@@ -176,19 +183,35 @@ export class SourcesGatewayController {
     const files: GatewayUploadFile[] = [];
     let metadata: string | null = null;
 
-    for await (const part of request.parts()) {
-      if (part.type === "file") {
-        files.push({
-          fileName: part.filename,
-          mediaType: part.mimetype,
-          buffer: await part.toBuffer(),
-        });
-      } else if (
-        part.fieldname === "metadata" &&
-        typeof part.value === "string"
-      ) {
-        metadata = part.value;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          files.push({
+            fileName: part.filename,
+            mediaType: part.mimetype,
+            buffer: await part.toBuffer(),
+          });
+        } else if (
+          part.fieldname === "metadata" &&
+          typeof part.value === "string"
+        ) {
+          metadata = part.value;
+        }
       }
+    } catch (error) {
+      // Los límites de @fastify/multipart (tamaño, número de archivos o de partes) llegan como errores
+      // del servidor HTTP: sin esta traducción el usuario recibía un 500 en vez de un 413.
+      const code = (error as { code?: unknown } | null)?.code;
+      if (
+        code === "FST_REQ_FILE_TOO_LARGE" ||
+        code === "FST_FILES_LIMIT" ||
+        code === "FST_PARTS_LIMIT"
+      ) {
+        throw new PayloadTooLargeException(
+          "La carga supera el tamaño o el número de archivos permitido.",
+        );
+      }
+      throw error;
     }
 
     if (!metadata) {
@@ -197,12 +220,7 @@ export class SourcesGatewayController {
       );
     }
 
-    return this.sources.uploadFiles(
-      requireAccessToken(request),
-      projectId,
-      files,
-      metadata,
-    );
+    return this.sources.uploadFiles(accessToken, projectId, files, metadata);
   }
 
   @ApiOperation({ summary: "Procesar las fuentes seleccionadas" })
