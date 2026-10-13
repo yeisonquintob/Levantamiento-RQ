@@ -1,3 +1,8 @@
+import {
+  verifyAccessJwt,
+  type JwtAccessVerificationConfig,
+} from "@levantamiento-rq/shared-http";
+
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
 
 export interface RateLimitDecision {
@@ -107,13 +112,44 @@ export function requiresAccessCredential(input: {
   return !PUBLIC_GATEWAY_ROUTES.includes(relative);
 }
 
+/**
+ * Token de acceso de la petición, con la misma precedencia que usan los controladores: la cookie de sesión y,
+ * si no hay, el encabezado `Authorization: Bearer`.
+ */
+export function selectAccessToken(input: {
+  cookieHeader?: string;
+  authorization?: string;
+}): string | null {
+  const cookieToken = readCookie(input.cookieHeader, ACCESS_COOKIE);
+  if (cookieToken) return cookieToken;
+  return /^Bearer\s+(.+)$/iu.exec(input.authorization ?? "")?.[1] ?? null;
+}
+
 /** Hay una credencial de acceso presente (cookie de sesión o `Authorization: Bearer`); no valida su firma. */
 export function hasAccessCredential(input: {
   cookieHeader?: string;
   authorization?: string;
 }): boolean {
-  if (readCookie(input.cookieHeader, ACCESS_COOKIE)) return true;
-  return /^Bearer\s+\S+/iu.test(input.authorization ?? "");
+  return selectAccessToken(input) !== null;
+}
+
+/**
+ * Comprueba la firma, el emisor, la audiencia y el vencimiento del token con las mismas reglas que los
+ * servicios. Sin JWKS configurado (solo fuera de producción) no hay con qué verificar y se acepta: en ese caso
+ * únicamente se exige que haya credencial. Un token aceptado aquí puede ser rechazado después por el servicio
+ * (por ejemplo, por cambio de contraseña pendiente): esto solo evita leer el cuerpo de quien no tiene ninguna.
+ */
+export async function acceptsAccessToken(
+  token: string,
+  verification: JwtAccessVerificationConfig | null,
+): Promise<boolean> {
+  if (!verification) return true;
+  try {
+    await verifyAccessJwt(token, verification);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

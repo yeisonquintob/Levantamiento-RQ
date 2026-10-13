@@ -159,6 +159,18 @@ export class SourcesService {
     return this.toDetail(await this.sources.save(source));
   }
 
+  /**
+   * Comprobación ligera previa a la carga: exige el MISMO permiso que `uploadFiles` (gestionar el proyecto).
+   * El Gateway la usa antes de leer los archivos, para no cargar en memoria el envío de quien no podrá subirlo.
+   */
+  async requireUploadAccess(
+    actor: AuthenticatedUser,
+    accessToken: string,
+    projectId: string,
+  ): Promise<void> {
+    await this.projectAccess.requireManage(projectId, accessToken, actor);
+  }
+
   async uploadFiles(
     actor: AuthenticatedUser,
     accessToken: string,

@@ -83,6 +83,28 @@ export class SourcesController {
     );
   }
 
+  @ApiOperation({
+    summary: "Comprobar que el usuario puede cargar archivos en el proyecto",
+    description:
+      "Validación ligera previa al envío: exige el mismo permiso de gestión que la carga de archivos.",
+  })
+  @ApiParam({ name: "projectId", format: "uuid" })
+  @Get("upload-access")
+  async uploadAccess(
+    @Req() request: SourcesRequest,
+    @Param("projectId") projectId: string,
+  ) {
+    const context = requireContext(request);
+
+    await this.sources.requireUploadAccess(
+      context.actor,
+      context.accessToken,
+      parseProjectId(projectId),
+    );
+
+    return { allowed: true };
+  }
+
   @ApiOperation({ summary: "Listar fuentes del proyecto" })
   @ApiParam({ name: "projectId", format: "uuid" })
   @Get()

@@ -156,14 +156,32 @@ async function readContract(
   return document.paths ?? {};
 }
 
+/**
+ * Servicios a comprobar. `EXPOSURE_SERVICES` limita la lista, pero un nombre desconocido (o una lista vacía)
+ * es un error: antes se ignoraba y el script terminaba «con éxito» sin haber comprobado ninguna ruta.
+ */
+function selectTargets(requested: string | undefined): readonly Target[] {
+  if (requested === undefined) return TARGETS;
+  const names = requested.split(/\s+/u).filter(Boolean);
+  const known = TARGETS.map((target) => target.name);
+  const unknown = names.filter((name) => !known.includes(name));
+  if (names.length === 0 || unknown.length > 0) {
+    throw new Error(
+      names.length === 0
+        ? `EXPOSURE_SERVICES está vacío. Servicios válidos: ${known.join(", ")}.`
+        : `EXPOSURE_SERVICES contiene servicios desconocidos: ${unknown.join(", ")}. Servicios válidos: ${known.join(", ")}.`,
+    );
+  }
+  return TARGETS.filter((target) => names.includes(target.name));
+}
+
 async function main(): Promise<void> {
+  const targets = selectTargets(process.env.EXPOSURE_SERVICES);
   const exposed: string[] = [];
   let routes = 0;
   let requests = 0;
-  const only = process.env.EXPOSURE_SERVICES?.split(/\s+/u).filter(Boolean);
 
-  for (const target of TARGETS) {
-    if (only && !only.includes(target.name)) continue;
+  for (const target of targets) {
     const paths = await readContract(target);
     let count = 0;
     for (const [rawPath, operations] of Object.entries(paths)) {
@@ -199,6 +217,12 @@ async function main(): Promise<void> {
   }
 
   console.log(`Exposición: ${routes} rutas, ${requests} peticiones anónimas.`);
+  // Una comprobación que no probó nada no puede darse por buena.
+  if (routes === 0 || requests === 0) {
+    console.error("No se comprobó ninguna ruta: el resultado no es válido.");
+    process.exitCode = 1;
+    return;
+  }
   if (exposed.length) {
     console.error(
       `\nRutas que NO rechazan una petición sin sesión (${exposed.length}):`,

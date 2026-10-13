@@ -2,6 +2,10 @@ import {
   loadBaseServiceConfig,
   type BaseServiceConfig,
 } from "@levantamiento-rq/shared-config";
+import {
+  requiredPublicJwks,
+  type JwtAccessVerificationConfig,
+} from "@levantamiento-rq/shared-http";
 
 export const GATEWAY_CONFIG = Symbol("GATEWAY_CONFIG");
 
@@ -30,6 +34,11 @@ export interface GatewayConfig extends BaseServiceConfig {
   sourcesMaxFilesPerUpload: number;
   sourcesMaxBatchBytes: number;
   cookieSecure: boolean;
+  /**
+   * Verificación de la firma del token de acceso ANTES de leer el cuerpo de la petición. Es `null` cuando no hay
+   * JWKS configurado (solo permitido fuera de producción): entonces únicamente se exige que haya credencial.
+   */
+  accessTokenVerification: JwtAccessVerificationConfig | null;
   authSignInRateLimit: number;
   authSignInRateWindowSeconds: number;
   rateLimitRedisHost: string;
@@ -156,6 +165,37 @@ function readInteger(
   }
 
   return resolved;
+}
+
+function readAccessTokenVerification(
+  environment: NodeJS.ProcessEnv,
+  isProduction: boolean,
+): JwtAccessVerificationConfig | null {
+  const configured = environment.JWT_ACCESS_PUBLIC_JWKS_BASE64?.trim();
+
+  if (!configured) {
+    if (isProduction) {
+      throw new Error(
+        "JWT_ACCESS_PUBLIC_JWKS_BASE64 es obligatorio en producción: el Gateway verifica el token antes de leer el cuerpo.",
+      );
+    }
+    return null;
+  }
+
+  return {
+    // Mismos valores por defecto que los servicios: un token solo es válido si lo emitió Identity.
+    issuer: readText(
+      environment.JWT_ISSUER,
+      "levantamiento-rq-identity",
+      "JWT_ISSUER",
+    ),
+    audience: readText(
+      environment.JWT_AUDIENCE,
+      "levantamiento-rq",
+      "JWT_AUDIENCE",
+    ),
+    publicJwks: requiredPublicJwks(configured),
+  };
 }
 
 export function loadGatewayConfig(
@@ -324,6 +364,10 @@ export function loadGatewayConfig(
       "SOURCES_MAX_BATCH_BYTES",
     ),
     cookieSecure,
+    accessTokenVerification: readAccessTokenVerification(
+      environment,
+      baseConfig.environment === "production",
+    ),
     authSignInRateLimit: readInteger(
       environment.AUTH_SIGN_IN_RATE_LIMIT,
       10,

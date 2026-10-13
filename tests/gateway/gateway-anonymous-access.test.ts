@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Readable } from "node:stream";
 import { test } from "node:test";
 
 import {
@@ -10,6 +11,7 @@ import {
 import { SourcesGatewayController } from "../../apps/gateway/src/sources/sources-gateway.controller";
 
 const prefix = "v1";
+const UPLOAD_CONFIG = { sourcesMaxBatchBytes: 100 * 1024 * 1024 } as never;
 
 /** El error es una excepción HTTP de Nest con ese código (se compara el estado: hay copias de @nestjs/common). */
 function httpStatus(expected: number) {
@@ -91,7 +93,7 @@ function uploadRequest(options: { cookie?: string; failWith?: unknown }) {
         type: "file" as const,
         filename: "a.txt",
         mimetype: "text/plain",
-        toBuffer: async () => Buffer.from("hola"),
+        file: Readable.from([Buffer.from("hola")]),
       };
       yield {
         type: "field" as const,
@@ -104,9 +106,10 @@ function uploadRequest(options: { cookie?: string; failWith?: unknown }) {
 }
 
 test("la subida de fuentes exige la sesión antes de leer ningún archivo", async () => {
-  const controller = new SourcesGatewayController({
-    summary: async () => ({}),
-  } as never);
+  const controller = new SourcesGatewayController(
+    { uploadAccess: async () => ({ allowed: true }) } as never,
+    UPLOAD_CONFIG,
+  );
   const { request, state } = uploadRequest({});
 
   await assert.rejects(
@@ -117,9 +120,10 @@ test("la subida de fuentes exige la sesión antes de leer ningún archivo", asyn
 });
 
 test("la subida de fuentes devuelve 413 cuando se superan los límites de tamaño", async () => {
-  const controller = new SourcesGatewayController({
-    summary: async () => ({}),
-  } as never);
+  const controller = new SourcesGatewayController(
+    { uploadAccess: async () => ({ allowed: true }) } as never,
+    UPLOAD_CONFIG,
+  );
 
   for (const code of [
     "FST_REQ_FILE_TOO_LARGE",
@@ -139,9 +143,10 @@ test("la subida de fuentes devuelve 413 cuando se superan los límites de tamañ
 });
 
 test("un error inesperado al leer la subida no se disfraza de 413", async () => {
-  const controller = new SourcesGatewayController({
-    summary: async () => ({}),
-  } as never);
+  const controller = new SourcesGatewayController(
+    { uploadAccess: async () => ({ allowed: true }) } as never,
+    UPLOAD_CONFIG,
+  );
   const { request } = uploadRequest({
     cookie: "rq_access=token",
     failWith: new Error("disco lleno"),
@@ -155,13 +160,16 @@ test("un error inesperado al leer la subida no se disfraza de 413", async () => 
 
 test("con sesión, los archivos se entregan al servicio de fuentes con el token", async () => {
   const received: unknown[] = [];
-  const controller = new SourcesGatewayController({
-    summary: async () => ({}),
-    uploadFiles: async (...args: unknown[]) => {
-      received.push(args);
-      return { ok: true };
-    },
-  } as never);
+  const controller = new SourcesGatewayController(
+    {
+      uploadAccess: async () => ({ allowed: true }),
+      uploadFiles: async (...args: unknown[]) => {
+        received.push(args);
+        return { ok: true };
+      },
+    } as never,
+    UPLOAD_CONFIG,
+  );
   const { request } = uploadRequest({ cookie: "rq_access=token-123" });
 
   const result = await controller.uploadFiles(request as never, "proyecto-1");
@@ -179,13 +187,16 @@ test("con sesión, los archivos se entregan al servicio de fuentes con el token"
 });
 
 test("un token que el servicio rechaza no llega a cargar archivos en el Gateway", async () => {
-  const controller = new SourcesGatewayController({
-    summary: async () => {
-      throw Object.assign(new Error("token inválido"), {
-        getStatus: () => 401,
-      });
-    },
-  } as never);
+  const controller = new SourcesGatewayController(
+    {
+      uploadAccess: async () => {
+        throw Object.assign(new Error("token inválido"), {
+          getStatus: () => 401,
+        });
+      },
+    } as never,
+    UPLOAD_CONFIG,
+  );
   const { request, state } = uploadRequest({ cookie: "rq_access=basura" });
 
   await assert.rejects(
