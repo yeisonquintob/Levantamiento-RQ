@@ -88,6 +88,18 @@ export class SourcesClientService {
     );
   }
 
+  /** Valida, con el permiso de gestión que exige la carga, que el usuario puede subir archivos al proyecto. */
+  uploadAccess(
+    accessToken: string,
+    projectId: string,
+  ): Promise<{ allowed: true }> {
+    return this.request<{ allowed: true }>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sources/upload-access`,
+      "GET",
+      accessToken,
+    );
+  }
+
   summary(accessToken: string, projectId: string): Promise<SourceMetrics> {
     return this.request<SourceMetrics>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/sources/summary`,

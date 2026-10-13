@@ -16,7 +16,11 @@ param workloads = [
     healthPath: '/api/v1/health/ready'
     minReplicas: 1
     maxReplicas: 5
-    env: []
+    // Claves públicas de Identity (no es un secreto; el mismo valor que usan los servicios): el Gateway verifica
+    // el token antes de leer el cuerpo de la petición y en producción no arranca sin ellas.
+    env: [
+      { name: 'JWT_ACCESS_PUBLIC_JWKS_BASE64', value: '<claves-publicas-jwks-en-base64>' }
+    ]
     keyVaultSecrets: []
   }
   {

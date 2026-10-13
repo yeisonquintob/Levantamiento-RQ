@@ -895,3 +895,39 @@ test("el procesamiento publica progreso real y la UI lo conserva entre pestañas
 
   assert.match(workspace, /document\.visibilityState/);
 });
+
+test("la comprobación previa de carga exige el permiso de gestión (el de la carga), no el de lectura", async () => {
+  const calls: string[] = [];
+  const projectAccess = {
+    requireManage: async (projectId: string) => {
+      calls.push(`manage:${projectId}`);
+      if (projectId === "solo-lectura") {
+        throw Object.assign(new Error("sin permiso de gestión"), {
+          getStatus: () => 403,
+        });
+      }
+    },
+    requireRead: async () => {
+      calls.push("read");
+    },
+  };
+  const service = new SourcesService(
+    {} as never,
+    projectAccess as never,
+    {} as never,
+    {} as never,
+    { maxFileBytes: 1024, maxFilesPerUpload: 20, maxBatchBytes: 2048 } as never,
+  );
+  const actor = { id: "u1" } as never;
+
+  await service.requireUploadAccess(actor, "token", "proyecto-gestionable");
+  await assert.rejects(
+    service.requireUploadAccess(actor, "token", "solo-lectura"),
+    /sin permiso de gestión/u,
+  );
+
+  assert.deepEqual(calls, [
+    "manage:proyecto-gestionable",
+    "manage:solo-lectura",
+  ]);
+});

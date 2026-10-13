@@ -14,6 +14,8 @@ SUITES=(
   "operations|apps/operations-service/tsconfig.app.json|apps/operations-service/src/**/*.ts|80|tests/operations/*.test.ts"
   "prototypes|apps/prototypes-service/tsconfig.app.json|apps/prototypes-service/src/**/*.ts|85|tests/prototypes/*.test.ts"
   "ai-analysis|apps/ai-analysis-service/tsconfig.app.json|apps/ai-analysis-service/src/**/*.ts|80|tests/ai-analysis/*.test.ts"
+  "documents|apps/documents-service/tsconfig.app.json|apps/documents-service/src/**/*.ts|80|tests/documents/*.test.ts*"
+  "gateway|apps/gateway/tsconfig.app.json|apps/gateway/src/**/*.ts|90|tests/gateway/*.test.ts tests/identity/gateway-security.test.ts tests/identity/http-error-forwarding.test.ts"
 )
 
 selected=("$@")

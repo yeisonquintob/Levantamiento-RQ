@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  Inject,
+  PayloadTooLargeException,
   Body,
   Controller,
   Delete,
@@ -33,6 +35,7 @@ import type {
 } from "@levantamiento-rq/shared-contracts";
 
 import { ACCESS_COOKIE, readCookie } from "../auth/cookies";
+import { GATEWAY_CONFIG, type GatewayConfig } from "../config/gateway-config";
 import {
   type GatewayUploadFile,
   SourcesClientService,
@@ -85,7 +88,10 @@ function attachmentDisposition(fileName: string): string {
 @ApiBearerAuth()
 @Controller("projects/:projectId/sources")
 export class SourcesGatewayController {
-  constructor(private readonly sources: SourcesClientService) {}
+  constructor(
+    private readonly sources: SourcesClientService,
+    @Inject(GATEWAY_CONFIG) private readonly config: GatewayConfig,
+  ) {}
 
   @ApiOperation({ summary: "Consultar indicadores de fuentes" })
   @ApiParam({ name: "projectId", format: "uuid" })
@@ -169,26 +175,61 @@ export class SourcesGatewayController {
     @Req() request: RequestLike,
     @Param("projectId") projectId: string,
   ) {
+    // La credencial se exige antes de leer ningún archivo (el Gateway también corta antes del cuerpo las
+    // peticiones sin credencial) y se comprueba con una consulta ligera al servicio de fuentes que el usuario
+    // PUEDE subir archivos a este proyecto (permiso de gestión, el mismo de la carga): el multipart se lee de
+    // forma perezosa, así que quien no tiene acceso o permiso nunca llega a cargar archivos en el Gateway.
+    const accessToken = requireAccessToken(request);
+    await this.sources.uploadAccess(accessToken, projectId);
+
     if (!request.isMultipart()) {
       throw new BadRequestException("La carga debe usar multipart/form-data.");
     }
 
     const files: GatewayUploadFile[] = [];
     let metadata: string | null = null;
+    // Bytes de archivo ya retenidos: el límite total del lote se aplica MIENTRAS se lee, no al final.
+    let receivedBytes = 0;
 
-    for await (const part of request.parts()) {
-      if (part.type === "file") {
-        files.push({
-          fileName: part.filename,
-          mediaType: part.mimetype,
-          buffer: await part.toBuffer(),
-        });
-      } else if (
-        part.fieldname === "metadata" &&
-        typeof part.value === "string"
-      ) {
-        metadata = part.value;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file as AsyncIterable<Buffer>) {
+            receivedBytes += chunk.length;
+            if (receivedBytes > this.config.sourcesMaxBatchBytes) {
+              throw new PayloadTooLargeException(
+                "El tamaño total de la carga supera el límite permitido.",
+              );
+            }
+            chunks.push(chunk);
+          }
+          files.push({
+            fileName: part.filename,
+            mediaType: part.mimetype,
+            buffer: Buffer.concat(chunks),
+          });
+        } else if (
+          part.fieldname === "metadata" &&
+          typeof part.value === "string"
+        ) {
+          metadata = part.value;
+        }
       }
+    } catch (error) {
+      // Los límites de @fastify/multipart (tamaño, número de archivos o de partes) llegan como errores
+      // del servidor HTTP: sin esta traducción el usuario recibía un 500 en vez de un 413.
+      const code = (error as { code?: unknown } | null)?.code;
+      if (
+        code === "FST_REQ_FILE_TOO_LARGE" ||
+        code === "FST_FILES_LIMIT" ||
+        code === "FST_PARTS_LIMIT"
+      ) {
+        throw new PayloadTooLargeException(
+          "La carga supera el tamaño o el número de archivos permitido.",
+        );
+      }
+      throw error;
     }
 
     if (!metadata) {
@@ -197,12 +238,7 @@ export class SourcesGatewayController {
       );
     }
 
-    return this.sources.uploadFiles(
-      requireAccessToken(request),
-      projectId,
-      files,
-      metadata,
-    );
+    return this.sources.uploadFiles(accessToken, projectId, files, metadata);
   }
 
   @ApiOperation({ summary: "Procesar las fuentes seleccionadas" })

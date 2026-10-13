@@ -180,6 +180,10 @@ jobs:
           SWAGGER_USE_RUNNING: "1"
           SWAGGER_SERVICES: gateway identity-service projects-service sources-service documents-service ai-analysis-service workflow-service operations-service
         run: pnpm swagger:validate
+      # Cada ruta del Gateway y de los servicios, llamada sin sesión (anónima, token basura y JWT sin firma),
+      # debe responder 401/403. Una ruta nueva sin protección rompe el CI.
+      - name: Exposición - ninguna ruta responde sin sesión válida
+        run: pnpm test:exposure
       - name: Integración real de la generación de imágenes (SQL Server, Redis y Azurite)
         run: pnpm test:integration:prototypes
       - name: E2E de API completo (login, proyecto, documento, exportación, auditoría)

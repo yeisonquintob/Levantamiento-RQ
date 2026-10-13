@@ -27,7 +27,13 @@ import {
 import { AppModule } from "./app/app.module";
 import { ACCESS_COOKIE, hasCookie, REFRESH_COOKIE } from "./auth/cookies";
 import { loadGatewayConfig } from "./config/gateway-config";
-import { isBrowserMutationAllowed } from "./security/gateway-security";
+import {
+  acceptsAccessToken,
+  corsHeadersForAllowedOrigin,
+  isBrowserMutationAllowed,
+  requiresAccessCredential,
+  selectAccessToken,
+} from "./security/gateway-security";
 
 loadEnvironmentFiles({
   paths: [".env", "apps/gateway/.env"],
@@ -102,13 +108,53 @@ async function bootstrap(): Promise<void> {
           ? correlationHeader[0]
           : correlationHeader) ?? randomUUID();
 
-      await reply.status(403).send({
+      return reply.status(403).send({
         type: "about:blank",
         title: "Solicitud rechazada",
         status: 403,
         detail: "El origen de la solicitud no está autorizado.",
         correlationId,
       });
+    }
+
+    // Sin una credencial válida no se llega a leer el cuerpo: una carga anónima, o con un token falso, no consume
+    // memoria del Gateway. Con JWKS configurado se verifica la firma y el vencimiento (las mismas reglas que
+    // los servicios); sin él solo se exige que haya credencial. Los servicios siguen validando por su cuenta.
+    const authorizationHeader = request.headers.authorization;
+    const accessToken = selectAccessToken({
+      cookieHeader,
+      authorization: Array.isArray(authorizationHeader)
+        ? authorizationHeader[0]
+        : authorizationHeader,
+    });
+    if (
+      requiresAccessCredential({
+        method: request.method,
+        url: request.url,
+        globalPrefix: config.globalPrefix,
+      }) &&
+      (!accessToken ||
+        !(await acceptsAccessToken(
+          accessToken,
+          config.accessTokenVerification,
+        )))
+    ) {
+      const correlationHeader = request.headers["x-correlation-id"];
+      const correlationId =
+        (Array.isArray(correlationHeader)
+          ? correlationHeader[0]
+          : correlationHeader) ?? randomUUID();
+
+      return reply
+        .headers(corsHeadersForAllowedOrigin(origin, config.webOrigins))
+        .status(401)
+        .send({
+          type: "about:blank",
+          title: "Autenticación requerida",
+          status: 401,
+          detail: "Se requiere una sesión válida.",
+          correlationId,
+        });
     }
   });
 
@@ -173,6 +219,13 @@ async function bootstrap(): Promise<void> {
         withCredentials: true,
       },
     });
+  }
+
+  if (!config.accessTokenVerification) {
+    Logger.warn(
+      "El Gateway no verifica la firma de los tokens antes de leer el cuerpo: JWT_ACCESS_PUBLIC_JWKS_BASE64 sin configurar (obligatorio en producción).",
+      "Bootstrap",
+    );
   }
 
   app.enableShutdownHooks();

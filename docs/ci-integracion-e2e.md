@@ -26,6 +26,14 @@ El job `integration-e2e` de `.github/workflows/ci.yml` levanta el stack completo
 - Se crea un administrador de prueba con `identity:bootstrap-admin` y se arranca todo con `scripts/local-auth-up.sh`.
 - En CI la web se compila y se sirve en producción (`RQ_WEB_MODE=start`, como en el despliegue). Con el servidor de desarrollo (`nx dev web`, el modo por defecto en local) una recarga de la página a mitad de una prueba reinicia el estado de la pantalla y la prueba falla de forma intermitente. Si una prueba de navegador falla, el paso deja una anotación «Diagnóstico E2E» con la URL final, el texto visible, los errores de consola, las respuestas HTTP fallidas, el número de cargas del documento y los últimos cambios de URL (`e2e/diagnostics.ts`).
 
+## Exposición de endpoints
+
+- `pnpm test:exposure` (`scripts/exposure-check.ts`) lee el contrato OpenAPI de los servicios ya levantados y llama a cada ruta **sin sesión** con tres variantes: sin credenciales, con un token basura y con un JWT sin firma (`alg: none`) que se hace pasar por administrador. Toda ruta no pública debe responder 401/403; si una responde otra cosa, el CI falla.
+- Son públicas solo `health` y el acceso (`auth/sign-in`, `register`, `refresh`, `sign-out`, `microsoft/*`); la lista está en `PUBLIC_GATEWAY_ROUTES` (`apps/gateway/src/security/gateway-security.ts`).
+- El Gateway rechaza con 401, **antes de leer el cuerpo**, las peticiones a rutas no públicas que no traen cookie de acceso ni `Authorization: Bearer`. Con `JWT_ACCESS_PUBLIC_JWKS_BASE64` configurado (obligatorio en producción; `local-auth-up.sh` lo exporta en local y en CI) también verifica la firma, el emisor, la audiencia y el vencimiento del token, así que un `Bearer` inventado tampoco llega a leer el cuerpo. Sin esa variable (solo fuera de producción) únicamente se exige que haya credencial y el arranque lo avisa. Ese 401 lleva cabeceras CORS para los orígenes de la web: sin ellas el navegador no puede leerlo y la web no renueva la sesión caducada (`e2e/session-renewal.spec.ts`).
+- La carga de archivos tiene además un límite total del lote que se aplica mientras se lee (`SOURCES_MAX_BATCH_BYTES`) y una comprobación previa del permiso de gestión del proyecto (`GET /projects/:id/sources/upload-access`) antes de leer ningún archivo; al desplegar, actualiza primero Sources y después el Gateway.
+- Solo ejecutarlo contra un stack desechable: envía escrituras anónimas que deben rechazarse.
+
 ## Credenciales
 
 Contraseña de SQL Server y del usuario E2E se generan en cada ejecución (`openssl rand`), se enmascaran en los registros y no se guardan. El correo es `e2e-admin@example.test`.
