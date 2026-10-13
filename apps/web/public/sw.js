@@ -1,4 +1,4 @@
-const PUBLIC_CACHE = "rq-public-v1";
+const PUBLIC_CACHE = "rq-public-v2";
 const PUBLIC_SHELL = [
   "/favicon.ico",
   "/icons/icon-192.png",
