@@ -637,25 +637,44 @@ export class PrototypeImageGenerationService {
   ): Promise<{ id: string; deleted: true }> {
     await this.requireGeneration(generationId, actorId);
     await this.queue.cancelGeneration(generationId);
-    const images = await this.images.find({ where: { generationId } });
-    const storageKeys = new Set(
-      images.flatMap((image) =>
-        [image.storageKey, image.previousStorageKey].filter(
-          (key): key is string => Boolean(key),
-        ),
-      ),
-    );
-    // Primero la metadata (hijos antes que la generación): si algo falla a medias, la generación sigue
-    // existiendo con sus archivos intactos y se puede volver a eliminar. Un archivo huérfano lo repara el
+    // Toda la metadata (hijos antes que la generación) se elimina en una sola transacción: si cualquier
+    // borrado falla, no queda nada a medias y no se toca ningún archivo. Un archivo huérfano lo repara el
     // reconciliador; una fila viva cuyo archivo ya no existe no se puede reparar.
-    await this.images.delete({ generationId });
-    await this.specifications.delete({ generationId });
-    await this.screens.delete({ generationId });
-    await this.generations.delete({
-      id: generationId,
-      requestedByUserId: actorId,
-    });
-    // Los archivos se limpian después, uno a uno y sin abortar por el fallo de otro.
+    const storageKeys = await this.generations.manager.transaction(
+      async (manager) => {
+        const generation = await manager
+          .getRepository(PrototypeGenerationEntity)
+          .findOne({
+            where: { id: generationId, requestedByUserId: actorId },
+            lock: { mode: "pessimistic_write" },
+          });
+        if (!generation)
+          throw new NotFoundException("La generación de prototipo no existe.");
+        const imageRepository = manager.getRepository(
+          PrototypeGeneratedImageEntity,
+        );
+        const images = await imageRepository.find({ where: { generationId } });
+        const keys = new Set(
+          images.flatMap((image) =>
+            [image.storageKey, image.previousStorageKey].filter(
+              (key): key is string => Boolean(key),
+            ),
+          ),
+        );
+        await imageRepository.delete({ generationId });
+        await manager
+          .getRepository(PrototypeVisualSpecificationEntity)
+          .delete({ generationId });
+        await manager
+          .getRepository(PrototypeScreenEntity)
+          .delete({ generationId });
+        await manager
+          .getRepository(PrototypeGenerationEntity)
+          .delete({ id: generationId, requestedByUserId: actorId });
+        return keys;
+      },
+    );
+    // Solo con la transacción confirmada se limpian los archivos, uno a uno y sin abortar por el fallo de otro.
     for (const key of storageKeys) await this.discardBlob(key);
     return { id: generationId, deleted: true };
   }

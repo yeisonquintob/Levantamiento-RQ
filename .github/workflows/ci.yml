@@ -55,6 +55,10 @@ jobs:
       - name: Lint, typecheck y build completos
         if: github.event_name != 'pull_request'
         run: pnpm lint:all && pnpm typecheck:projects && pnpm build:all
+      # Las pruebas importan las librerías compartidas ya compiladas (dist). En un PR solo se construye
+      # lo afectado, así que se garantizan siempre (con la caché de Nx son instantáneas si no cambiaron).
+      - name: Construir las librerías compartidas
+        run: pnpm nx run-many --target=build --projects='shared-*' --parallel=3
       - run: pnpm test:unit
       - run: pnpm test:web
       - run: pnpm test:events
@@ -163,6 +167,9 @@ jobs:
       - name: Levantar el stack completo (infraestructura, bases, migraciones, servicios y web)
         env:
           RQ_USE_NX_CACHE: "1"
+          # Los E2E de interfaz se ejecutan contra la web compilada (como en el despliegue): el servidor de
+          # desarrollo puede recargar la página a mitad de una prueba y reiniciar el estado de la pantalla.
+          RQ_WEB_MODE: start
         run: bash scripts/ci-stack-up.sh
       - name: Integración con bases de datos (7 servicios y Prototypes), Redis, Azurite y RabbitMQ
         run: pnpm test:integration
