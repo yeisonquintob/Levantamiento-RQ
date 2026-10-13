@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
@@ -126,6 +127,20 @@ test("producción activa Secure por defecto y rechaza su desactivación", () => 
   const environment = {
     NODE_ENV: "production",
     WEB_ORIGINS: "https://app.example.com",
+    // En producción el Gateway exige las claves públicas de Identity para verificar los tokens.
+    JWT_ACCESS_PUBLIC_JWKS_BASE64: Buffer.from(
+      JSON.stringify({
+        keys: [
+          {
+            ...generateKeyPairSync("ed25519").publicKey.export({
+              format: "jwk",
+            }),
+            kid: "gateway-config-test",
+            principal: "identity",
+          },
+        ],
+      }),
+    ).toString("base64"),
   };
 
   assert.equal(loadGatewayConfig(environment).cookieSecure, true);

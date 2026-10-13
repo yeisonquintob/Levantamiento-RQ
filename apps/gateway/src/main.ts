@@ -28,10 +28,11 @@ import { AppModule } from "./app/app.module";
 import { ACCESS_COOKIE, hasCookie, REFRESH_COOKIE } from "./auth/cookies";
 import { loadGatewayConfig } from "./config/gateway-config";
 import {
+  acceptsAccessToken,
   corsHeadersForAllowedOrigin,
-  hasAccessCredential,
   isBrowserMutationAllowed,
   requiresAccessCredential,
+  selectAccessToken,
 } from "./security/gateway-security";
 
 loadEnvironmentFiles({
@@ -116,21 +117,27 @@ async function bootstrap(): Promise<void> {
       });
     }
 
-    // Sin credencial no se llega a leer el cuerpo: una carga anónima no consume memoria del Gateway.
-    // Los servicios siguen validando la firma del token; esto solo corta el tráfico anónimo a tiempo.
+    // Sin una credencial válida no se llega a leer el cuerpo: una carga anónima, o con un token falso, no consume
+    // memoria del Gateway. Con JWKS configurado se verifica la firma y el vencimiento (las mismas reglas que
+    // los servicios); sin él solo se exige que haya credencial. Los servicios siguen validando por su cuenta.
     const authorizationHeader = request.headers.authorization;
+    const accessToken = selectAccessToken({
+      cookieHeader,
+      authorization: Array.isArray(authorizationHeader)
+        ? authorizationHeader[0]
+        : authorizationHeader,
+    });
     if (
       requiresAccessCredential({
         method: request.method,
         url: request.url,
         globalPrefix: config.globalPrefix,
       }) &&
-      !hasAccessCredential({
-        cookieHeader,
-        authorization: Array.isArray(authorizationHeader)
-          ? authorizationHeader[0]
-          : authorizationHeader,
-      })
+      (!accessToken ||
+        !(await acceptsAccessToken(
+          accessToken,
+          config.accessTokenVerification,
+        )))
     ) {
       const correlationHeader = request.headers["x-correlation-id"];
       const correlationId =
@@ -212,6 +219,13 @@ async function bootstrap(): Promise<void> {
         withCredentials: true,
       },
     });
+  }
+
+  if (!config.accessTokenVerification) {
+    Logger.warn(
+      "El Gateway no verifica la firma de los tokens antes de leer el cuerpo: JWT_ACCESS_PUBLIC_JWKS_BASE64 sin configurar (obligatorio en producción).",
+      "Bootstrap",
+    );
   }
 
   app.enableShutdownHooks();
